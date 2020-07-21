@@ -22,6 +22,7 @@
  *    https://github.com/natecj/SmartThings/blob/master/smartapps/natecj/sleepiq-manager.src/sleepiq-manager.groovy
  *    https://github.com/ClassicTim1/SleepNumberManager/blob/master/FlexBase/SmartApp.groovy
  */
+// TODO: Consider using package manager: https://community.hubitat.com/t/beta-hubitat-package-manager/38016
 import groovy.transform.Field
 
 @Field final String DRIVER_NAME = "Sleep Number Bed"
@@ -46,7 +47,7 @@ definition(
   category    : "Convenience",
   iconUrl     : "",
   iconX2Url   : "",
-  importUrl   : "https://raw.githubusercontent.com/rvrolyk/SleepNumberController/master/SleepNumberController_App.groovy"
+  importUrl   : ""
 )
 
 preferences {
@@ -87,7 +88,15 @@ def homePage() {
       }
     }
 
-    section (title: "<b>Advanced Settings</b>", required: false) {
+    section(title: "") {
+      href url: "https://github.com/rvrolyk/SleepNumberController", style: "external", required: false, title: "Documentation", description: "Tap to open browser"
+    }
+ 
+    section(title: "") {
+      href url: "https://www.paypal.me/rvrolyk", style: "external", required: false, title: "Donations", description: "Tap to open browser for PayPal"
+    }
+       
+    section(title: "<b>Advanced Settings</b>") {
       label title: "Assign an app name", required: false
       mode title: "Set for specific mode(s)", required: false
       input "logEnable", "bool", title: "Enable debug logging?", defaultValue: false, required: true
