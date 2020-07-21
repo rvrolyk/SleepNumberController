@@ -22,7 +22,6 @@
  *    https://github.com/natecj/SmartThings/blob/master/smartapps/natecj/sleepiq-manager.src/sleepiq-manager.groovy
  *    https://github.com/ClassicTim1/SleepNumberManager/blob/master/FlexBase/SmartApp.groovy
  */
-// TODO: Consider using package manager: https://community.hubitat.com/t/beta-hubitat-package-manager/38016
 import groovy.transform.Field
 
 @Field final String DRIVER_NAME = "Sleep Number Bed"
@@ -38,16 +37,15 @@ Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like 
 @Field final ArrayList VALID_PRESET_TIMES = [0, 15, 30, 45, 60, 120, 180]
 @Field final ArrayList VALID_PRESETS = [1, 2, 3, 4, 5, 6]
 
-
 definition(
-  name        : "Sleep Number Controller",
-  namespace   : "rvrolyk",
-  author      : "Russ Vrolyk",
-  description : "Control your Sleep Number Flexfit bed.",
-  category    : "Integrations",
-  iconUrl     : "",
-  iconX2Url   : "",
-  importUrl   : ""
+  name: "Sleep Number Controller",
+  namespace: "rvrolyk",
+  author: "Russ Vrolyk",
+  description: "Control your Sleep Number Flexfit bed.",
+  category: "Integrations",
+  iconUrl: "",
+  iconX2Url: "",
+  importUrl: ""
 )
 
 preferences {
