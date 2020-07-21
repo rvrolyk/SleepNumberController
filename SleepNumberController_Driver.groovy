@@ -35,7 +35,11 @@ import groovy.transform.Field
 
 
 metadata {
-  definition(name: "Sleep Number Bed", namespace: "rvrolyk", author: "Russ Vrolyk") {
+  definition(name: "Sleep Number Bed",
+             namespace: "rvrolyk",
+             author: "Russ Vrolyk",
+             importUrl: "https://raw.githubusercontent.com/rvrolyk/SleepNumberController/master/SleepNumberController_Driver.groovy"
+  ) {
     capability "Switch"
     capability "SwitchLevel"
     capability "PresenceSensor"
