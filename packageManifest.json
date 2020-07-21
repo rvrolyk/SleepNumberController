@@ -1,0 +1,27 @@
+{
+  "packageName": "Sleep Number Controller",
+  "author": "Russ Vrolyk",
+  "version": "1.0",
+  "minimumHEVersion": "2.2.2",
+  "dateReleased": "2020-07-22",
+  "drivers": [
+    {
+      "id": "6f2329ab-9f3d-4bc5-b80f-d2cff7a64413",
+      "name": "Sleep Number Bed",
+      "namespace": "rvrolyk",
+      "location": "https://raw.githubusercontent.com/rvrolyk/SleepNumberController/master/SleepNumberController_Driver.groovy",
+      "required": true
+    }
+  ],
+  "apps": [
+    {
+      "id": "25503f1c-f1bc-47a7-8cda-76029bd21aef",
+      "name": "Sleep Number Controller",
+      "namespace": "rvrolyk",
+      "location": "https://raw.githubusercontent.com/rvrolyk/SleepNumberController/master/SleepNumberController_App.groovy",
+      "required": true,
+      "oauth": false,
+      "primary": true
+    }
+  ]
+}
