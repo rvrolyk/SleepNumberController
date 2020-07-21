@@ -41,10 +41,10 @@ Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like 
 
 definition(
   name        : "Sleep Number Controller",
-  namespace   : NAMESPACE,
+  namespace   : "rvrolyk",
   author      : "Russ Vrolyk",
   description : "Control your Sleep Number Flexfit bed.",
-  category    : "Convenience",
+  category    : "Integrations",
   iconUrl     : "",
   iconX2Url   : "",
   importUrl   : ""
