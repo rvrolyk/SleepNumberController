@@ -46,7 +46,7 @@ definition(
   category    : "Convenience",
   iconUrl     : "",
   iconX2Url   : "",
-  importUrl   : ""
+  importUrl   : "https://raw.githubusercontent.com/rvrolyk/SleepNumberController/master/SleepNumberController_App.groovy"
 )
 
 preferences {
