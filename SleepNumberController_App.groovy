@@ -363,29 +363,41 @@ def processBedData(responseData) {
         if (!footwarmingStatus.get(bed.bedId)) {
           footwarmingStatus[bed.bedId] = getFootWarmingStatus(device.getState().bedId)
         }
+
         def bedSide = device.getState().side == "Right" ? bed.rightSide : bed.leftSide
-        def sleepNumber = bedSide.sleepNumber
-        def bedPreset = foundationStatus.get(bed.bedId)."fsCurrentPositionPreset${device.getState().side}"
-        debug "${device.label} (${device.getState().type}) foundation is at preset ${bedPreset} at Sleep Number setting ${sleepNumber}"
-        debug "Setting ${device.label} (${device.getState().side}) to ${bedSide.isInBed ? "Present" : "Not Present"}"
-        // update device presence
         device.setPresence(bedSide.isInBed)
-        // update attributes
-        // Strangely positions may be in hex (I think?) so convert if they seem to be.
-        def headPosition = convertHexToNumber(foundationStatus.get(bed.bedId)."fs${device.getState().side}HeadPosition")
-        def footPosition = convertHexToNumber(foundationStatus.get(bed.bedId)."fs${device.getState().side}FootPosition")
-        // There's also a MSB timer but not sure when that gets set.  Least significant bit seems used for all valid times.
-        def positionTimer = convertHexToNumber(foundationStatus.get(bed.bedId)."fs${device.getState().side}PositionTimerLSB")
-        device.setStatus([
-          sleepNumber: sleepNumber,
-          headPosition: headPosition,
-          footPosition:  footPosition,
-          footWarmingTemp: footwarmingStatus.get(bed.bedId)."footWarmingStatus${device.getState().side}",
-          footWarmingTimer: footwarmingStatus.get(bed.bedId)."footWarmingTimer${device.getState().side}",
-          positionPreset: bedPreset,
-          positionPresetTimer: foundationStatus.get(bed.bedId)."fsTimerPositionPreset${device.getState().side}",
-          positionTimer: positionTimer
-        ])
+        def statusMap = [
+          sleepNumber: bedSide.sleepNumber,
+        ]
+        // Check for valid foundation status and footwarming status data before trying to use it
+        // as it's possible the HTTP calls failed.
+        if (foundationStatus.get(bed.bedId)) {
+          // Strangely positions may be in hex (I think?) so convert if they seem to be.
+          def headPosition = convertHexToNumber(foundationStatus.get(bed.bedId)."fs${device.getState().side}HeadPosition")
+          def footPosition = convertHexToNumber(foundationStatus.get(bed.bedId)."fs${device.getState().side}FootPosition")
+          def bedPreset = foundationStatus.get(bed.bedId)."fsCurrentPositionPreset${device.getState().side}"
+          // There's also a MSB timer but not sure when that gets set.  Least significant bit seems used for all valid times.
+          def positionTimer = convertHexToNumber(foundationStatus.get(bed.bedId)."fs${device.getState().side}PositionTimerLSB")
+          statusMap << [
+            headPosition: headPosition,
+            footPosition:  footPosition,
+            positionPreset: bedPreset,
+            positionPresetTimer: foundationStatus.get(bed.bedId)."fsTimerPositionPreset${device.getState().side}",
+            positionTimer: positionTimer
+          ]
+        } else {
+          log.info "Not updating foundation state, no data"
+        }
+        if (footwarmingStatus.get(bed.bedId)) {
+          statusMap << [
+            footWarmingTemp: footwarmingStatus.get(bed.bedId)."footWarmingStatus${device.getState().side}",
+            footWarmingTimer: footwarmingStatus.get(bed.bedId)."footWarmingTimer${device.getState().side}",
+          ]
+        } else {
+          log.info "Not updating footwarming state, no data"
+        }
+
+        device.setStatus(statusMap)
         break
       }
     }
@@ -426,7 +438,7 @@ def getFootWarmingStatus(String bedId) {
  * The side is derived from the specified device.
  */
 def setFoundationAdjustment(Map params, devId) {
-  def device = getBedDevices().find { it.deviceNetworkId }
+  def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
     return
@@ -459,7 +471,7 @@ def setFoundationAdjustment(Map params, devId) {
  * The side is derived from the specified device.
  */
 def setFootWarmingState(Map params, devId) {
-  def device = getBedDevices().find { it.deviceNetworkId }
+  def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
     return
@@ -490,7 +502,7 @@ def setFootWarmingState(Map params, devId) {
  * The side is derived from the specified device.
  */
 def setFoundationTimer(Map params, devId) {
-  def device = getBedDevices().find { it.deviceNetworkId }
+  def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
     return
@@ -518,7 +530,7 @@ def setFoundationTimer(Map params, devId) {
 }
 
 def setFoundationPreset(preset, devId) {
-  def device = getBedDevices().find { it.deviceNetworkId }
+  def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
     return
@@ -539,15 +551,15 @@ def setFoundationPreset(preset, devId) {
 }
 
 def stopFoundationMovement(ignored, devId) {
-  def device = getBedDevices().find { it.deviceNetworkId }
+  def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
     return
   }
   def body = [
-    "massageMotion" : 0,
-    "headMotion" : 1,
-    "footMotion" : 1,
+    massageMotion: 0,
+    headMotion: 1,
+    footMotion: 1,
     side: device.getState().side[0],
   ]
   httpRequest("/rest/bed/${device.getState().bedId}/foundation/motion", this.&put, body)
@@ -609,24 +621,33 @@ def httpRequest(path, method = this.&get, body = null, alreadyTriedRequest = fal
     query: [_k: state.session?.key],
     body: payload,
   ]
+  if (payload) {
+    debug "Sending payload to ${path}: ${payload}"
+  }
   try {
     return method(statusParams) { response -> 
       if (response.status == 200) {
         return response.data
       } else {
-        log.error "Failed with request for ${path} / ${payload}: (${response.status}) ${response.data}"
+        log.error "Failed with request for ${path} with payload/ ${payload}: (${response.status}) ${response.data}"
         state.session = null
         return [:]
       }
     }
   } catch (Exception e) {
-    log.error "Error in request for ${path} / ${payload}: ${statusParams}"
-    log.error "Error: ${e}"
+    if (!e.toString().contains("Unauthorized")) {
+      // Only log the error if it's not unauthorized since we'll retry that
+      // or log failure elsewhere anyway
+      log.error "Error in request for ${path}: ${statusParams}"
+      log.error "Exception: ${e}"
+    }
     state.session = null
     state.session?.key = null
     if (!alreadyTriedRequest) {
       login()
       return httpRequest(path, method, body, true)
+    } else {
+      return [:]
     }
   }
 }
