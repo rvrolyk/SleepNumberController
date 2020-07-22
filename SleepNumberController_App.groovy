@@ -114,7 +114,7 @@ def updated() {
 
 def initialize() {
   refreshChildDevices()
-  schedule("* /${settings.refreshInterval} * * * ?", "refreshChildDevices")
+  schedule("0 /${settings.refreshInterval} * * * ?", "refreshChildDevices")
 }
 
 /**
