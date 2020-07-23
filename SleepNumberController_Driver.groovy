@@ -322,7 +322,6 @@ def setStatus(Map params) {
         debug("Setting ${param.key} to ${value}")
         // If this is a head or foot device, we need to sync level with the relevant position.
         if ((state.type == "head" && param.key == "headPosition") || (state.type == "foot" && param.key == "footPosition")) {
-            log.trace "head or foot set level to ${value}"
           sendEvent name: "level", value: value
         }
         if (state.type != "foot warmer" && param.key == "positionPreset") {
@@ -350,6 +349,7 @@ def setStatus(Map params) {
                 break
           }
           sendEvent name: "level", value: level
+          sendEvent name: "switch", value: level > 0 ? "on" : "off"
         }
         sendEvent name: param.key, value: value
       }
