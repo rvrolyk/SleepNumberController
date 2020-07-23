@@ -154,7 +154,7 @@ def setRefreshInterval(val, devId) {
   if (val && val > 0) {
     schedule("0 /${val} * * * ?", "refreshChildDevices")
   } else {
-    debug "Resetting interval to ${settings.interval}"
+    debug "Resetting interval to ${settings.refreshInterval}"
     schedule("0 /${settings.refreshInterval} * * * ?", "refreshChildDevices")
   }
 }
