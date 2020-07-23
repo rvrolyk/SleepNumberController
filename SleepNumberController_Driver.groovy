@@ -112,6 +112,7 @@ def poll() {
 
 // Required by Switch capability
 def on() {
+  sendEvent name: "switch", value: "on"
   if (state.type == "foot warmer") {
     debug "on(): foot warmer"
     setFootWarmingState(footWarmerLevel, footWarmerTimer)
@@ -123,6 +124,7 @@ def on() {
 
 // Required by Switch capability
 def off() {
+  sendEvent name: "switch", value: "off"
   if (state.type == "foot warmer") {
     debug "off(): foot warmer"
     setFootWarmingState("Off")
@@ -134,7 +136,6 @@ def off() {
 
 // Required by SwitchLevel capability
 def setLevel(val) {
-	sendEvent name: "level", value: val
   switch (state.type) {
     case "presence":
       debug "setLevel(${val}): sleepNumber"
@@ -169,6 +170,7 @@ def setLevel(val) {
       setFootWarmingState(level)
       break;
   }
+  sendEvent name: "level", value: val
 }
 
 // Required by PresenceSensor capability
@@ -223,7 +225,7 @@ def setType(val) {
       msg += "on/off will switch between preset level (on) and flat (off).  Dimming changes the foot position (0 is flat, 100 is fully raised)."
       break
     case "foot warmer":
-      msg += "off switches foot warming off,  on will set it to medium. Dimming changes the heat levels (1: low, 2: medium, 3: high).  Time is always 30m."
+      msg += "off switches foot warming off, on will set it to preferred value for preferred time. Dimming changes the heat levels (1: low, 2: medium, 3: high)."
       break
   } 
   state.typeInfo = msg
@@ -309,17 +311,46 @@ def setStatus(Map params) {
     if (param.key in validAttributes) {
       def attributeValue = device."current${param.key.capitalize()}"
       def value = param.value
+      // Translate heat temp to something more meaningful but leave the other values alone
       if (param.key == "footWarmingTemp") {
         value = HEAT_TEMPS.find{ it.value == value }
         if (value == null) {
           log.error "Invalid foot warming temp ${param.value}"
-        } else {
-          value = value.key
         }
       }
       if (value != attributeValue) {
-        // Translate heat temp to something more meaningful but leave the other values alone
         debug("Setting ${param.key} to ${value}")
+        // If this is a head or foot device, we need to sync level with the relevant position.
+        if ((state.type == "head" && param.key == "headPosition") || (state.type == "foot" && param.key == "footPosition")) {
+            log.trace "head or foot set level to ${value}"
+          sendEvent name: "level", value: value
+        }
+        if (state.type != "foot warmer" && param.key == "positionPreset") {
+          if (value == "Flat") {
+            sendEvent name: "switch", value: "off"
+          } else if (value == presetLevel) {
+            sendEvent name: "switch", value: "on"
+          }
+        }
+        if (state.type == "foot warmer" && param.key == "footWarmingTemp") {
+          value = value.key
+          def level = 0
+          switch (value) {
+              case "Off":
+                level = 0
+                break
+              case "Low":
+                level = 1
+                break
+              case "Medium":
+                level = 2
+                break
+              case "High":
+                level = 3
+                break
+          }
+          sendEvent name: "level", value: level
+        }
         sendEvent name: param.key, value: value
       }
     } else {
