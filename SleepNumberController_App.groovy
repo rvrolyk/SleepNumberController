@@ -638,8 +638,7 @@ def httpRequest(path, method = this.&get, body = null, alreadyTriedRequest = fal
     if (!e.toString().contains("Unauthorized")) {
       // Only log the error if it's not unauthorized since we'll retry that
       // or log failure elsewhere anyway
-      log.error "Error in request for ${path}: ${statusParams}"
-      log.error "Exception: ${e}"
+      log.error "Error ${e} in request: ${statusParams}"
     }
     state.session = null
     state.session?.key = null
