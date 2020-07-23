@@ -57,7 +57,7 @@ metadata {
     // The timer for the preset change
     attribute "positionTimer", "number"
 
-    command "setInterval", [[name: "interval", type: "NUMBER", constraints: ["NUMBER"]]]
+    command "setRefreshInterval", [[name: "interval", type: "NUMBER", constraints: ["NUMBER"]]]
     command "arrived"
     command "departed"
     command "setSleepNumber", [[name: "sleep number", type: "NUMBER", constraints: ["NUMBER"]]]
@@ -238,9 +238,9 @@ def setSide(val) {
   state.side = val
 }
 
-def setInterval(val) {
-  debug "setInterval(${val})"
-  sendToParent "setInterval", val
+def setRefreshInterval(val) {
+  debug "setRefreshInterval(${val})"
+  sendToParent "setRefreshInterval", val
 }
 
 def setSleepNumber(val) {
@@ -343,6 +343,5 @@ def debug(msg) {
     log.debug msg
   }
 }
-
 
 // vim: tabstop=2 shiftwidth=2 expandtab

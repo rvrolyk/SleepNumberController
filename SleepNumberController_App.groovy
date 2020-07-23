@@ -142,6 +142,23 @@ def refreshChildDevices(ignored, ignoredDevId) {
   refreshChildDevices()
 }
 
+/**
+ * Sets the refresh interval or resets to the app setting value if
+ * 0 is given.
+ * Can be used when refresh interval is long (say 15 or 30 minutes) during the day
+ * but quicker, say 1 minute, is desired when presence is first detected or it's
+ * a particular time of day.
+ */
+def setRefreshInterval(val, devId) {
+  debug "setRefreshInterval(${val})"
+  if (val && val > 0) {
+    schedule("0 /${val} * * * ?", "refreshChildDevices")
+  } else {
+    debug "Resetting interval to ${settings.interval}"
+    schedule("0 /${settings.refreshInterval} * * * ?", "refreshChildDevices")
+  }
+}
+
 def findBedPage() {
   def responseData = getBedData()
   dynamicPage(name: "findBedPage") {
@@ -666,6 +683,5 @@ def get(Map params, Closure closure) {
 def put(Map params, Closure closure) {
   httpPut(params, closure)
 }
-
 
 // vim: tabstop=2 shiftwidth=2 expandtab
