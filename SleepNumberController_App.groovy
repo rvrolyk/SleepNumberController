@@ -389,7 +389,7 @@ def processBedData(responseData) {
         // Check for valid foundation status and footwarming status data before trying to use it
         // as it's possible the HTTP calls failed.
         if (foundationStatus.get(bed.bedId)) {
-          // Strangely positions may be in hex (I think?) so convert if they seem to be.
+	  // Positions are in hex so convert to a decimal
           def headPosition = convertHexToNumber(foundationStatus.get(bed.bedId)."fs${device.getState().side}HeadPosition")
           def footPosition = convertHexToNumber(foundationStatus.get(bed.bedId)."fs${device.getState().side}FootPosition")
           def bedPreset = foundationStatus.get(bed.bedId)."fsCurrentPositionPreset${device.getState().side}"
@@ -422,16 +422,11 @@ def processBedData(responseData) {
 }
 
 def convertHexToNumber(value) {
-  // Strangely positions and some other values may be in hex (I think?) so convert if they seem to be.
-  if (value.isNumber()) {
+  try {
+    return Integer.parseInt(value, 16)
+  } catch (Exception e) {
+    log.err "Failed to convert non-numeric value ${value}: ${e}"
     return value
-  } else {
-    try {
-      return Integer.parseInt(value, 16)
-    } catch (Exception e) {
-      log.err "Failed to convert non-numeric value ${value}: ${e}"
-      return value
-    }
   }
 }
 
