@@ -316,6 +316,8 @@ def setStatus(Map params) {
         value = HEAT_TEMPS.find{ it.value == value }
         if (value == null) {
           log.error "Invalid foot warming temp ${param.value}"
+        } else {
+          value = value.key
         }
       }
       if (value != attributeValue) {
@@ -328,11 +330,14 @@ def setStatus(Map params) {
           if (value == "Flat") {
             sendEvent name: "switch", value: "off"
           } else if (value == presetLevel) {
+            // On if the level is the desired preset.
+            // Note this means it's off even when raised if it doesn't match a preset which
+            // may not make sense given there is a level.  But since it can be "turned on"
+            // when not at preset level, the behavior (if not the indicator) seems logical.
             sendEvent name: "switch", value: "on"
           }
         }
         if (state.type == "foot warmer" && param.key == "footWarmingTemp") {
-          value = value.key
           def level = 0
           switch (value) {
               case "Off":
