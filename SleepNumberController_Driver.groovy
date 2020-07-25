@@ -56,6 +56,7 @@ metadata {
     attribute "positionPresetTimer", "string"
     // The timer for the preset change
     attribute "positionTimer", "number"
+    attribute "privacyMode", "enum", ["on", "off"]
 
     command "setRefreshInterval", [[name: "interval", type: "NUMBER", constraints: ["NUMBER"]]]
     command "arrived"
@@ -69,6 +70,8 @@ metadata {
     command "setBedPresetTimer", [[name: "preset", type: "ENUM", constraints: PRESET_NAMES.collect{ it.key }],
         [name: "timer", type: "ENUM", constraints: PRESET_TIMES.collect{ it.key }]]
     command "stopBedPosition"
+    command "enablePrivacyMode"
+    command "disablePrivacyMode"
   }
 
   preferences {
@@ -180,7 +183,7 @@ def isPresent() {
 
 def arrived() {
   debug "arrived()"
-  if (!isPresent()) {
+  if (!isPresent() && state.type == "presence") {
     log.info "${device.displayName} arrived"
   }
   sendEvent name: "presence", value: "present"
@@ -188,7 +191,7 @@ def arrived() {
 
 def departed() {
   debug "departed()"
-  if (isPresent()) {
+  if (isPresent() && state.type == "presence") {
     log.info "${device.displayName} departed"
   }
   sendEvent name: "presence", value: "not present"
@@ -299,9 +302,19 @@ def setBedPresetTimer(preset, timer) {
 }
 
 def stopBedPosition() {
+  debug "stopBedPostion()"
   sendToParent "stopFoundationMovement"
 }
 
+def enablePrivacyMode() {
+  debug "enablePrivacyMode()"
+  sendToParent "setPrivacyMode", true
+}
+
+def disablePrivacyMode() {
+  debug "disablePrivacyMode()"
+  sendToParent "setPrivacyMode", false
+}
 
 // Method used by parent app to set bed state
 def setStatus(Map params) {
@@ -381,3 +394,4 @@ def debug(msg) {
 }
 
 // vim: tabstop=2 shiftwidth=2 expandtab
+

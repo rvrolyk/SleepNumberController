@@ -28,8 +28,9 @@ import groovy.transform.Field
 @Field final String NAMESPACE = "rvrolyk"
 @Field final String API_HOST = "prod-api.sleepiq.sleepnumber.com"
 @Field final String API_URL = "https://" + API_HOST
-@Field final String USER_AGENT = '''\
-Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36'''
+@Field final String USER_AGENT = "SleepIQ/1593766370 CFNetwork/1185.2 Darwin/20.0.0"
+//'''\
+//Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36'''
 
 @Field final ArrayList VALID_ACTUATORS = ["H", "F"]
 @Field final ArrayList VALID_WARMING_TIMES = [30, 60, 120, 180, 240, 300, 360]
@@ -371,9 +372,13 @@ def processBedData(responseData) {
   // cache for foundation status per bed id so we don't have to run the api call N times
   def foundationStatus = [:]
   def footwarmingStatus = [:]
+  def privacyStatus = [:]
   for (def device : getBedDevices()) {
     for (def bed : responseData.beds) {
       if (device.getState().bedId == bed.bedId) {
+        if (!privacyStatus.get(bed.bedId)) {
+          privacyStatus[bed.bedId] = getPrivacyMode(bed.bedId)
+        }
         if (!foundationStatus.get(bed.bedId)) {
           foundationStatus[bed.bedId] = getFoundationStatus(device.getState().bedId, device.getState().side)
         }
@@ -385,6 +390,7 @@ def processBedData(responseData) {
         device.setPresence(bedSide.isInBed)
         def statusMap = [
           sleepNumber: bedSide.sleepNumber,
+          privacyMode: privacyStatus[bed.bedId],
         ]
         // Check for valid foundation status and footwarming status data before trying to use it
         // as it's possible the HTTP calls failed.
@@ -578,6 +584,22 @@ def stopFoundationMovement(ignored, devId) {
   runIn(10, "refreshChildDevices")
 }
 
+def getPrivacyMode(String bedId) {
+  debug "Getting Privacy Mode for ${bedId}"
+  return httpRequest("/rest/bed/${bedId}/pauseMode", this.&get)?.pauseMode
+}
+
+def setPrivacyMode(Boolean mode, devId) {
+  def device = getBedDevices().find { devId == it.deviceNetworkId }
+  if (!device) {
+    log.error "Bed device with id ${devId} is not a valid child"
+    return
+  }
+  def pauseMode = mode ? "on" : "off"
+  httpRequest("/rest/bed/${device.getState().bedId}/pauseMode", this.&put, null, [mode: pauseMode])
+  runIn(2, "refreshChildDevices")
+}
+
 def login() {
   debug "Logging in"
   state.session = null
@@ -613,12 +635,16 @@ def login() {
   }
 }
 
-def httpRequest(path, method = this.&get, body = null, alreadyTriedRequest = false) {
+def httpRequest(path, method = this.&get, body = null, query = null, alreadyTriedRequest = false) {
   if ((!state.session || !state.session?.key) && alreadyTriedRequest) {
     log.error "Already attempted login, giving up"
     return [:]
   }
   def payload = body ? new groovy.json.JsonBuilder(body).toString() : null
+  def queryString = [_k: state.session?.key]
+  if (query) {
+    queryString << query
+  }
   def statusParams = [
     uri: API_URL,
     path: path,
@@ -630,7 +656,7 @@ def httpRequest(path, method = this.&get, body = null, alreadyTriedRequest = fal
       "Cookie": state.session?.cookies,
       "DNT": "1",
     ],
-    query: [_k: state.session?.key],
+    query: queryString,
     body: payload,
   ]
   if (payload) {
@@ -641,7 +667,7 @@ def httpRequest(path, method = this.&get, body = null, alreadyTriedRequest = fal
       if (response.status == 200) {
         return response.data
       } else {
-        log.error "Failed with request for ${path} with payload/ ${payload}: (${response.status}) ${response.data}"
+        log.error "Failed with request for ${path} ${queryString} with payload/ ${payload}: (${response.status}) ${response.data}"
         state.session = null
         return [:]
       }
@@ -656,7 +682,7 @@ def httpRequest(path, method = this.&get, body = null, alreadyTriedRequest = fal
     state.session?.key = null
     if (!alreadyTriedRequest) {
       login()
-      return httpRequest(path, method, body, true)
+      return httpRequest(path, method, body, queryString, true)
     } else {
       return [:]
     }
