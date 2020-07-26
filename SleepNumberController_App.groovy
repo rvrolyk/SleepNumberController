@@ -115,7 +115,11 @@ def updated() {
 
 def initialize() {
   refreshChildDevices()
-  schedule("0 /${settings.refreshInterval} * * * ?", "refreshChildDevices")
+  if (settings.refreshInterval > 0) {
+    schedule("0 /${settings.refreshInterval} * * * ?", "refreshChildDevices")
+  } else {
+    log.error "Invalid refresh interval ${settings.refreshInterval}"
+  }
 }
 
 /**
