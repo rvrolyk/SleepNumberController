@@ -333,8 +333,8 @@ def setStatus(Map params) {
           value = value.key
         }
       }
-      if (value != attributeValue) {
-        debug("Setting ${param.key} to ${value}")
+      if (attributeValue.toString() != value.toString()) {
+        debug "Setting ${param.key} to ${value}, it was ${attributeValue}"
         // If this is a head or foot device, we need to sync level with the relevant position.
         if ((state.type == "head" && param.key == "headPosition") || (state.type == "foot" && param.key == "footPosition")) {
           sendEvent name: "level", value: value
@@ -394,4 +394,3 @@ def debug(msg) {
 }
 
 // vim: tabstop=2 shiftwidth=2 expandtab
-
