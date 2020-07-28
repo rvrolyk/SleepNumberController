@@ -640,9 +640,10 @@ def login() {
 }
 
 def httpRequest(path, method = this.&get, body = null, query = null, alreadyTriedRequest = false) {
+  def result = [:]
   if ((!state.session || !state.session?.key) && alreadyTriedRequest) {
     log.error "Already attempted login, giving up"
-    return [:]
+    return result
   }
   def payload = body ? new groovy.json.JsonBuilder(body).toString() : null
   def queryString = [_k: state.session?.key]
@@ -667,15 +668,15 @@ def httpRequest(path, method = this.&get, body = null, query = null, alreadyTrie
     debug "Sending payload to ${path}: ${payload}"
   }
   try {
-    return method(statusParams) { response -> 
+    method(statusParams) { response -> 
       if (response.status == 200) {
-        return response.data
+        result = response.data
       } else {
         log.error "Failed with request for ${path} ${queryString} with payload/ ${payload}: (${response.status}) ${response.data}"
         state.session = null
-        return [:]
       }
     }
+    return result
   } catch (Exception e) {
     if (!e.toString().contains("Unauthorized")) {
       // Only log the error if it's not unauthorized since we'll retry that
@@ -688,7 +689,7 @@ def httpRequest(path, method = this.&get, body = null, query = null, alreadyTrie
       login()
       return httpRequest(path, method, body, queryString, true)
     } else {
-      return [:]
+      return result
     }
   }
 }
