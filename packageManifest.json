@@ -1,9 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "1.0",
+  "version": "1.1",
   "minimumHEVersion": "2.2.2",
-  "dateReleased": "2020-07-22",
+  "dateReleased": "2020-08-03",
+  "releaseNotes": "Added diagnostics page in app"
   "drivers": [
     {
       "id": "6f2329ab-9f3d-4bc5-b80f-d2cff7a64413",
