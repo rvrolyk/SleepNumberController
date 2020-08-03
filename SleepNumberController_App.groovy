@@ -54,6 +54,7 @@ preferences {
   page name: "findBedPage"
   page name: "selectBedPage"
   page name: "createBedPage"
+  page name: "diagnosticsPage"
 }
 
 def homePage() {
@@ -99,6 +100,9 @@ def homePage() {
       label title: "Assign an app name", required: false
       mode title: "Set for specific mode(s)", required: false
       input "logEnable", "bool", title: "Enable debug logging?", defaultValue: false, required: true
+      if (settings.login && settings.password) {
+        href "diagnosticsPage", title: "Diagnostics", description: "Show diagnostic info"
+      }
     }
   }
 }
@@ -341,6 +345,28 @@ def createBedPage(params) {
   }
 }
 
+def diagnosticsPage() {
+  def info = getBeds()
+  dynamicPage(name: "diagnosticsPage") {
+    info.beds.each { bed ->
+      section("Bed: ${bed.bedId}") {
+        def bedOutput = "<ul>"
+        bedOutput += "<li>Size: ${bed.size}"
+        bedOutput += "<li>Dual Sleep: ${bed.dualSleep}"
+        bedOutput += "<li>Components:"
+        for (def component : bed.components) {
+          bedOutput += "<ul>"
+          bedOutput += "<li>Type: ${component.type}"
+          bedOutput += "<li>Status: ${component.status}"
+          bedOutput += "<li>Model: ${component.model}"
+          bedOutput += "</ul>"
+        }
+        paragraph bedOutput
+      }
+    }
+  }
+}
+
 /**
  * Creates a virtual container with the given name and side
  */
@@ -438,6 +464,11 @@ def convertHexToNumber(value) {
     log.err "Failed to convert non-numeric value ${value}: ${e}"
     return value
   }
+}
+
+def getBeds() {
+  debug "Getting information for all beds"
+  return httpRequest("/rest/bed")
 }
 
 def getFamilyStatus() {
@@ -660,6 +691,8 @@ def httpRequest(path, method = this.&get, body = null, query = null, alreadyTrie
       "User-Agent": USER_AGENT,
       "Cookie": state.session?.cookies,
       "DNT": "1",
+      "Accept-Version": "4.3",
+      "X-App-Version": "4.3.2",
     ],
     query: queryString,
     body: payload,
@@ -669,7 +702,7 @@ def httpRequest(path, method = this.&get, body = null, query = null, alreadyTrie
   }
   try {
     method(statusParams) { response -> 
-      if (response.status == 200) {
+      if (response.success) {
         result = response.data
       } else {
         log.error "Failed with request for ${path} ${queryString} with payload/ ${payload}: (${response.status}) ${response.data}"
