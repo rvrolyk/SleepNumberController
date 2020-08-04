@@ -342,6 +342,8 @@ def createBedPage(params) {
       devices.add(device)
     }
   }
+  // Reset the bed info since we added more.
+  initializeBedInfo(true)
   settings.newDeviceName = null
   dynamicPage(name: "selectDevicePage") {
     section {
