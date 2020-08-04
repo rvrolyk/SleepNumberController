@@ -124,6 +124,25 @@ def initialize() {
   } else {
     log.error "Invalid refresh interval ${settings.refreshInterval}"
   }
+  initializeBedInfo()
+}
+
+def initializeBedInfo(reinitialize = false) {
+  if (!state?.bedInfo || reinitialize) {
+    debug "Setting up bed info"
+    def info = getBeds()
+    state.bedInfo = [:]
+    info.beds.each() { bed ->
+      if (!state.bedInfo.containsKey(bed.bedId)) {
+        state.bedInfo[bed.bedId] = [:]
+      }
+      def components = []
+      for (def component : bed.components) {
+        components << component.type
+      }
+      state.bedInfo[bed.bedId].components = components
+    }
+  }
 }
 
 /**
@@ -412,7 +431,8 @@ def processBedData(responseData) {
         if (!foundationStatus.get(bed.bedId)) {
           foundationStatus[bed.bedId] = getFoundationStatus(device.getState().bedId, device.getState().side)
         }
-        if (!footwarmingStatus.get(bed.bedId)) {
+        if (!footwarmingStatus.get(bed.bedId) && state.bedInfo[bed.bedId].components.contains("Warming")) {
+          // Only try to update the warming state if the bed actually has it.
           footwarmingStatus[bed.bedId] = getFootWarmingStatus(device.getState().bedId)
         }
 
@@ -425,7 +445,7 @@ def processBedData(responseData) {
         // Check for valid foundation status and footwarming status data before trying to use it
         // as it's possible the HTTP calls failed.
         if (foundationStatus.get(bed.bedId)) {
-	  // Positions are in hex so convert to a decimal
+	        // Positions are in hex so convert to a decimal
           def headPosition = convertHexToNumber(foundationStatus.get(bed.bedId)."fs${device.getState().side}HeadPosition")
           def footPosition = convertHexToNumber(foundationStatus.get(bed.bedId)."fs${device.getState().side}FootPosition")
           def bedPreset = foundationStatus.get(bed.bedId)."fsCurrentPositionPreset${device.getState().side}"
@@ -439,7 +459,7 @@ def processBedData(responseData) {
             positionTimer: positionTimer
           ]
         } else {
-          log.info "Not updating foundation state, no data"
+          debug "Not updating foundation state, no data"
         }
         if (footwarmingStatus.get(bed.bedId)) {
           statusMap << [
@@ -447,7 +467,7 @@ def processBedData(responseData) {
             footWarmingTimer: footwarmingStatus.get(bed.bedId)."footWarmingTimer${device.getState().side}",
           ]
         } else {
-          log.info "Not updating footwarming state, no data"
+          debug "Not updating footwarming state, no data"
         }
 
         device.setStatus(statusMap)
