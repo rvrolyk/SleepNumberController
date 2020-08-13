@@ -670,7 +670,7 @@ def login() {
         "User-Agent": USER_AGENT,
         "DNT": "1",
       ],
-      body: "{'login':${settings.login}, 'password':${settings.password}}="
+      body: "{'login':'${settings.login}', 'password':'${settings.password}'}="
     ]
     httpPut(params) { response ->
       if (response.status == 200) {
