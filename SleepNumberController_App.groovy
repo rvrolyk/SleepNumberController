@@ -604,6 +604,9 @@ def setFoundationTimer(Map params, devId) {
   runIn(10, "refreshChildDevices")
 }
 
+/**
+ * The side is derived from the specified device.
+ */
 def setFoundationPreset(preset, devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
@@ -639,6 +642,25 @@ def stopFoundationMovement(ignored, devId) {
   ]
   httpRequest("/rest/bed/${device.getState().bedId}/foundation/motion", this.&put, body)
   runIn(10, "refreshChildDevices")
+}
+
+/**
+ * The side is derived from the specified device.
+ */
+def setSleepNumber(number, devId) {
+  def device = getBedDevices().find { devId == it.deviceNetworkId }
+  if (!device) {
+    log.error "Bed device with id ${devId} is not a valid child"
+    return
+  }
+
+  def body = [
+    bedId: device.getState().bedId,
+    sleepNumber: number,
+    side: device.getState().side[0]
+  ]
+  httpRequest("/rest/bed/${device.getState().bedId}/sleepNumber", this.&put, body)
+  runIn(30, "refreshChildDevices") 
 }
 
 def getPrivacyMode(String bedId) {

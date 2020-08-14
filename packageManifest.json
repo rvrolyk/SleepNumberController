@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "1.4",
+  "version": "1.5",
   "minimumHEVersion": "2.2.2",
-  "dateReleased": "2020-08-12",
-  "releaseNotes": "Fix bug with login in certain scenarios",
+  "dateReleased": "2020-08-13",
+  "releaseNotes": "Fix bug setting sleep number"
   "drivers": [
     {
       "id": "6f2329ab-9f3d-4bc5-b80f-d2cff7a64413",

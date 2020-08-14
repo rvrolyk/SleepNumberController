@@ -142,7 +142,7 @@ def setLevel(val) {
   switch (state.type) {
     case "presence":
       debug "setLevel(${val}): sleepNumber"
-      setSleepNumbe(val)
+      setSleepNumber(val)
       break
     case "head":
       debug "setLevel(${val}): head position"
@@ -250,6 +250,11 @@ def setRefreshInterval(val) {
 
 def setSleepNumber(val) {
   debug "setSleepNumber(${val})"
+  if (val > 0 && val <= 100) {
+    sendToParent "setSleepNumber", val
+  } else {
+    log.error "Invalid number, must be between 1 and 100"
+  }
 }
 
 def setBedPosition(val, actuator = null) {
