@@ -235,6 +235,8 @@ Side: ${params.side}
 Presence: ${presenceText(params.presence)}
 """ 
     }
+    // TODO: Consider showing only valid options for foundation and foot warmer.  That is, if warming is not a component,
+    // don't show it and if base is not a component, don't show head or foot.
     section {
       input "newDeviceName", "text", title: "Device Name",
           description: "What do you want to call the devices?", submitOnChange: true,
@@ -430,7 +432,8 @@ def processBedData(responseData) {
         if (!privacyStatus.get(bed.bedId)) {
           privacyStatus[bed.bedId] = getPrivacyMode(bed.bedId)
         }
-        if (!foundationStatus.get(bed.bedId)) {
+        if (!foundationStatus.get(bed.bedId) && state.bedInfo[bed.bedId].components.contains("Base")) {
+          // It is possible to have a mattress without the base so this only works when base is a component.
           foundationStatus[bed.bedId] = getFoundationStatus(device.getState().bedId, device.getState().side)
         }
         if (!footwarmingStatus.get(bed.bedId) && state.bedInfo[bed.bedId].components.contains("Warming")) {
