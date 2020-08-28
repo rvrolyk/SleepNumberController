@@ -340,8 +340,11 @@ def setStatus(Map params) {
       }
       if (attributeValue.toString() != value.toString()) {
         debug "Setting ${param.key} to ${value}, it was ${attributeValue}"
-        // If this is a head or foot device, we need to sync level with the relevant position.
-        if ((state.type == "head" && param.key == "headPosition") || (state.type == "foot" && param.key == "footPosition")) {
+        // If this is a head or foot device, we need to sync level with the relevant
+        // position, if it's presence, then we sync level with the sleep number value.
+        if ((state.type == "head" && param.key == "headPosition")
+            || (state.type == "foot" && param.key == "footPosition")
+            || (state.type == "presence" && param.key == "sleepNumber")) {
           sendEvent name: "level", value: value
         }
         if (state.type != "foot warmer" && param.key == "positionPreset") {

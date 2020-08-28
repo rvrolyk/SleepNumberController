@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "1.6",
+  "version": "1.7",
   "minimumHEVersion": "2.2.2",
   "dateReleased": "2020-08-13",
-  "releaseNotes": "Fix bug polling beds without bases",
+  "releaseNotes": "Fix bug updating sleep number level",
   "drivers": [
     {
       "id": "6f2329ab-9f3d-4bc5-b80f-d2cff7a64413",
