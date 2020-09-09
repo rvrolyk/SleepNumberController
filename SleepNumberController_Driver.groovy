@@ -57,6 +57,22 @@ metadata {
     // The timer for the preset change
     attribute "positionTimer", "number"
     attribute "privacyMode", "enum", ["on", "off"]
+    // Attributes for sleep IQ data
+    attribute "sleepMessage", "string"
+    attribute "sleepScore", "number"
+    attribute "restfulAverage", "string"
+    attribute "restlessAverage", "string"
+    attribute "heartRateAverage", "number"
+    attribute "HRVAverage", "number"
+    attribute "breathRateAverage", "number"
+    attribute "outOfBedTime", "string"
+    attribute "inBedTime", "string"
+    attribute "timeToSleep", "string"
+    attribute "sessionStart", "date"
+    attribute "sessionEnd", "date"
+    attribute "sleepDataRefreshTime", "date"
+    attribute "sleepIQSummary", "string"
+    attribute "sessionSummary", "string"
 
     command "setRefreshInterval", [[name: "interval", type: "NUMBER", constraints: ["NUMBER"]]]
     command "arrived"
@@ -72,6 +88,7 @@ metadata {
     command "stopBedPosition"
     command "enablePrivacyMode"
     command "disablePrivacyMode"
+    command "getSleepData"
   }
 
   preferences {
@@ -80,6 +97,8 @@ metadata {
       input name: "presetLevel", type: "enum", title: "Preset level for 'on'", description: "Only valid for device type that is not 'foot warmer'", options: PRESET_NAMES.collect{ it.key }, defaultValue: "Favorite"
       input name: "footWarmerLevel", type: "enum", title: "Warmer level for 'on'", description: "Only valid for device type that is 'foot warmer'", options: HEAT_TEMPS.collect{ it.key }, defaultValue: "Medium"
       input name: "footWarmerTimer", type: "enum", title: "Warmer duration for 'on'", description: "Only valid for device type that is 'foot warmer'", options: HEAT_TIMES.collect{ it.key }, defaultValue: "30m"
+      input name: "enableSleepData", type: "bool", title: "Enable sleep data collection", defaultValue: false
+      input name: "sleepDataWideTile", type: "bool", title: "Create aggregated sleep data tile with larger fonts", defaultValue: false
     }
   }
 }
@@ -185,16 +204,19 @@ def arrived() {
   debug "arrived()"
   if (!isPresent() && state.type == "presence") {
     log.info "${device.displayName} arrived"
+    sendEvent name: "presence", value: "present"
   }
-  sendEvent name: "presence", value: "present"
 }
 
 def departed() {
   debug "departed()"
   if (isPresent() && state.type == "presence") {
     log.info "${device.displayName} departed"
+    sendEvent name: "presence", value: "not present"
+    if (enableSleepData) {
+      getSleepData()
+    }
   }
-  sendEvent name: "presence", value: "not present"
 }
 
 def setPresence(val) {
@@ -321,6 +343,71 @@ def disablePrivacyMode() {
   sendToParent "setPrivacyMode", false
 }
 
+def getSleepData() {
+  def data = sendToParent "getSleepData"
+    debug "sleep data ${data}"
+
+    // Set basic attributes
+    // device.currentValue(name, true) doesn't seem to avoid the cache so stash the values
+    // used in the summary tiles.
+    sendEvent name: "sleepDataRefreshTime", value: new Date(now()).format("yyyy-MM-dd'T'HH:mm:ssXXX")
+    sendEvent name: "sleepMessage", value: data.sleepData.message.find{it != ''}
+    def sleepScore = data.sleepIQAvg
+    sendEvent name: "sleepScore", value: sleepScore
+    def restfulAvg = convertSecondsToTimeString(data.restfulAvg)
+    sendEvent name: "restfulAverage", value: restfulAvg
+    def restlessAvg = convertSecondsToTimeString(data.restlessAvg)
+    sendEvent name: "restlessAverage", value: restlessAvg
+    def heartRateAvg = data.heartRateAvg
+    sendEvent name: "heartRateAverage", value: heartRateAvg
+    def hrvAvg = data.hrvAvg
+    sendEvent name: "HRVAverage", value: hrvAvg
+    def breathRateAvg = data.respirationRateAvg
+    sendEvent name: "breathRateAverage", value: breathRateAvg
+    def outOfBedTime = convertSecondsToTimeString(data.outOfBedTotal)
+    sendEvent name: "outOfBedTime", value: outOfBedTime
+    def inBedTime = convertSecondsToTimeString(data.inBedTotal)
+    sendEvent name: "inBedTime", value: inBedTime
+    def timeToSleep = convertSecondsToTimeString(data.fallAsleepPeriod)
+    sendEvent name: "timeToSleep", value: timeToSleep
+    sendEvent name: "sessionStart", value: data.sleepData.sessions[0].startDate[0]
+    sendEvent name: "sessionEnd", value: data.sleepData.sessions[data.sleepData.sessions.size() - 1].endDate[0]
+
+    String fontSize = ''
+    if (!sleepDataWideTile) {
+      fontSize = 'font-size:12px'
+    }
+    String table = '<table align="center" style="width:100%;' + fontSize + '">'
+    // Set up tile attributes
+    // Basic tile to represent what app shows when launched: last score, heart rate, hrv, breath rate
+    String iqTile = table
+    iqTile += '<tr><th style="text-align: center">SleepIQ Score</th><th style="text-align: center">Breath Rate</th></tr>'
+    iqTile += '<tr><td style="text-align: center">'
+    iqTile += "${sleepScore}</td>"
+    iqTile += '<td style="text-align: center">' + breathRateAvg + '</td></tr>'
+    iqTile += '<tr><th style="text-align: center">Heart Rate</th><th style="text-align: center">HRV</th></tr>'
+    iqTile += '<tr><td style="text-align: center">'
+    iqTile += "${heartRateAvg}</td>"
+    iqTile += '<td style="text-align: center">' + hrvAvg + '</td></tr>'
+    iqTile += '</table>'
+    sendEvent name: "sleepIQSummary", value: iqTile
+    // Basic tile to aggregate session stats: time in bed, time to sleep, restful, restless, bed exits
+    String summaryTile = table
+    summaryTile += "<tr><td colspan=2>In bed for ${inBedTime}</td></tr>"
+    summaryTile += '<tr><th style="text-align: center">Time to fall asleep</th><th style="text-align: center">Restful</th></tr>'
+    summaryTile += '<tr><td style="text-align: center">' + timeToSleep + '</td>'
+    summaryTile += '<td style="text-align: center">' + restfulAvg + '</td></tr>'
+    summaryTile += '<tr><th style="text-align: center">Restless</th><th style="text-align: center">Bed Exit</th></tr>'
+    summaryTile += '<tr><td style="text-align: center">' + restlessAvg + '</td>'
+    summaryTile += '<td style="text-align: center">' + outOfBedTime + '</td>'
+    summaryTile += '</tr></table>'
+    sendEvent name: "sessionSummary", value: summaryTile
+}
+
+def convertSecondsToTimeString(int secondsToConvert) {
+  new GregorianCalendar(0, 0, 0, 0, 0, secondsToConvert, 0).time.format("HH:mm:ss")
+}
+
 // Method used by parent app to set bed state
 def setStatus(Map params) {
   debug "setStatus(${params})"
@@ -402,3 +489,4 @@ def debug(msg) {
 }
 
 // vim: tabstop=2 shiftwidth=2 expandtab
+

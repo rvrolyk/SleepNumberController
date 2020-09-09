@@ -71,6 +71,20 @@ you to have a slow refresh when you're not using the bed.  Also note that any co
 states.
 
 
+## Sleep Data
+
+You can optionally enable sleep data collection (only works **in the presence device**) so that you can track
+statistics from your last sleep session.  This enables collecting basic sleep data like how long you slept, how restless
+you were, your heart rate, etc. and stores them as attributes. The data is refreshed when you leave the bed.
+
+There are also two summary tiles that will be created that attempt to give a
+single tile view of the useful data (similar to the app).  If you enable *larger fonts*, the tile is best viewed
+as two wide. 
+
+A sample tile looks like:
+![Image of sample tile](https://github.com/rvrolyk/SleepNumberController/raw/master/summary_tile.jpg)
+
+
 # Donations
 
 This work is fully Open Source, and available for use at no charge.

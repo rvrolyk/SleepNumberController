@@ -682,6 +682,47 @@ def setPrivacyMode(Boolean mode, devId) {
   runIn(2, "refreshChildDevices")
 }
 
+def getSleepData(ignored, devId) {
+  def device = getBedDevices().find { devId == it.deviceNetworkId }
+  if (!device) {
+    log.error "Bed device with id ${devId} is not a valid child"
+      return
+  }
+  def bedId = device.getState().bedId
+  def ids = [:]
+  // We need a sleeper id for the side in order to look up sleep data.
+  // Get sleeper to get list of sleeper ids
+  debug "Getting sleeper ids for ${bedId}"
+  def sleepers = httpRequest("/rest/sleeper", this.&get)
+  sleepers.sleepers.each() { sleeper ->
+    if (sleeper.bedId == bedId) {
+      def side
+      switch (sleeper.side) {
+        case 0:
+          side = "Left"
+          break
+        case 1:
+          side = "Right"
+          break
+        default:
+          log.warn "Unknown sleeper info: ${sleeper}"
+      }
+      if (side) {
+        ids[side] = sleeper.sleeperId
+      }
+    }
+  }
+
+  debug "Getting sleep data for ${ids[device.getState().side]}"
+  // Interval can be W1 for a week, D1 for a day and M1 for a month.
+  httpRequest("/rest/sleepData", this.&get, null, [
+      interval: "D1",
+      sleeper: ids[device.getState().side],
+      includeSlices: false,
+      date: new Date().format("yyyy-MM-dd'T'HH:mm:ss")
+  ])
+}
+
 def login() {
   debug "Logging in"
   state.session = null
@@ -738,8 +779,8 @@ def httpRequest(path, method = this.&get, body = null, query = null, alreadyTrie
       "User-Agent": USER_AGENT,
       "Cookie": state.session?.cookies,
       "DNT": "1",
-      "Accept-Version": "4.3",
-      "X-App-Version": "4.3.2",
+      "Accept-Version": "4.4.1",
+      "X-App-Version": "4.4.1",
     ],
     query: queryString,
     body: payload,
@@ -791,3 +832,4 @@ def put(Map params, Closure closure) {
 }
 
 // vim: tabstop=2 shiftwidth=2 expandtab
+
