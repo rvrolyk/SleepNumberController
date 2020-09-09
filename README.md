@@ -81,7 +81,8 @@ There are also two summary tiles that will be created that attempt to give a
 single tile view of the useful data (similar to the app).  If you enable *larger fonts*, the tile is best viewed
 as two wide. 
 
-A sample tile looks like:
+Here's a sample tile:
+
 ![Image of sample tile](https://github.com/rvrolyk/SleepNumberController/raw/master/summary_tile.jpg)
 
 
