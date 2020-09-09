@@ -78,7 +78,7 @@ statistics from your last sleep session.  This enables collecting basic sleep da
 you were, your heart rate, etc. and stores them as attributes. The data is refreshed when you leave the bed.
 
 There are also two summary tiles that will be created that attempt to give a
-single tile view of the useful data (similar to the app).  If you enable *larger fonts*, the tile is best viewed
+single tile view of the useful data (similar to the SleepIQ app).  If you enable *larger fonts*, the tile is best viewed
 as two wide. 
 
 Here's a sample tile:
