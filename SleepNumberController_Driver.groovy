@@ -98,7 +98,6 @@ metadata {
       input name: "footWarmerLevel", type: "enum", title: "Warmer level for 'on'", description: "Only valid for device type that is 'foot warmer'", options: HEAT_TEMPS.collect{ it.key }, defaultValue: "Medium"
       input name: "footWarmerTimer", type: "enum", title: "Warmer duration for 'on'", description: "Only valid for device type that is 'foot warmer'", options: HEAT_TIMES.collect{ it.key }, defaultValue: "30m"
       input name: "enableSleepData", type: "bool", title: "Enable sleep data collection", defaultValue: false
-      input name: "sleepDataWideTile", type: "bool", title: "Create aggregated sleep data tile with larger fonts", defaultValue: false
     }
   }
 }
@@ -373,15 +372,11 @@ def getSleepData() {
     sendEvent name: "sessionStart", value: data.sleepData.sessions[0].startDate[0]
     sendEvent name: "sessionEnd", value: data.sleepData.sessions[data.sleepData.sessions.size() - 1].endDate[0]
 
-    String fontSize = ''
-    if (!sleepDataWideTile) {
-      fontSize = 'font-size:12px'
-    }
-    String table = '<table align="center" style="width:100%;' + fontSize + '">'
+    String table = '<table style="width:100%;font-size:12px;font-size:1.5vmax">'
     // Set up tile attributes
     // Basic tile to represent what app shows when launched: last score, heart rate, hrv, breath rate
     String iqTile = table
-    iqTile += '<tr><th style="text-align: center">SleepIQ Score</th><th style="text-align: center">Breath Rate</th></tr>'
+    iqTile += '<tr><th style="text-align: center; width: 50%">SleepIQ Score</th><th style="text-align: center">Breath Rate</th></tr>'
     iqTile += '<tr><td style="text-align: center">'
     iqTile += "${sleepScore}</td>"
     iqTile += '<td style="text-align: center">' + breathRateAvg + '</td></tr>'
@@ -394,7 +389,7 @@ def getSleepData() {
     // Basic tile to aggregate session stats: time in bed, time to sleep, restful, restless, bed exits
     String summaryTile = table
     summaryTile += "<tr><td colspan=2>In bed for ${inBedTime}</td></tr>"
-    summaryTile += '<tr><th style="text-align: center">Time to fall asleep</th><th style="text-align: center">Restful</th></tr>'
+    summaryTile += '<tr><th style="text-align: center; width: 50%">Time to fall asleep</th><th style="text-align: center">Restful</th></tr>'
     summaryTile += '<tr><td style="text-align: center">' + timeToSleep + '</td>'
     summaryTile += '<td style="text-align: center">' + restfulAvg + '</td></tr>'
     summaryTile += '<tr><th style="text-align: center">Restless</th><th style="text-align: center">Bed Exit</th></tr>'
