@@ -109,13 +109,22 @@ def installed() {
 
 def logsOff() {
   log.warn "debug logging disabled..."
-  device.updateSetting "logEnable", [value:"false",type:"bool"]
+  device.updateSetting "logEnable", [value: "false", type: "bool"]
 }
 
 def updated() {
   debug "updated()"
   if (logEnable) {
     runIn(1800, logsOff)
+  }
+  if (enableSleepData) {
+    if (state.type == "presence") {
+      getSleepData()
+    } else {
+      // only valid for presence so turn it back off
+      log.info "Sleep data only available on presence device, this is ${state.type}"
+      device.updateSetting "enableSleepData",  [value: false, type: "bool"]
+    }
   }
   // Poll right after updated / installed
   poll()
@@ -343,60 +352,66 @@ def disablePrivacyMode() {
 }
 
 def getSleepData() {
+  if (state.type != "presence") {
+    log.error "Sleep data only available on presence (main) device, this is ${state.type}"
+    return
+  }
   def data = sendToParent "getSleepData"
-    debug "sleep data ${data}"
+  debug "sleep data ${data}"
 
-    // Set basic attributes
-    // device.currentValue(name, true) doesn't seem to avoid the cache so stash the values
-    // used in the summary tiles.
-    sendEvent name: "sleepDataRefreshTime", value: new Date(now()).format("yyyy-MM-dd'T'HH:mm:ssXXX")
-    sendEvent name: "sleepMessage", value: data.sleepData.message.find{it != ''}
-    def sleepScore = data.sleepIQAvg
-    sendEvent name: "sleepScore", value: sleepScore
-    def restfulAvg = convertSecondsToTimeString(data.restfulAvg)
-    sendEvent name: "restfulAverage", value: restfulAvg
-    def restlessAvg = convertSecondsToTimeString(data.restlessAvg)
-    sendEvent name: "restlessAverage", value: restlessAvg
-    def heartRateAvg = data.heartRateAvg
-    sendEvent name: "heartRateAverage", value: heartRateAvg
-    def hrvAvg = data.hrvAvg
-    sendEvent name: "HRVAverage", value: hrvAvg
-    def breathRateAvg = data.respirationRateAvg
-    sendEvent name: "breathRateAverage", value: breathRateAvg
-    def outOfBedTime = convertSecondsToTimeString(data.outOfBedTotal)
-    sendEvent name: "outOfBedTime", value: outOfBedTime
-    def inBedTime = convertSecondsToTimeString(data.inBedTotal)
-    sendEvent name: "inBedTime", value: inBedTime
-    def timeToSleep = convertSecondsToTimeString(data.fallAsleepPeriod)
-    sendEvent name: "timeToSleep", value: timeToSleep
-    sendEvent name: "sessionStart", value: data.sleepData.sessions[0].startDate[0]
-    sendEvent name: "sessionEnd", value: data.sleepData.sessions[data.sleepData.sessions.size() - 1].endDate[0]
+  // Set basic attributes
+  // device.currentValue(name, true) doesn't seem to avoid the cache so stash the values
+  // used in the summary tiles.
+  sendEvent name: "sleepDataRefreshTime", value: new Date(now()).format("yyyy-MM-dd'T'HH:mm:ssXXX")
+  sendEvent name: "sleepMessage", value: data.sleepData.message.find{it != ''}
+  def sleepScore = data.sleepIQAvg
+  sendEvent name: "sleepScore", value: sleepScore
+  def restfulAvg = convertSecondsToTimeString(data.restfulAvg)
+  sendEvent name: "restfulAverage", value: restfulAvg
+  def restlessAvg = convertSecondsToTimeString(data.restlessAvg)
+  sendEvent name: "restlessAverage", value: restlessAvg
+  def heartRateAvg = data.heartRateAvg
+  sendEvent name: "heartRateAverage", value: heartRateAvg
+  def hrvAvg = data.hrvAvg
+  sendEvent name: "HRVAverage", value: hrvAvg
+  def breathRateAvg = data.respirationRateAvg
+  sendEvent name: "breathRateAverage", value: breathRateAvg
+  def outOfBedTime = convertSecondsToTimeString(data.outOfBedTotal)
+  sendEvent name: "outOfBedTime", value: outOfBedTime
+  def inBedTime = convertSecondsToTimeString(data.inBedTotal)
+  sendEvent name: "inBedTime", value: inBedTime
+  def timeToSleep = convertSecondsToTimeString(data.fallAsleepPeriod)
+  sendEvent name: "timeToSleep", value: timeToSleep
+  sendEvent name: "sessionStart", value: data.sleepData.sessions[0].startDate[0]
+  sendEvent name: "sessionEnd", value: data.sleepData.sessions[data.sleepData.sessions.size() - 1].endDate[0]
 
-    String table = '<table style="width:100%;font-size:12px;font-size:1.5vmax">'
-    // Set up tile attributes
-    // Basic tile to represent what app shows when launched: last score, heart rate, hrv, breath rate
-    String iqTile = table
-    iqTile += '<tr><th style="text-align: center; width: 50%">SleepIQ Score</th><th style="text-align: center">Breath Rate</th></tr>'
-    iqTile += '<tr><td style="text-align: center">'
-    iqTile += "${sleepScore}</td>"
-    iqTile += '<td style="text-align: center">' + breathRateAvg + '</td></tr>'
-    iqTile += '<tr><th style="text-align: center">Heart Rate</th><th style="text-align: center">HRV</th></tr>'
-    iqTile += '<tr><td style="text-align: center">'
-    iqTile += "${heartRateAvg}</td>"
-    iqTile += '<td style="text-align: center">' + hrvAvg + '</td></tr>'
-    iqTile += '</table>'
-    sendEvent name: "sleepIQSummary", value: iqTile
-    // Basic tile to aggregate session stats: time in bed, time to sleep, restful, restless, bed exits
-    String summaryTile = table
-    summaryTile += "<tr><td colspan=2>In bed for ${inBedTime}</td></tr>"
-    summaryTile += '<tr><th style="text-align: center; width: 50%">Time to fall asleep</th><th style="text-align: center">Restful</th></tr>'
-    summaryTile += '<tr><td style="text-align: center">' + timeToSleep + '</td>'
-    summaryTile += '<td style="text-align: center">' + restfulAvg + '</td></tr>'
-    summaryTile += '<tr><th style="text-align: center">Restless</th><th style="text-align: center">Bed Exit</th></tr>'
-    summaryTile += '<tr><td style="text-align: center">' + restlessAvg + '</td>'
-    summaryTile += '<td style="text-align: center">' + outOfBedTime + '</td>'
-    summaryTile += '</tr></table>'
-    sendEvent name: "sessionSummary", value: summaryTile
+  String table = '<table class="sleep-tiles %extraClasses" style="width:100%;font-size:12px;font-size:1.5vmax" id="%id">'
+  // Set up tile attributes
+  // Basic tile to represent what app shows when launched: last score, heart rate, hrv, breath rate
+  String iqTile = table.replaceFirst('%id', "sleepiq-summary-${device.getLabel().toLowerCase().replaceAll(" ", "_")}")
+      .replaceFirst('%extraClasses', "sleepiq-summary")
+  iqTile += '<tr><th style="text-align: center; width: 50%">SleepIQ Score</th><th style="text-align: center">Breath Rate</th></tr>'
+  iqTile += '<tr><td style="text-align: center">'
+  iqTile += "${sleepScore}</td>"
+  iqTile += '<td style="text-align: center">' + breathRateAvg + '</td></tr>'
+  iqTile += '<tr><th style="text-align: center">Heart Rate</th><th style="text-align: center">HRV</th></tr>'
+  iqTile += '<tr><td style="text-align: center">'
+  iqTile += "${heartRateAvg}</td>"
+  iqTile += '<td style="text-align: center">' + hrvAvg + '</td></tr>'
+  iqTile += '</table>'
+  sendEvent name: "sleepIQSummary", value: iqTile
+  // Basic tile to aggregate session stats: time in bed, time to sleep, restful, restless, bed exits
+  String summaryTile = table.replaceFirst('%id', "session-summary-${device.getLabel().toLowerCase().replaceAll(" ", "_")}")
+      .replaceFirst('%extraClasses', "session-summary")
+  summaryTile += "<tr><td colspan=2>In bed for ${inBedTime}</td></tr>"
+  summaryTile += '<tr><th style="text-align: center; width: 50%">Time to fall asleep</th><th style="text-align: center">Restful</th></tr>'
+  summaryTile += '<tr><td style="text-align: center">' + timeToSleep + '</td>'
+  summaryTile += '<td style="text-align: center">' + restfulAvg + '</td></tr>'
+  summaryTile += '<tr><th style="text-align: center">Restless</th><th style="text-align: center">Bed Exit</th></tr>'
+  summaryTile += '<tr><td style="text-align: center">' + restlessAvg + '</td>'
+  summaryTile += '<td style="text-align: center">' + outOfBedTime + '</td>'
+  summaryTile += '</tr></table>'
+  sendEvent name: "sessionSummary", value: summaryTile
 }
 
 def convertSecondsToTimeString(int secondsToConvert) {

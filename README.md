@@ -85,6 +85,53 @@ Here's a sample tile:
 ![Image of sample tile](https://github.com/rvrolyk/SleepNumberController/raw/master/summary_tile.jpg)
 
 
+### Styling
+
+If you want to customize the look and feel of the tiles, you can use custom CSS.  Each tile has a unique
+id to make selection easier.  It is composed of the tile type and the device label.  In each case, the 
+device name is all lower case and any spaces are replaced with underscores.
+
+* The Sleep IQ tile prefix is `sleepiq-summary-`
+* The Session tile prefix is `session-summary-`
+
+So if your device name is `My Bed` then you'd have two ids like:
+
+1. sleepiq-summary-my_bed
+1. session-summary-my_bed
+
+To use those in css, for example to change the font colors, you would use:
+
+```css
+#sleepiq-summary-my_bed {
+  color: blue
+}
+
+#session-summary-my_bed {
+  color: green
+}
+```
+
+In addition, there is a class applied to each table as well as one per tile type that lets you override all
+tiles at once if that is desired.
+The overall class name is `sleep-tiles` and the per type class names are `sleepiq-summary` and `session-summary`.
+So if you wanted to set the font face of all tiles you could use the following
+css:
+
+```css
+.sleep-tiles {
+  font-family: arial
+}
+```
+
+And if you just wanted to change the font fact of the sleep summary tile, you'd use:
+
+```css
+.session-summary {
+  font-family: arial
+}
+```
+
+
 # Donations
 
 This work is fully Open Source, and available for use at no charge.

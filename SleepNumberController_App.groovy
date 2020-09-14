@@ -426,19 +426,30 @@ def processBedData(responseData) {
   def foundationStatus = [:]
   def footwarmingStatus = [:]
   def privacyStatus = [:]
+  def bedFailures = [:]
+  def loggedError = [:]
   for (def device : getBedDevices()) {
     for (def bed : responseData.beds) {
       if (device.getState().bedId == bed.bedId) {
-        if (!privacyStatus.get(bed.bedId)) {
+        if (!bedFailures.get(bed.bedId) && !privacyStatus.get(bed.bedId)) {
           privacyStatus[bed.bedId] = getPrivacyMode(bed.bedId)
+          if (!privacyStatus.get(bed.bedId)) {
+            bedFailures[bed.bedId] = true
+          } 
         }
-        if (!foundationStatus.get(bed.bedId) && state.bedInfo[bed.bedId].components.contains("Base")) {
+        if (!bedFailures.get(bed.bedId) && !foundationStatus.get(bed.bedId) && state.bedInfo[bed.bedId].components.contains("Base")) {
           // It is possible to have a mattress without the base so this only works when base is a component.
           foundationStatus[bed.bedId] = getFoundationStatus(device.getState().bedId, device.getState().side)
+          if (!foundationStatus.get(bed.bedId)) {
+            bedFailures[bed.bedId] = true
+          } 
         }
-        if (!footwarmingStatus.get(bed.bedId) && state.bedInfo[bed.bedId].components.contains("Warming")) {
+        if (!bedFailures.get(bed.bedId) && !footwarmingStatus.get(bed.bedId) && state.bedInfo[bed.bedId].components.contains("Warming")) {
           // Only try to update the warming state if the bed actually has it.
           footwarmingStatus[bed.bedId] = getFootWarmingStatus(device.getState().bedId)
+          if (!footwarmingStatus.get(bed.bedId)) {
+            bedFailures[bed.bedId] = true
+          } 
         }
 
         def bedSide = device.getState().side == "Right" ? bed.rightSide : bed.leftSide
@@ -463,18 +474,21 @@ def processBedData(responseData) {
             positionPresetTimer: foundationStatus.get(bed.bedId)."fsTimerPositionPreset${device.getState().side}",
             positionTimer: positionTimer
           ]
-        } else {
-          debug "Not updating foundation state, no data"
+        } else if (!loggedError.get(bed.bedId)) {
+          debug "Not updating foundation state, " + (bedFailures.get(bed.bedId) ? "error making requests" : "no data")
         }
         if (footwarmingStatus.get(bed.bedId)) {
           statusMap << [
             footWarmingTemp: footwarmingStatus.get(bed.bedId)."footWarmingStatus${device.getState().side}",
             footWarmingTimer: footwarmingStatus.get(bed.bedId)."footWarmingTimer${device.getState().side}",
           ]
-        } else {
-          debug "Not updating footwarming state, no data"
+        } else if (!loggedError.get(bed.bedId)) {
+          debug "Not updating footwarming state, " + (bedFailures.get(bed.bedId) ? "error making requests" : "no data")
         }
-
+        if (bedFailures.get(bed.bedId)) {
+          // Only log update errors once per bed
+          loggedError[bed.bedId] = true
+        }
         device.setStatus(statusMap)
         break
       }
@@ -486,7 +500,7 @@ def convertHexToNumber(value) {
   try {
     return Integer.parseInt(value, 16)
   } catch (Exception e) {
-    log.err "Failed to convert non-numeric value ${value}: ${e}"
+    log.error "Failed to convert non-numeric value ${value}: ${e}"
     return value
   }
 }
@@ -739,7 +753,7 @@ def login() {
       body: "{'login':'${settings.login}', 'password':'${settings.password}'}="
     ]
     httpPut(params) { response ->
-      if (response.status == 200) {
+      if (response.success) {
         debug "login Success: (${response.status}) ${response.data}"
         state.session = [:]
         state.session.key = response.data.key
@@ -748,24 +762,28 @@ def login() {
           state.session.cookies = state.session.cookies + it.value.split(";")[0] + ";"
         }
       } else {
-        debug "login Failure: (${response.status}) ${response.data}"
-        state.session = null
+        log.error "login Failure: (${response.status}) ${response.data}"
       }
     }
+    return
   } catch (Exception e) {
     log.error "login Error: ${e}"
-    state.session = null
   }
 }
 
 def httpRequest(path, method = this.&get, body = null, query = null, alreadyTriedRequest = false) {
   def result = [:]
-  if ((!state.session || !state.session?.key) && alreadyTriedRequest) {
-    log.error "Already attempted login, giving up"
-    return result
+  if (!state.session || !state.session.key) {
+    if (alreadyTriedRequest) {
+      log.error "Already attempted login but still no session key, giving up"
+      return result
+    } else {
+      login()
+      return httpRequest(path, method, body, queryString, true)
+    }
   }
   def payload = body ? new groovy.json.JsonBuilder(body).toString() : null
-  def queryString = [_k: state.session?.key]
+  def queryString = [_k: state.session.key]
   if (query) {
     queryString << query
   }
@@ -786,31 +804,35 @@ def httpRequest(path, method = this.&get, body = null, query = null, alreadyTrie
     body: payload,
   ]
   if (payload) {
-    debug "Sending payload to ${path}: ${payload}"
+    debug "Sending request for ${path} with query ${queryString}: ${payload}"
+  } else {
+    debug "Sending request for ${path} with query ${queryString}"
   }
   try {
     method(statusParams) { response -> 
       if (response.success) {
         result = response.data
       } else {
-        log.error "Failed with request for ${path} ${queryString} with payload/ ${payload}: (${response.status}) ${response.data}"
-        state.session = null
+        log.error "Failed request for ${path} ${queryString} with payload ${payload}:(${response.status}) ${response.data}"
       }
     }
     return result
   } catch (Exception e) {
-    if (!e.toString().contains("Unauthorized")) {
-      // Only log the error if it's not unauthorized since we'll retry that
-      // or log failure elsewhere anyway
-      log.error "Error ${e} in request: ${statusParams}"
-    }
-    state.session = null
-    state.session?.key = null
-    if (!alreadyTriedRequest) {
+    if (e.toString().contains("Unauthorized") && !alreadyTriedRequest) {
+      // The session is invalid so retry login before giving up.
+      log.error "Unauthorized, retrying login"
       login()
       return httpRequest(path, method, body, queryString, true)
     } else {
-      return result
+      // There was some other error so retry if that hasn't already been done
+      // otherwise give up.
+      if (!alreadyTriedRequest) {
+        log.error "Retrying failed request ${statusParams}\n${e}"
+        return httpRequest(path, method, body, queryString, true)
+      } else {
+        log.error "Error making request ${statusParams}\n${e}"
+        return result
+      }
     }
   }
 }
