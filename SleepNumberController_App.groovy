@@ -820,7 +820,7 @@ def httpRequest(path, method = this.&get, body = null, query = null, alreadyTrie
   } catch (Exception e) {
     if (e.toString().contains("Unauthorized") && !alreadyTriedRequest) {
       // The session is invalid so retry login before giving up.
-      log.error "Unauthorized, retrying login"
+      log.info "Unauthorized, retrying login"
       login()
       return httpRequest(path, method, body, queryString, true)
     } else {
