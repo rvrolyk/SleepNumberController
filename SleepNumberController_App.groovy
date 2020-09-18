@@ -399,10 +399,26 @@ def diagnosticsPage(params) {
           requestQuery: requestQuery
         ]
         if (params && params.requestPath && params.requestType) {
+          def body
+          if (body) {
+            try {
+              body = parseJson(params.requestBody)
+            } catch (groovy.json.JsonException e) {
+              log.error "${params.requestBody} : ${e}"
+            }
+          }
+          def query
+          if (query) {
+            try {
+              query = parseJson(params.requestBody)
+            } catch (groovy.json.JsonException e) {
+              log.error "${params.requestBody} : ${e}"
+            }
+          }
           def response = httpRequest(params.requestPath,
                                      requestType == 'PUT' ? this.&put : this.&get,
-                                     params.requestBody ? parseJson(params.requestBody) : null,
-                                     params.requestQuery ? parseJson(params.requestQuery) : null,
+                                     body,
+                                     query,
                                      true)
           paragraph "${response}"
         }
