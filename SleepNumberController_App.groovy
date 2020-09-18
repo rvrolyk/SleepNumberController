@@ -368,7 +368,7 @@ def createBedPage(params) {
   }
 }
 
-def diagnosticsPage() {
+def diagnosticsPage(params) {
   def info = getBeds()
   dynamicPage(name: "diagnosticsPage") {
     info.beds.each { bed ->
@@ -386,6 +386,26 @@ def diagnosticsPage() {
         }
         paragraph bedOutput
       }
+    }
+    section("Send Requests") {
+        input "requestType", "enum", title: "Request type", options: ["PUT", "GET"]
+        input "requestPath", "text", title: "Request path", description: "Full path including bed id if needed"
+        input "requestBody", "text", title: "Request Body in JSON"
+        input "requestQuery", "text", title: "Extra query key/value pairs in JSON"
+        href "diagnosticsPage", title: "Send request", description: null, params: [
+          requestType: requestType,
+          requestPath: requestPath,
+          requestBody: requestBody,
+          requestQuery: requestQuery
+        ]
+        if (params && params.requestPath && params.requestType) {
+          def response = httpRequest(params.requestPath,
+                                     requestType == 'PUT' ? this.&put : this.&get,
+                                     params.requestBody ? parseJson(params.requestBody) : null,
+                                     params.requestQuery ? parseJson(params.requestQuery) : null,
+                                     true)
+          paragraph "${response}"
+        }
     }
   }
 }
