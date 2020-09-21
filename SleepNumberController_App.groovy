@@ -458,6 +458,7 @@ def processBedData(responseData) {
     debug "Empty response data"
     return
   }
+  debug "Response data from SleepNumber: ${responseData}"
   // cache for foundation status per bed id so we don't have to run the api call N times
   def foundationStatus = [:]
   def footwarmingStatus = [:]
@@ -530,6 +531,7 @@ def processBedData(responseData) {
       }
     }
   }
+  debug "Cached data: ${foundationStatus}\n${footwarmingStatus}"
 }
 
 def convertHexToNumber(value) {
