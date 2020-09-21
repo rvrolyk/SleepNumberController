@@ -77,7 +77,7 @@ def homePage() {
         if (devices.size() > 0) {
           paragraph "Current beds"
           devices.each { device ->
-            paragraph  "${device.getState().bedId} / ${device.label} / ${device.getState().side} / ${device.getState().type}"
+            paragraph  "${device.getState().bedId}  (dev:${device.id}) / ${device.label} / ${device.getState().side} / ${device.getState().type}"
           }
           paragraph "<br>Note: <i>To remove a device remove it from the Devices list</i>"
         }
