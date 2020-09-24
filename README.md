@@ -55,6 +55,9 @@ level are preferences.
 * Set Bed Preset*: sets the bed to a preset level.  If the device type is *presence*, *head* or *foot*, then on will set enable
 the preset set as a preference (in this way, you can have 3 preferred preset levels via voice) and off will set the bed to *flat*.
 
+  Please note that a preset for Flextop beds (partial split) will result in changing *both* sides, not just the one selected.  This is
+apparently by design (per SleepNumber).  If you want to change an individual head setting, I suggest using automation vs. a preset.
+
 * Set Bed Preset Timer: sets the bed to a preset level after an elapsed time.
 
 * Stop Bed Position: stops the motion of the bed if it's currently moving.
