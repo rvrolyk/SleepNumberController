@@ -164,7 +164,12 @@ def off() {
   }
 }
 
-// Required by SwitchLevel capability
+// setLevel required by SwitchLevel capability
+// including one with duration (which we ignore).
+def setLevel(val, duration) {
+  setLevel(val)
+}
+
 def setLevel(val) {
   switch (state.type) {
     case "presence":
@@ -358,6 +363,11 @@ def getSleepData() {
   }
   def data = sendToParent "getSleepData"
   debug "sleep data ${data}"
+
+  if (data.sleepSessionCount == 0) {
+    log.info "No sleep sessions found, skipping update"
+    return
+  }
 
   // Set basic attributes
   // device.currentValue(name, true) doesn't seem to avoid the cache so stash the values
