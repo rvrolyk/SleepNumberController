@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "2.0.3",
+  "version": "2.1",
   "minimumHEVersion": "2.2.2",
   "dateReleased": "2020-09-21",
-  "releaseNotes": "Fix small errors in diagnostics page.",
+  "releaseNotes": "Fix bug due to missing setLevel method, also fix bug collecting sleep data with no sessions.",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",
   "payPalUrl": "https://www.paypal.com/paypalme/rvrolyk",
