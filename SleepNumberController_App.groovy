@@ -400,7 +400,7 @@ def diagnosticsPage(params) {
         ]
         if (params && params.requestPath && params.requestType) {
           def body
-          if (body) {
+          if (params.requestBody) {
             try {
               body = parseJson(params.requestBody)
             } catch (groovy.json.JsonException e) {
@@ -408,11 +408,11 @@ def diagnosticsPage(params) {
             }
           }
           def query
-          if (query) {
+          if (params.requestQuery) {
             try {
-              query = parseJson(params.requestBody)
+              query = parseJson(params.requestQuery)
             } catch (groovy.json.JsonException e) {
-              log.error "${params.requestBody} : ${e}"
+              log.error "${params.requestQuery} : ${e}"
             }
           }
           def response = httpRequest(params.requestPath,
