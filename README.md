@@ -73,6 +73,8 @@ of 1 minute (the fastest the app allows) doesn't seem to cause any problems for 
 you to have a slow refresh when you're not using the bed.  Also note that any command being sent will cause a refresh of all
 states.
 
+* Set SleepNumber Favorite: sets the bed to the user's favorite SleepNumber value.
+
 
 ## Sleep Data
 

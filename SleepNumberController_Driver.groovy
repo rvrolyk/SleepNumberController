@@ -40,6 +40,7 @@ metadata {
              author: "Russ Vrolyk",
              importUrl: "https://raw.githubusercontent.com/rvrolyk/SleepNumberController/master/SleepNumberController_Driver.groovy"
   ) {
+    capability "Actuator"
     capability "Switch"
     capability "SwitchLevel"
     capability "PresenceSensor"
@@ -50,6 +51,8 @@ metadata {
     attribute "footWarmingTemp", "enum", HEAT_TEMPS.collect{ it.key }
     attribute "footWarmingTimer", "enum", HEAT_TIMES.collect{ it.key }
     attribute "sleepNumber", "number"
+    // The user's sleep number favorite
+    attribute "sleepNumberFavorite", "number"
     // The current preset position of the side
     attribute "positionPreset", "string"
     // The preset that the bed will change to once timer is done
@@ -89,6 +92,7 @@ metadata {
     command "enablePrivacyMode"
     command "disablePrivacyMode"
     command "getSleepData"
+    command "setSleepNumberFavorite"
   }
 
   preferences {
@@ -354,6 +358,14 @@ def enablePrivacyMode() {
 def disablePrivacyMode() {
   debug "disablePrivacyMode()"
   sendToParent "setPrivacyMode", false
+}
+
+/**
+ * Sets the SleepNumber to the preset favorite.
+ */
+def setSleepNumberFavorite() {
+  debug "setSleepNumberFavorite()"
+  sendToParent "setSleepNumberFavorite"
 }
 
 def getSleepData() {

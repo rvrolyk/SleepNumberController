@@ -97,7 +97,12 @@ def homePage() {
     }
        
     section(title: "<b>Advanced Settings</b>") {
-      label title: "Assign an app name", required: false
+      String defaultName = "Sleep Number Controller"
+      if (state.displayName) {
+        defaultName = state.displayName
+        app.updateLabel(defaultName)
+      }
+      label title: "Assign an app name", required: false, defaultValue: defaultName
       mode title: "Set for specific mode(s)", required: false
       input "logEnable", "bool", title: "Enable debug logging?", defaultValue: false, required: true
       if (settings.login && settings.password) {
@@ -125,6 +130,27 @@ def initialize() {
     log.error "Invalid refresh interval ${settings.refreshInterval}"
   }
   initializeBedInfo()
+
+  updateLabel()
+}
+
+def updateLabel() {
+  // Store the user's original label in state.displayName
+  if (!app.label.contains('<span') && state?.displayName != app.label) {
+    state.displayName = app.label
+  }
+  if (state?.status) {
+    String label = "${state.displayName} <span style=color:"
+    if (state.status == "Online") {
+      label += "green"
+    } else if (state.status.contains("Login")) {
+      label += "red"
+    } else {
+      label += "orange"
+    }
+    label += ">${state.status}</span>"
+    app.updateLabel(label)
+  }
 }
 
 def initializeBedInfo(reinitialize = false) {
@@ -164,6 +190,7 @@ def getBedDevices() {
 
 def refreshChildDevices() {
   getBedData()
+  updateLabel()
 }
 
 def refreshChildDevices(ignored, ignoredDevId) {
@@ -465,6 +492,8 @@ def processBedData(responseData) {
   def privacyStatus = [:]
   def bedFailures = [:]
   def loggedError = [:]
+  def sleepNumberFavorites = [:]
+  
   for (def device : getBedDevices()) {
     for (def bed : responseData.beds) {
       if (device.getState().bedId == bed.bedId) {
@@ -522,6 +551,15 @@ def processBedData(responseData) {
         } else if (!loggedError.get(bed.bedId)) {
           debug "Not updating footwarming state, " + (bedFailures.get(bed.bedId) ? "error making requests" : "no data")
         }
+        if (!sleepNumberFavorites.get(bed.bedId)) {
+          sleepNumberFavorites[bed.bedId] = getSleepNumberFavorite(bed.bedId)
+        }
+        def favorite = sleepNumberFavorites.get(bed.bedId).get("sleepNumberFavorite" + device.getState().side, -1)
+        if (favorite >= 0) {
+          statusMap << [
+            sleepNumberFavorite: favorite
+          ]
+        }
         if (bedFailures.get(bed.bedId)) {
           // Only log update errors once per bed
           loggedError[bed.bedId] = true
@@ -530,6 +568,9 @@ def processBedData(responseData) {
         break
       }
     }
+  }
+  if (bedFailures.size() == 0) {
+    state.status = "Online"
   }
   debug "Cached data: ${foundationStatus}\n${footwarmingStatus}"
 }
@@ -734,6 +775,32 @@ def setPrivacyMode(Boolean mode, devId) {
   runIn(2, "refreshChildDevices")
 }
 
+def getSleepNumberFavorite(String bedId) {
+  debug "Getting Sleep Number Favorites"
+  return httpRequest("/rest/bed/${bedId}/sleepNumberFavorite", this.&get)
+}
+
+def setSleepNumberFavorite(ignored, devId) {
+  def device = getBedDevices().find { devId == it.deviceNetworkId }
+  if (!device) {
+    log.error "Bed device with id ${devId} is not a valid child"
+    return
+  }
+  // Get the favorite for the device first, the most recent poll should be accurate
+  // enough.
+  def favorite = device.currentValue("sleepNumberFavorite")
+  debug "sleep number favorite for ${device.getState().side} is ${favorite}"
+  if (!favorite || favorite < 0) {
+    log.error "Unable to determine sleep number favorite for side ${device.getState().side}"
+    return
+  }
+  if (device.currentValue("sleepNumber") == favorite) {
+    debug "Already at favorite"
+    return
+  }
+  setSleepNumber(favorite, devId)
+}
+
 def getSleepData(ignored, devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
@@ -801,11 +868,13 @@ def login() {
         }
       } else {
         log.error "login Failure: (${response.status}) ${response.data}"
+        state.status = "Login Error"
       }
     }
     return
   } catch (Exception e) {
     log.error "login Error: ${e}"
+    state.status = "Login Error"
   }
 }
 
@@ -852,6 +921,7 @@ def httpRequest(path, method = this.&get, body = null, query = null, alreadyTrie
         result = response.data
       } else {
         log.error "Failed request for ${path} ${queryString} with payload ${payload}:(${response.status}) ${response.data}"
+        state.status = "API Error"
       }
     }
     return result
@@ -869,6 +939,7 @@ def httpRequest(path, method = this.&get, body = null, query = null, alreadyTrie
         return httpRequest(path, method, body, queryString, true)
       } else {
         log.error "Error making request ${statusParams}\n${e}"
+        state.status = "API Error"
         return result
       }
     }
