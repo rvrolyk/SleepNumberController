@@ -1,7 +1,7 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "2.1",
+  "version": "2.2",
   "minimumHEVersion": "2.2.2",
   "dateReleased": "2020-10-02",
   "releaseNotes": "Add status to app listing\nAdd actuator to driver capabilities\nAdd sleep number favorite command",
