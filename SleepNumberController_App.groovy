@@ -155,28 +155,26 @@ def updateLabel() {
   }
 }
 
-def initializeBedInfo(reinitialize = false) {
-  if (!state?.bedInfo || reinitialize) {
-    debug "Setting up bed info"
-    def info = getBeds()
-    state.bedInfo = [:]
-    info.beds.each() { bed ->
-      if (!state.bedInfo.containsKey(bed.bedId)) {
-        state.bedInfo[bed.bedId] = [:]
-      }
-      def components = []
-      for (def component : bed.components) {
-        if (component.type == "Base"
-            && component.model.toLowerCase().contains("integrated")) {
-          // Integrated bases need to be treated separately as they don't appear to have
-          // foundation status endpoints so don't lump this with a base type directly.
-          components << "Integrated Base"
-        } else {
-          components << component.type
-        }
-      }
-      state.bedInfo[bed.bedId].components = components
+def initializeBedInfo() {
+  debug "Setting up bed info"
+  def info = getBeds()
+  state.bedInfo = [:]
+  info.beds.each() { bed ->
+    if (!state.bedInfo.containsKey(bed.bedId)) {
+      state.bedInfo[bed.bedId] = [:]
     }
+    def components = []
+    for (def component : bed.components) {
+      if (component.type == "Base"
+          && component.model.toLowerCase().contains("integrated")) {
+        // Integrated bases need to be treated separately as they don't appear to have
+        // foundation status endpoints so don't lump this with a base type directly.
+        components << "Integrated Base"
+      } else {
+        components << component.type
+      }
+    }
+    state.bedInfo[bed.bedId].components = components
   }
 }
 
@@ -385,7 +383,7 @@ def createBedPage(params) {
     }
   }
   // Reset the bed info since we added more.
-  initializeBedInfo(true)
+  initializeBedInfo()
   settings.newDeviceName = null
   dynamicPage(name: "selectDevicePage") {
     section {

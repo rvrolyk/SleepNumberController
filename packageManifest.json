@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "2.3",
+  "version": "2.3.1",
   "minimumHEVersion": "2.2.2",
   "dateReleased": "2020-10-23",
-  "releaseNotes": "Added control for underbed lighting\nSkip foundation status for integrated bases\nActually implement mode controls",
+  "releaseNotes": "Stop caching bed info so it updates correctly to detect integrated bases",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",
   "payPalUrl": "https://www.paypal.com/paypalme/rvrolyk",
