@@ -32,7 +32,9 @@ import groovy.transform.Field
 @Field final Map ACTUATOR_TYPES = [head: "H", foot: "F"]
 @Field final Map PRESET_TIMES = ["Off": 0, "15m": 15, "30m": 30, "45m": 45, "1h": 60, "2h": 120, "3h": 180]
 @Field final Map PRESET_NAMES = [Favorite: 1, Flat: 4, ZeroG: 5, Snore: 6, WatchTV: 3, Read: 2]
-
+@Field final ArrayList UNDERBED_LIGHT_STATES = ['Auto', 'On', 'Off']
+@Field final Map UNDERBED_LIGHT_BRIGHTNESS = [Low: 1, Medium: 30, High: 100]
+@Field final Map UNDERBED_LIGHT_TIMES = ["Forever": 0, "15m": 15, "30m": 30, "45m": 45, "1h": 60, "2h": 120, "3h": 180]
 
 metadata {
   definition(name: "Sleep Number Bed",
@@ -93,6 +95,9 @@ metadata {
     command "disablePrivacyMode"
     command "getSleepData"
     command "setSleepNumberFavorite"
+    command "setUnderbedLightState", [[name: "state", type: "ENUM", constraints: UNDERBED_LIGHT_STATES],
+        [name: "timer", type: "ENUM", constraints: UNDERBED_LIGHT_TIMES.collect{ it.key }],
+        [name: "brightness", type: "ENUM", constraints: UNDERBED_LIGHT_BRIGHTNESS.collect{ it.key }]]
   }
 
   preferences {
@@ -366,6 +371,25 @@ def disablePrivacyMode() {
 def setSleepNumberFavorite() {
   debug "setSleepNumberFavorite()"
   sendToParent "setSleepNumberFavorite"
+}
+
+def setUnderbedLightState(state, timer = 0, brightness = "high") {
+  debug "setUnderbedLightState(${state}, ${timer}, ${brightness})"
+  if (state == null || !UNDERBED_LIGHT_STATES.contains(state)) {
+    log.error "Invalid state ${state}"
+    return
+  }
+  if (timer != null && UNDERBED_LIGHT_TIMES.get(timer) == null) {
+    log.error "Invalid timer ${timer}"
+    return
+  }
+  if (brightness && !UNDERBED_LIGHT_BRIGHTNESS.get(brightness)) {
+    log.error "Invalid brightness ${brightness}"
+    return
+  }
+  sendToParent "setUnderbedLightState", [state: state,
+    timer: UNDERBED_LIGHT_TIMES.get(timer),
+    brightness: UNDERBED_LIGHT_BRIGHTNESS.get(brightness)]
 }
 
 def getSleepData() {

@@ -37,6 +37,8 @@ import groovy.transform.Field
 @Field final ArrayList VALID_WARMING_TEMPS = [0, 31, 57, 72]
 @Field final ArrayList VALID_PRESET_TIMES = [0, 15, 30, 45, 60, 120, 180]
 @Field final ArrayList VALID_PRESETS = [1, 2, 3, 4, 5, 6]
+@Field final ArrayList VALID_LIGHT_TIMES = [15, 30, 45, 60, 120, 180]
+@Field final ArrayList VALID_LIGHT_BRIGHTNESS = [1, 30, 100]
 
 definition(
   name: "Sleep Number Controller",
@@ -103,8 +105,8 @@ def homePage() {
         app.updateLabel(defaultName)
       }
       label title: "Assign an app name", required: false, defaultValue: defaultName
-      mode title: "Set for specific mode(s)", required: false
-      input "logEnable", "bool", title: "Enable debug logging?", defaultValue: false, required: true
+      input name: "modes", type: "mode", title: "Set for specific mode(s)", required: false, multiple: true, submitOnChange: true
+      input "logEnable", "bool", title: "Enable debug logging?", defaultValue: false, required: true, submitOnChange: true
       if (settings.login && settings.password) {
         href "diagnosticsPage", title: "Diagnostics", description: "Show diagnostic info"
       }
@@ -136,7 +138,7 @@ def initialize() {
 
 def updateLabel() {
   // Store the user's original label in state.displayName
-  if (!app.label.contains('<span') && state?.displayName != app.label) {
+  if (!app.label.contains("<span") && state?.displayName != app.label) {
     state.displayName = app.label
   }
   if (state?.status) {
@@ -164,7 +166,14 @@ def initializeBedInfo(reinitialize = false) {
       }
       def components = []
       for (def component : bed.components) {
-        components << component.type
+        if (component.type == "Base"
+            && component.model.toLowerCase().contains("integrated")) {
+          // Integrated bases need to be treated separately as they don't appear to have
+          // foundation status endpoints so don't lump this with a base type directly.
+          components << "Integrated Base"
+        } else {
+          components << component.type
+        }
       }
       state.bedInfo[bed.bedId].components = components
     }
@@ -189,6 +198,10 @@ def getBedDevices() {
 }
 
 def refreshChildDevices() {
+  // Only refresh if mode is a selected one
+  if (settings.modes && !settings.modes.contains(location.mode)) {
+    return
+  }
   getBedData()
   updateLabel()
 }
@@ -443,7 +456,7 @@ def diagnosticsPage(params) {
             }
           }
           def response = httpRequest(params.requestPath,
-                                     requestType == 'PUT' ? this.&put : this.&get,
+                                     requestType == "PUT" ? this.&put : this.&get,
                                      body,
                                      query,
                                      true)
@@ -503,14 +516,20 @@ def processBedData(responseData) {
             bedFailures[bed.bedId] = true
           } 
         }
-        if (!bedFailures.get(bed.bedId) && !foundationStatus.get(bed.bedId) && state.bedInfo[bed.bedId].components.contains("Base")) {
-          // It is possible to have a mattress without the base so this only works when base is a component.
+        // It is possible to have a mattress without the base so this only works when base is a component.
+        // Due to splitting out integrated bases in #initializeBedInfo, this also skips integrated bases
+        // which lack foundation status.
+        if (!bedFailures.get(bed.bedId)
+            && !foundationStatus.get(bed.bedId)
+            && state.bedInfo[bed.bedId].components.contains("Base")) {
           foundationStatus[bed.bedId] = getFoundationStatus(device.getState().bedId, device.getState().side)
           if (!foundationStatus.get(bed.bedId)) {
             bedFailures[bed.bedId] = true
           } 
         }
-        if (!bedFailures.get(bed.bedId) && !footwarmingStatus.get(bed.bedId) && state.bedInfo[bed.bedId].components.contains("Warming")) {
+        if (!bedFailures.get(bed.bedId)
+            && !footwarmingStatus.get(bed.bedId)
+            && state.bedInfo[bed.bedId].components.contains("Warming")) {
           // Only try to update the warming state if the bed actually has it.
           footwarmingStatus[bed.bedId] = getFootWarmingStatus(device.getState().bedId)
           if (!footwarmingStatus.get(bed.bedId)) {
@@ -800,6 +819,77 @@ def setSleepNumberFavorite(ignored, devId) {
   }
   setSleepNumber(favorite, devId)
 }
+
+/**
+ * Sets the underbed lighting per given params.
+ * At least one parameter is required or this is a no-op.
+ * If only timer is given, state is assumed to be `on`.
+ * The params map may include:
+ * state: on, off, auto
+ * timer: valid minute duration
+ * brightness: low, medium, high
+ */
+def setUnderbedLightState(params, devId) {
+  def device = getBedDevices().find { devId == it.deviceNetworkId }
+  if (!device) {
+    log.error "Bed device with id ${devId} is not a valid child"
+    return
+  }
+
+  if (!params.state
+      && !params.timer
+      && !params.brightness) {
+    log.error "No params present"
+    return
+  }
+
+  if (params.timer && !VALID_LIGHT_TIMES.contains(params.timer)) {
+    log.error "Invalid underbed light timer ${params.timer}.  Valid values are ${VALID_LIGHT_TIMES}"
+    return
+  }
+
+  params.state = (params.state ?: "").toLowerCase()
+
+  // If there's a timer but no state, state should be 'on'
+  if (params.timer && !params.state) {
+    params.state = "on"
+  }
+
+  // A timer with a state of auto makes no sense, choose to honor state vs. timer.
+  if (params.state == "auto") {
+    params.timer = 0
+  }
+
+  if (params.brightness && !VALID_LIGHT_BRIGHTNESS.contains(params.brightness)) {
+    log.error "Invalid underbed light brightness ${params.brightness}. Valid values are ${VALID_LIGHT_BRIGHTNESS}"
+    return
+  }
+
+  // First set the light state.
+  def body = [
+    enableAuto: params.state == "auto"
+  ]
+  httpRequest("/rest/bed/${device.getState().bedId}/foundation/underbedLight", this.&put, body)
+
+  // Now set outlet data.
+  body = [
+    timer: params.timer ?: 0,
+    setting: params.state == "on" ? 1 : 0,
+    outletId: 3 /* The underbed light.  Does this ever change? */
+  ]
+  httpRequest("/rest/bed/${device.getState().bedId}/foundation/outlet", this.&put, body)
+
+  // If brightness was given then set it.  Strangely, though PWM (whatever that is) is broken
+  // down by side, the API expects both to be set to the same value.
+  if (params.brightness) {
+    body = [
+      rightUnderbedLightPWM: params.brightness,
+      leftUnderbedLightPWM: params.brightness
+    ]
+    httpRequest("/rest/bed/${device.getState().bedId}/foundation/system", this.&put, body)
+  }
+}
+
 
 def getSleepData(ignored, devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
