@@ -75,6 +75,11 @@ states.
 
 * Set SleepNumber Favorite: sets the bed to the user's favorite SleepNumber value.
 
+* Set Underbed Light State: sets the bed's underbed lighting state (if present).  If there are two lights present (as some beds
+have), this will set the side relative to the device side.
+
+* Set Outlet State: sets the bed's outlet state (on/off) relative to the device side.
+
 
 ## Sleep Data
 
