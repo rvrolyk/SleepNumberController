@@ -107,7 +107,7 @@ metadata {
       input name: "footWarmerLevel", type: "enum", title: "Warmer level for 'on'", description: "Only valid for device type that is 'foot warmer'", options: HEAT_TEMPS.collect{ it.key }, defaultValue: "Medium"
       input name: "footWarmerTimer", type: "enum", title: "Warmer duration for 'on'", description: "Only valid for device type that is 'foot warmer'", options: HEAT_TIMES.collect{ it.key }, defaultValue: "30m"
       input name: "enableSleepData", type: "bool", title: "Enable sleep data collection", defaultValue: false
-      input name: "enableChildDevices", type: "bool", title: "Enable child devices for switches", defaultValue: false
+      input name: "enableChildDevices", type: "bool", title: "Enable child devices for switches (Presence device only)", defaultValue: false
     }
   }
 }
@@ -143,27 +143,33 @@ def updated() {
   poll()
 }
 
+def uninstalled() {
+   deleteChildDevice(getChildDNI("outlet"))
+   deleteChildDevice(getChildDNI("underbedlight"))
+}
 
 def manageChildren() {
-    def outlet = getOutlet()
-    if (!outlet) {
-        outlet = addChildDevice('hubitat','Generic Component Switch', getChildDNI("outlet"),
-            	                     [ label: getChildName("Outlet"),
-                                      componentName: "outlet",
-                                      componentLabel: getChildName("Outlet"),
-                	                  isComponent:true,
-                                      completedSetup:true])
-	    log.info("Created Outlet child device")
-    }
-    def underbed = getUnderbed()
-    if (!underbed) {
-        outlet = addChildDevice('hubitat','Generic Component Switch', getChildDNI("underbedlight"),
-            	                     [ label: getChildName("Underbed Light"),
-                                      componentName: "underbedlight",
-                                      componentLabel: getChildName("Underbed Light"),
-                	                  isComponent:true,
-                                      completedSetup:true])
-	    log.info("Created Underbed light child device")
+    switch (state.type) {
+        case "presence":
+            def outlet = getOutlet()
+            if (!outlet) {
+                outlet = addChildDevice('hubitat','Generic Component Switch', getChildDNI("outlet"),
+                                        [ label: getChildName("Outlet"),
+                                         componentName: "outlet",
+                                         componentLabel: getChildName("Outlet"),                	                  
+                                         completedSetup:true])
+                log.info("Created Outlet child device")
+            }
+            def underbed = getUnderbed()
+            if (!underbed) {
+                outlet = addChildDevice('hubitat','Generic Component Switch', getChildDNI("underbedlight"),
+                                        [ label: getChildName("Underbed Light"),
+                                         componentName: "underbedlight",
+                                         componentLabel: getChildName("Underbed Light"),                	                  
+                                         completedSetup:true])
+                log.info("Created Underbed light child device")
+            }
+            break
     }
 }
 
