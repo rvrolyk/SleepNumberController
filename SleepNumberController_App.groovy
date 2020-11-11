@@ -856,9 +856,11 @@ def setOutletState(bedId, outletId, state, timer = null) {
   if (outletId < 3) {
     // No timer is valid for outlets other than 3 and 4
     timer = null
+  } else {
+    timer = timer ?: 0
   }
   body = [
-    timer: timer ?: 0,
+    timer: timer,
     setting: state == "on" ? 1 : 0,
     outletId: outletId
   ]
