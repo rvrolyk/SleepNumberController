@@ -107,6 +107,7 @@ metadata {
       input name: "footWarmerLevel", type: "enum", title: "Warmer level for 'on'", description: "Only valid for device type that is 'foot warmer'", options: HEAT_TEMPS.collect{ it.key }, defaultValue: "Medium"
       input name: "footWarmerTimer", type: "enum", title: "Warmer duration for 'on'", description: "Only valid for device type that is 'foot warmer'", options: HEAT_TIMES.collect{ it.key }, defaultValue: "30m"
       input name: "enableSleepData", type: "bool", title: "Enable sleep data collection", defaultValue: false
+      input name: "enableChildDevices", type: "bool", title: "Enable child devices for switches", defaultValue: false
     }
   }
 }
@@ -123,6 +124,9 @@ def logsOff() {
 
 def updated() {
   debug "updated()"
+   if (enableChildDevices) {
+      manageChildren()      
+  }
   if (logEnable) {
     runIn(1800, logsOff)
   }
@@ -138,6 +142,82 @@ def updated() {
   // Poll right after updated / installed
   poll()
 }
+
+
+def manageChildren() {
+    def outlet = getOutlet()
+    if (!outlet) {
+        outlet = addChildDevice('hubitat','Generic Component Switch', getChildDNI("outlet"),
+            	                     [ label: getChildName("Outlet"),
+                                      componentName: "outlet",
+                                      componentLabel: getChildName("Outlet"),
+                	                  isComponent:true,
+                                      completedSetup:true])
+	    log.info("Created Outlet child device")
+    }
+    def underbed = getUnderbed()
+    if (!underbed) {
+        outlet = addChildDevice('hubitat','Generic Component Switch', getChildDNI("underbedlight"),
+            	                     [ label: getChildName("Underbed Light"),
+                                      componentName: "underbedlight",
+                                      componentLabel: getChildName("Underbed Light"),
+                	                  isComponent:true,
+                                      completedSetup:true])
+	    log.info("Created Underbed light child device")
+    }
+}
+
+def getOutlet() {
+    return childDevices.find({it.deviceNetworkId == getChildDNI("outlet")})
+}
+
+def getUnderbed() {
+    return childDevices.find({it.deviceNetworkId == getChildDNI("underbedlight")})
+}
+
+
+def getChildName(name) {
+    return "Sleep Number ${state.side} - ${name}"
+}
+
+def getChildDNI(name) {
+	return device.deviceNetworkId + "-" + name
+}
+
+def getChildDNI(type, name) {
+    return device.deviceNetworkId + + "-${type}-${name}"
+}
+
+def componentRefresh(device) {
+    log.warn("Component Refresh not implemented")
+}
+
+def componentOn(device) {    
+    def o = getOutlet()  
+    def u = getUnderbed()  
+    if (device.deviceNetworkId == o?.deviceNetworkId) {     
+        setOutletState('On')
+        device.sendEvent([[name:"switch", value: "on"]])
+    }
+    else if (device.deviceNetworkId == u?.deviceNetworkId) {
+        setUnderbedLightState('On')
+        device.sendEvent([[name:"switch", value: "on"]])
+    }
+}
+
+def componentOff(device) {
+    def o = getOutlet()   
+     def u = getUnderbed()  
+    if (device.deviceNetworkId == o?.deviceNetworkId) {        
+        setOutletState('Off')
+        device.sendEvent([[name:"switch", value: "off"]])
+    }
+    else if (device.deviceNetworkId == u?.deviceNetworkId) {
+        setUnderbedLightState('Off')
+        device.sendEvent([[name:"switch", value: "off"]])
+    }
+}
+
 
 def parse(String description) {
   debug "parse() - Description: ${description}"
@@ -373,7 +453,7 @@ def setSleepNumberFavorite() {
   sendToParent "setSleepNumberFavorite"
 }
 
-def setUnderbedLightState(state, timer = 0, brightness = "high") {
+def setUnderbedLightState(state, timer = "Forever", brightness = "High") {
   debug "setUnderbedLightState(${state}, ${timer}, ${brightness})"
   if (state == null || !UNDERBED_LIGHT_STATES.contains(state)) {
     log.error "Invalid state ${state}"
