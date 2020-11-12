@@ -174,11 +174,11 @@ def manageChildren() {
 }
 
 def getOutlet() {
-    return childDevices.find({it.deviceNetworkId == getChildDNI("outlet")})
+    return getChildDevice(getChildDNI("outlet"))
 }
 
 def getUnderbed() {
-    return childDevices.find({it.deviceNetworkId == getChildDNI("underbedlight")})
+    return getChildDevice(getChildDNI("underbedlight"))
 }
 
 
