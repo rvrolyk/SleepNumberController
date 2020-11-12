@@ -818,14 +818,65 @@ def setSleepNumberFavorite(ignored, devId) {
   setSleepNumber(favorite, devId)
 }
 
+def setOutletState(state, devId) {
+  def device = getBedDevices().find { devId == it.deviceNetworkId }
+  if (!device) {
+    log.error "Bed device with id ${devId} is not a valid child"
+    return
+  }
+  if (!state) {
+    log.error "Missing state"
+    return
+  }
+  def outletNum = device.getState().side == "Left" ? 1 : 2
+  setOutletState(device.getState().bedId, outletNum, state)
+}
+
+/**
+ * Sets the state of the given outlet.
+ * @param bedId: the bed id
+ * @param outletId: 1-4
+ * @param state: on or off
+ * @param timer: a valid minute duration (for outlets 3 and 4 only)
+ * Timer is the only optional parameter.
+ */
+def setOutletState(bedId, outletId, state, timer = null) {
+  if (!bedId || !outletId || !state) {
+    log.error "Not all required arguments present"
+    return
+  }
+
+  if (timer && !VALID_LIGHT_TIMES.contains(timer)) {
+    log.error "Invalid underbed light timer ${timer}.  Valid values are ${VALID_LIGHT_TIMES}"
+    return
+  }
+
+  state = (state ?: "").toLowerCase()
+
+  if (outletId < 3) {
+    // No timer is valid for outlets other than 3 and 4
+    timer = null
+  } else {
+    timer = timer ?: 0
+  }
+  body = [
+    timer: timer,
+    setting: state == "on" ? 1 : 0,
+    outletId: outletId
+  ]
+  httpRequest("/rest/bed/${bedId}/foundation/outlet", this.&put, body)
+}
+
 /**
  * Sets the underbed lighting per given params.
- * At least one parameter is required or this is a no-op.
  * If only timer is given, state is assumed to be `on`.
- * The params map may include:
+ * If the foundation has outlet 3 and 4 then the bed side
+ * will be used to determine which to enable.
+ * The params map must include:
  * state: on, off, auto
+ * And may include:
  * timer: valid minute duration
- * brightness: low, medium, high
+ * brighness: low, medium, high
  */
 def setUnderbedLightState(params, devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
@@ -834,28 +885,19 @@ def setUnderbedLightState(params, devId) {
     return
   }
 
-  if (!params.state
-      && !params.timer
-      && !params.brightness) {
-    log.error "No params present"
+  if (!params.state) {
+    log.error "Missing param state"
     return
   }
 
-  if (params.timer && !VALID_LIGHT_TIMES.contains(params.timer)) {
-    log.error "Invalid underbed light timer ${params.timer}.  Valid values are ${VALID_LIGHT_TIMES}"
-    return
-  }
-
-  params.state = (params.state ?: "").toLowerCase()
-
-  // If there's a timer but no state, state should be 'on'
-  if (params.timer && !params.state) {
-    params.state = "on"
-  }
+  params.state = params.state.toLowerCase()
 
   // A timer with a state of auto makes no sense, choose to honor state vs. timer.
   if (params.state == "auto") {
     params.timer = 0
+  }
+  if (params.timer) {
+    params.state = "on"
   }
 
   if (params.brightness && !VALID_LIGHT_BRIGHTNESS.contains(params.brightness)) {
@@ -869,20 +911,48 @@ def setUnderbedLightState(params, devId) {
   ]
   httpRequest("/rest/bed/${device.getState().bedId}/foundation/underbedLight", this.&put, body)
 
-  // Now set outlet data.
-  body = [
-    timer: params.timer ?: 0,
-    setting: params.state == "on" ? 1 : 0,
-    outletId: 3 /* The underbed light.  Does this ever change? */
-  ]
-  httpRequest("/rest/bed/${device.getState().bedId}/foundation/outlet", this.&put, body)
+  if (!state.bedInfo[device.getState().bedId].outlets) {
+    debug "Determining underbed lighting outlets for ${device.getState().bedId}"
+    // Determine if this bed has 1 or 2 underbed lighting outlets and store for future use.
+    def outlet3 = httpRequest("/rest/bed/${device.getState().bedId}/foundation/outlet",
+        this.&get, null, [outletId: 3])
+    def outlet4 = httpRequest("/rest/bed/${device.getState().bedId}/foundation/outlet",
+        this.&get, null, [outletId: 4])
+    def outlets = []
+    if (outlet3) {
+      outlets << 3
+    }
+    if (outlet4) {
+      outlets << 4
+    }
+    state.bedInfo[device.getState().bedId].outlets = outlets
+  }
 
-  // If brightness was given then set it.  Strangely, though PWM (whatever that is) is broken
-  // down by side, the API expects both to be set to the same value.
+  def rightBrightness = params.brightness
+  def leftBrightness = params.brightness
+  def outletNum = 3
+  if (state.bedInfo[device.getState().bedId].outlets.size() > 1) {
+    // Two outlets so set the side corresponding to the device rather than
+    // defaulting to 3 (which should be a single light)
+    if (device.getState().side == "Left") {
+      outletNum = 3
+      rightBrightness = null
+      leftBrightness = params.brightness
+    } else {
+      outletNum = 4
+      rightBrightness = params.brightness
+      leftBrightness = null
+    }
+  }
+
+  setOutletState(device.getState().bedId, outletNum,
+      params.state == "auto" ? "off" : params.state, params.timer)
+
+  // If brightness was given then set it.
   if (params.brightness) {
     body = [
-      rightUnderbedLightPWM: params.brightness,
-      leftUnderbedLightPWM: params.brightness
+      rightUnderbedLightPWM: rightBrightness,
+      leftUnderbedLightPWM: leftBrightness
     ]
     httpRequest("/rest/bed/${device.getState().bedId}/foundation/system", this.&put, body)
   }
