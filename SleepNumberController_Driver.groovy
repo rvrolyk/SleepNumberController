@@ -154,19 +154,13 @@ def manageChildren() {
             def outlet = getOutlet()
             if (!outlet) {
                 outlet = addChildDevice('hubitat','Generic Component Switch', getChildDNI("outlet"),
-                                        [ label: getChildName("Outlet"),
-                                         componentName: "outlet",
-                                         componentLabel: getChildName("Outlet"),                	                  
-                                         completedSetup:true])
+                                        [ label: getChildName("Outlet")])
                 log.info("Created Outlet child device")
             }
             def underbed = getUnderbed()
             if (!underbed) {
                 outlet = addChildDevice('hubitat','Generic Component Switch', getChildDNI("underbedlight"),
-                                        [ label: getChildName("Underbed Light"),
-                                         componentName: "underbedlight",
-                                         componentLabel: getChildName("Underbed Light"),                	                  
-                                         completedSetup:true])
+                                        [ label: getChildName("Underbed Light")])
                 log.info("Created Underbed light child device")
             }
             break
