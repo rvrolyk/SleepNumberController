@@ -125,14 +125,13 @@ def updated() {
 }
 
 def initialize() {
-  refreshChildDevices()
   if (settings.refreshInterval > 0) {
-    schedule("0 /${settings.refreshInterval} * * * ?", "refreshChildDevices")
+    setRefreshInterval(settings.refreshInterval, 0)
   } else {
     log.error "Invalid refresh interval ${settings.refreshInterval}"
   }
   initializeBedInfo()
-
+  refreshChildDevices()
   updateLabel()
 }
 
@@ -215,7 +214,7 @@ def refreshChildDevices(ignored, ignoredDevId) {
  * but quicker, say 1 minute, is desired when presence is first detected or it's
  * a particular time of day.
  */
-def setRefreshInterval(val, devId) {
+def setRefreshInterval(val, ignored) {
   debug "setRefreshInterval(${val})"
   if (val && val > 0) {
     schedule("0 /${val} * * * ?", "refreshChildDevices")
