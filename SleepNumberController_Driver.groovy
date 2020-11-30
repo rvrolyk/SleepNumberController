@@ -25,6 +25,8 @@
  */
 import groovy.transform.Field
 
+@Field final ArrayList TYPES = ["presence", "head", "foot", "foot warmer"]
+
 @Field final ArrayList SIDES = ["Right", "Left"]
 @Field final Map HEAT_TEMPS = [Off: 0, Low: 31, Medium: 57, High: 72]
 @Field final Map HEAT_TIMES = ["30m": 30, "1h": 60, "2h": 120, "3h": 180, "4h": 240, "5h": 300, "6h": 360]
@@ -37,7 +39,7 @@ import groovy.transform.Field
 @Field final ArrayList OUTLET_STATES = ["On", "Off"]
 
 metadata {
-  definition(name: "Sleep Number Bed v2",
+  definition(name: "Sleep Number Bed",
              namespace: "rvrolyk",
              author: "Russ Vrolyk",
              importUrl: "https://raw.githubusercontent.com/rvrolyk/SleepNumberController/master/SleepNumberController_Driver.groovy"
@@ -146,197 +148,6 @@ def uninstalled() {
   }
 }
 
-def createChildDevice(String childNetworkId, String componentDriver, String label) {
-  // Make sure the child doesn't already exist.
-  def child = getChildDevice(childNetworkId)
-  if (getChildDevice(childNetworkId)) {
-    log.warn "Child device with id ${childNetworkId} already exists"
-    return child
-  } else {
-    child = addChildDevice("hubitat", componentDriver, childNetworkId, [label: label, isComponent: false])
-    log.info("Created ${label} child device")
-    return child
-  }
-}
-
-def getChildNetworkId(name) {
-  return device.deviceNetworkId + "-" + name
-}
-
-def componentRefresh(device) {
-  poll()
-}
-
-def getChildType(String childNetworkId) {
-  // network id is $parentId-type
-  return childNetworkId.substring(device.deviceNetworkId.length() + 1)
-}
-
-def componentOn(device) {
-  def type = getChildType(device.deviceNetworkId)
-  debug "componentOn $type"
-  switch (type) {
-    case "outlet": 
-      setOutletState("On")
-      break
-    case "underbedlight":
-      setUnderbedLightState("On", underbedLightTimer)
-      break
-    case "head":
-      log.info "Child type head does not support on"
-      break
-    case "foot":
-      log.info "Child type foot does not support on"
-      break
-    case "footwarmer":
-      setFootWarmingState(footWarmerLevel, footWarmerTimer)
-      break
-    case "outlet":
-      setOutletState("On")
-      break
-    default:
-      log.warn "Unknown child device type ${type}, not turning on"
-      break
-  }
-  device.sendEvent name:"switch", value: "on"
-}
-
-def componentOff(device) {
-  def type = getChildType(device.deviceNetworkId)
-  debug "componentOff $type"
-  switch (type) {
-    case "outlet": 
-      setOutletState("Off")
-      break
-    case "underbedlight":
-      setUnderbedLightState("Off")
-      break
-    case "head":
-      log.info "Child type head does not support off"
-      break
-    case "foot":
-      log.info "Child type foot does not support off"
-      break
-    case "footwarmer":
-      setFootWarmingState("Off")
-      break
-    case "outlet":
-      setOutletState("Off")
-      break
-    default:
-      log.warn "Unknown child device type ${type}, not turning off"
-      break
-  }
-  device.sendEvent name:"switch", value: "off"
-}
-
-def componentSetLevel(device, level) {
-  componentSetLevel(device, level, null)
-}
-
-def componentSetLevel(device, level, ramp) {
-  def type = getChildType(device.deviceNetworkId)
-  debug "componentSetLevel $type $level $ramp"
-  switch (type) {
-    case "outlet": 
-      "Child type outlet does not support level"
-      break
-    case "underbedlight":
-      // Only 3 levels are supported.
-      def val = 0
-      switch (level) {
-        case 1:
-          val = "Low"
-          break
-        case 2:
-          val = "Medium"
-          break
-        case 3:
-          val = "High"
-          break
-        default:
-          log.error "Invalid level for underbed light.  Only 1, 2 or 3 is valid"
-          return
-      }
-      def duration = underbedLightTimer
-      if (ramp != null && UNDERBED_LIGHT_TIMES.values().contains(ramp)) {
-        debug "Using provided ramp time of ${ramp}"
-        duration = ramp
-      }
-      debug "Set underbed light on to ${val} for duration ${duration}"
-      setUnderbedLightState("On", duration, val)
-      break
-    case "head":
-      setBedPosition(level, ACTUATOR_TYPES.get("head"))
-      break
-    case "foot":
-      setBedPosition(level, ACTUATOR_TYPES.get("foot"))
-      break
-    case "footwarmer":
-      def val = 0
-      switch (level) {
-        case 1:
-          val = "Low"
-          break
-        case 2:
-          val = "Medium"
-          break
-        case 3:
-          val = "High"
-          break
-        default:
-          log.error "Invalid level for warmer state.  Only 1, 2 or 3 is valid"
-          return
-      }
-      debug "Set warmer level to ${val}"
-      setFootWarmingState(val)
-      break
-    default:
-      log.warn "Unknown child device type ${type}, not setting level"
-      break
-  }
-  sendEvent name: "level", value: level
-}
-
-def childOn(childType) {
-  def child = getChildDevice(getChildNetworkId(childType))
-  if (!child) {
-    log.error "No child for type ${childType} found"
-    return
-  }
-  List<Map> evts = []
-  evts.add([name:"switch", value:"on", descriptionText:"${child.displayName} was turned on"])
-  if (child.getSupportedCommands().contains("setLevel")) {
-    Integer currentValue = cd.currentValue("level").toInteger()
-    evts.add([name: "level", value: currentValue, descriptionText: "${child.displayName} level was set to ${currentValue}%", unit: "%"])
-  }
-  child.parse(evts)
-}
-
-def childOff(childType) {
-  def child = getChildDevice(getChildNetworkId(childType))
-  if (!child) {
-    log.error "No child for type ${childType} found"
-    return
-  }
-  child.parse([[name: "switch", value: "off", descriptionText: "${child.displayName} was turned off"]])
-}
-
-def childDimmerLevel(childType, level) {
-  def child = getChildDevice(getChildNetworkId(childType))
-  if (!child) {
-    log.error "No child for type ${childType} found"
-    return
-  }
-  List<Map> evts = []
-  String currentValue = child.currentValue("switch")
-  if (currentValue == "off") {
-    evts.add([name: "switch", value: "on", descriptionText: "${child.displayName} was turned on"])
-  }
-  evts.add([name: "level", value: level, descriptionText: "${child.displayName} level was set to ${level}"])
-  child.parse(evts)    
-}
-
 def parse(String description) {
   debug "parse() - Description: ${description}"
 }
@@ -350,15 +161,25 @@ def poll() {
 // Required by Switch capability
 def on() {
   sendEvent name: "switch", value: "on"
-  debug "on(): set preset ${presetLevel}"
-  setBedPreset(presetLevel)
+  if (state?.type == "foot warmer") {
+    debug "on(): foot warmer"
+    setFootWarmingState(footWarmerLevel, footWarmerTimer)
+  } else {
+    debug "on(): set preset ${presetLevel}"
+    setBedPreset(presetLevel)
+  }
 }
 
 // Required by Switch capability
 def off() {
   sendEvent name: "switch", value: "off"
-  debug "off(): set Flat"
-  setBedPreset("Flat")
+  if (state?.type == "foot warmer") {
+    debug "off(): foot warmer"
+    setFootWarmingState("Off")
+  } else {
+    debug "off(): set Flat"
+    setBedPreset("Flat")
+  }
 }
 
 // setLevel required by SwitchLevel capability
@@ -368,9 +189,46 @@ def setLevel(val, duration) {
 }
 
 def setLevel(val) {
-  debug "setLevel(${val}): sleepNumber"
-  setSleepNumber(val)
-  sendEvent name: "level", value: val
+  if (state?.type) {
+    switch (state.type) {
+      case "presence":
+        debug "setLevel(${val}): sleepNumber"
+        setSleepNumber(val)
+        break
+      case "head":
+        debug "setLevel(${val}): head position"
+        setBedPosition(val)
+        break
+      case "foot":
+        debug "setLevel(${val}): foot position"
+        setBedPosition(val)
+        break
+      case "foot warmer":
+        def level = 0
+        switch (val) {
+          case 1:
+            level = "Low"
+            break
+          case 2:
+            level = "Medium"
+            break
+          case 3:
+            level = "High"
+            break
+        }
+        if (!level) {
+          log.error "Invalid level for warmer state.  Only 1, 2 or 3 is valid"
+          return
+        }
+        debug "setLevel(${val}): warmer level to ${level}"
+        setFootWarmingState(level)
+        break;
+    }
+  } else {
+    debug "setLevel(${val}): sleepNumber"
+    setSleepNumber(val)
+    sendEvent name: "level", value: val
+  }
 }
 
 // Required by PresenceSensor capability
@@ -608,6 +466,10 @@ def convertSecondsToTimeString(int secondsToConvert) {
 // Method used by parent app to set bed state
 def setStatus(Map params) {
   debug "setStatus(${params})"
+  if (state?.type) {
+    return setStatusOld(params)
+  }
+  // No type means we are using parent/child devices.
   def validAttributes = device.supportedAttributes.collect{ it.name }
   params.each {param ->
     if (param.key in validAttributes) {
@@ -704,6 +566,70 @@ def setStatus(Map params) {
   }
 }
 
+// Used to set individual device states.
+def setStatusOld(Map params) {
+  debug "setStatusOld(${params})"
+  def validAttributes = device.supportedAttributes.collect{ it.name }
+  params.each{param ->
+    if (param.key in validAttributes) {
+      def attributeValue = device."current${param.key.capitalize()}"
+      def value = param.value
+      // Translate heat temp to something more meaningful but leave the other values alone
+      if (param.key == "footWarmingTemp") {
+        value = HEAT_TEMPS.find{ it.value == value }
+        if (value == null) {
+          log.error "Invalid foot warming temp ${param.value}"
+        } else {
+          value = value.key
+        }
+      }
+      if (attributeValue.toString() != value.toString()) {
+        debug "Setting ${param.key} to ${value}, it was ${attributeValue}"
+        // If this is a head or foot device, we need to sync level with the relevant
+        // position, if it's presence, then we sync level with the sleep number value.
+        if ((state.type == "head" && param.key == "headPosition")
+            || (state.type == "foot" && param.key == "footPosition")
+            || (state.type == "presence" && param.key == "sleepNumber")) {
+          sendEvent name: "level", value: value
+        }
+        if (state.type != "foot warmer" && param.key == "positionPreset") {
+          if (value == "Flat") {
+            sendEvent name: "switch", value: "off"
+          } else if (value == presetLevel) {
+            // On if the level is the desired preset.
+            // Note this means it's off even when raised if it doesn't match a preset which
+            // may not make sense given there is a level.  But since it can be "turned on"
+            // when not at preset level, the behavior (if not the indicator) seems logical.
+            sendEvent name: "switch", value: "on"
+          }
+        }
+        if (state.type == "foot warmer" && param.key == "footWarmingTemp") {
+          def level = 0
+          switch (value) {
+              case "Off":
+                level = 0
+                break
+              case "Low":
+                level = 1
+                break
+              case "Medium":
+                level = 2
+                break
+              case "High":
+                level = 3
+                break
+          }
+          sendEvent name: "level", value: level
+          sendEvent name: "switch", value: level > 0 ? "on" : "off"
+        }
+        sendEvent name: param.key, value: value
+      }
+    } else {
+      log.error "Invalid attribute ${param.key}"
+    }
+  }
+}
+
 def sendToParent(method, data = null) {
   debug "sending to parent ${method}, ${data}"
   if (device.parentDeviceId) {
@@ -719,6 +645,239 @@ def debug(msg) {
     log.debug msg
   }
 }
+
+//-----------------------------------------------------------------------------
+// Methods specific to old device support
+//-----------------------------------------------------------------------------
+
+def setType(val) {
+  debug "setType(${val})"
+  if (!TYPES.contains(val)) {
+    log.error "Invalid type ${val}, possible values are ${TYPES}"
+  }
+  def msg = "${val.capitalize()} - "
+  switch (val) {
+    case "presence":
+      msg += "on/off will switch between preset level (on) and flat (off).  Dimming changes the Sleep Number."
+      break
+    case "head":
+      msg += "on/off will switch between preset level (on) and flat (off).  Dimming changes the head position (0 is flat, 100 is fully raised)."
+      break
+    case "foot":
+      msg += "on/off will switch between preset level (on) and flat (off).  Dimming changes the foot position (0 is flat, 100 is fully raised)."
+      break
+    case "foot warmer":
+      msg += "off switches foot warming off, on will set it to preferred value for preferred time. Dimming changes the heat levels (1: low, 2: medium, 3: high)."
+      break
+  } 
+  state.typeInfo = msg
+  state.type = val
+}
+
+//-----------------------------------------------------------------------------
+// Methods specific to child device support
+//-----------------------------------------------------------------------------
+
+def createChildDevice(String childNetworkId, String componentDriver, String label) {
+  // Make sure the child doesn't already exist.
+  def child = getChildDevice(childNetworkId)
+  if (getChildDevice(childNetworkId)) {
+    log.warn "Child device with id ${childNetworkId} already exists"
+    return child
+  } else {
+    child = addChildDevice("hubitat", componentDriver, childNetworkId, [label: label, isComponent: false])
+    log.info("Created ${label} child device")
+    return child
+  }
+}
+
+def getChildNetworkId(name) {
+  return device.deviceNetworkId + "-" + name
+}
+
+def componentRefresh(device) {
+  poll()
+}
+
+def getChildType(String childNetworkId) {
+  // network id is $parentId-type
+  return childNetworkId.substring(device.deviceNetworkId.length() + 1)
+}
+
+void componentOn(device) {
+  def type = getChildType(device.deviceNetworkId)
+  debug "componentOn $type"
+  switch (type) {
+    case "outlet": 
+      setOutletState("On")
+      break
+    case "underbedlight":
+      setUnderbedLightState("On", underbedLightTimer)
+      break
+    case "head":
+      log.info "Child type head does not support on"
+      break
+    case "foot":
+      log.info "Child type foot does not support on"
+      break
+    case "footwarmer":
+      setFootWarmingState(footWarmerLevel, footWarmerTimer)
+      break
+    case "outlet":
+      setOutletState("On")
+      break
+    default:
+      log.warn "Unknown child device type ${type}, not turning on"
+      break
+  }
+  device.sendEvent name:"switch", value: "on"
+}
+
+void componentOff(device) {
+  def type = getChildType(device.deviceNetworkId)
+  debug "componentOff $type"
+  switch (type) {
+    case "outlet": 
+      setOutletState("Off")
+      break
+    case "underbedlight":
+      setUnderbedLightState("Off")
+      break
+    case "head":
+      log.info "Child type head does not support off"
+      break
+    case "foot":
+      log.info "Child type foot does not support off"
+      break
+    case "footwarmer":
+      setFootWarmingState("Off")
+      break
+    case "outlet":
+      setOutletState("Off")
+      break
+    default:
+      log.warn "Unknown child device type ${type}, not turning off"
+      break
+  }
+  device.sendEvent name:"switch", value: "off"
+}
+
+void componentSetLevel(device, level) {
+  componentSetLevel(device, level, null)
+}
+
+void componentSetLevel(device, level, ramp) {
+  def type = getChildType(device.deviceNetworkId)
+  debug "componentSetLevel $type $level $ramp"
+  switch (type) {
+    case "outlet": 
+      log.info "Child type outlet does not support level"
+      break
+    case "underbedlight":
+      // Only 3 levels are supported.
+      def val = 0
+      switch (level) {
+        case 1:
+          val = "Low"
+          break
+        case 2:
+          val = "Medium"
+          break
+        case 3:
+          val = "High"
+          break
+        default:
+          log.error "Invalid level for underbed light.  Only 1, 2 or 3 is valid"
+          return
+      }
+      def duration = underbedLightTimer
+      if (ramp != null && UNDERBED_LIGHT_TIMES.values().contains(ramp)) {
+        debug "Using provided ramp time of ${ramp}"
+        duration = ramp
+      }
+      debug "Set underbed light on to ${val} for duration ${duration}"
+      setUnderbedLightState("On", duration, val)
+      break
+    case "head":
+      setBedPosition(level, ACTUATOR_TYPES.get("head"))
+      break
+    case "foot":
+      setBedPosition(level, ACTUATOR_TYPES.get("foot"))
+      break
+    case "footwarmer":
+      def val = 0
+      switch (level) {
+        case 1:
+          val = "Low"
+          break
+        case 2:
+          val = "Medium"
+          break
+        case 3:
+          val = "High"
+          break
+        default:
+          log.error "Invalid level for warmer state.  Only 1, 2 or 3 is valid"
+          return
+      }
+      debug "Set warmer level to ${val}"
+      setFootWarmingState(val)
+      break
+    default:
+      log.warn "Unknown child device type ${type}, not setting level"
+      break
+  }
+  sendEvent name: "level", value: level
+}
+
+void childOn(childType) {
+  def child = getChildDevice(getChildNetworkId(childType))
+  if (!child) {
+    log.error "No child for type ${childType} found"
+    return
+  }
+  List<Map> evts = []
+  evts.add([name:"switch", value:"on", descriptionText:"${child.displayName} was turned on"])
+  if (child.getSupportedCommands().contains("setLevel")) {
+    Integer currentValue = cd.currentValue("level").toInteger()
+    childDimmerLevel(childType, currentValue)
+  }
+  child.parse(evts)
+}
+
+void childOff(childType) {
+  def child = getChildDevice(getChildNetworkId(childType))
+  if (!child) {
+    log.error "No child for type ${childType} found"
+    return
+  }
+  child.parse([[name: "switch", value: "off", descriptionText: "${child.displayName} was turned off"]])
+}
+
+void childDimmerLevel(childType, level) {
+  def child = getChildDevice(getChildNetworkId(childType))
+  if (!child) {
+    log.error "No child for type ${childType} found"
+    return
+  }
+  List<Map> evts = []
+  String currentValue = child.currentValue("switch")
+  if (currentValue == "off") {
+    evts.add([name: "switch", value: "on", descriptionText: "${child.displayName} was turned on"])
+  }
+  evts.add([name: "level", value: level, descriptionText: "${child.displayName} level was set to ${level}"])
+  child.parse(evts)    
+}
+
+void componentStartLevelChange(device, direction) {
+  log.info "startLevelChange not supported"
+}
+
+void componentStopLevelChange(device) {
+  log.info "stopLevelChange not supported"
+}
+
+
 
 // vim: tabstop=2 shiftwidth=2 expandtab
 

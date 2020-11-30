@@ -24,7 +24,7 @@
  */
 import groovy.transform.Field
 
-@Field final String DRIVER_NAME = "Sleep Number Bed v2"
+@Field final String DRIVER_NAME = "Sleep Number Bed"
 @Field final String NAMESPACE = "rvrolyk"
 @Field final String API_HOST = "prod-api.sleepiq.sleepnumber.com"
 @Field final String API_URL = "https://" + API_HOST
@@ -66,6 +66,7 @@ def appButtonHandler(btn) {
       debug "Paused, unscheduling..."
       unschedule()
       unsubscribe()
+      updateLabel()
     } else {
       initialize()
     }
@@ -151,14 +152,13 @@ def updated() {
 }
 
 def initialize() {
-  refreshChildDevices()
   if (settings.refreshInterval > 0) {
-    schedule("0 /${settings.refreshInterval} * * * ?", "refreshChildDevices")
+    setRefreshInterval(settings.refreshInterval, 0)
   } else {
     log.error "Invalid refresh interval ${settings.refreshInterval}"
   }
   initializeBedInfo()
-
+  refreshChildDevices()
   updateLabel()
 }
 
@@ -167,16 +167,20 @@ def updateLabel() {
   if (!app.label.contains("<span") && state?.displayName != app.label) {
     state.displayName = app.label
   }
-  if (state?.status) {
+  if (state?.status || state?.paused) {
+    def status = state?.status
     String label = "${state.displayName} <span style=color:"
-    if (state.status == "Online") {
+    if (state?.paused) {
+      status = "(Paused)"
+      label += "red"
+    } else if (state.status == "Online") {
       label += "green"
     } else if (state.status.contains("Login")) {
       label += "red"
     } else {
       label += "orange"
     }
-    label += ">${state.status}</span>"
+    label += ">${status}</span>"
     app.updateLabel(label)
   }
 }
@@ -201,7 +205,15 @@ def initializeBedInfo() {
         components << component.type
       }
     }
-    state.bedInfo[bed.bedId].components = components
+    if (!components) {
+      log.info "No components found, assuming 'Base' at minimum"
+      components << "Base"
+    } else {
+      state.bedInfo[bed.bedId].components = components
+    }
+  }
+  if (!state.bedInfo) {
+    log.warn "No bed state set up"
   }
 }
 
@@ -242,7 +254,7 @@ def refreshChildDevices(ignored, ignoredDevId) {
  * but quicker, say 1 minute, is desired when presence is first detected or it's
  * a particular time of day.
  */
-def setRefreshInterval(val, devId) {
+def setRefreshInterval(val, ignored) {
   debug "setRefreshInterval(${val})"
   if (val && val > 0) {
     schedule("0 /${val} * * * ?", "refreshChildDevices")
@@ -633,6 +645,11 @@ def processBedData(responseData) {
   
   
   for (def device : getBedDevices()) {
+    // Make sure the various bed state info is set up so we can use it later.
+    if (!state?.bedInfo || !state?.bedInfo[bed.bedId] || !state?.bedInfo[bed.bedId]?.components) {
+      log.warn "state.bedInfo somehow lost, re-caching it"
+      initializeBedInfo()
+    }
     if (!outletData.get(device.getState().bedId)) {
       outletData[device.getState().bedId] = [:]
       underbedLightData[device.getState().bedId] = [:]
