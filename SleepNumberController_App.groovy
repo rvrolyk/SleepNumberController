@@ -194,6 +194,10 @@ def getBedDevices() {
   return children
 }
 
+def refreshChildDevices1() {
+  refreshChildDevices()
+}
+
 def refreshChildDevices() {
   // Only refresh if mode is a selected one
   if (settings.modes && !settings.modes.contains(location.mode)) {
@@ -217,10 +221,10 @@ def refreshChildDevices(ignored, ignoredDevId) {
 def setRefreshInterval(val, ignored) {
   debug "setRefreshInterval(${val})"
   if (val && val > 0) {
-    schedule("0 /${val} * * * ?", "refreshChildDevices")
+    schedule("0 /${val} * * * ?", "refreshChildDevices1")
   } else {
     debug "Resetting interval to ${settings.refreshInterval}"
-    schedule("0 /${settings.refreshInterval} * * * ?", "refreshChildDevices")
+    schedule("0 /${settings.refreshInterval} * * * ?", "refreshChildDevices1")
   }
 }
 
@@ -1050,4 +1054,3 @@ def put(Map params, Closure closure) {
 }
 
 // vim: tabstop=2 shiftwidth=2 expandtab
-
