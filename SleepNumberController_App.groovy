@@ -41,7 +41,7 @@ import groovy.transform.Field
 @Field final ArrayList VALID_LIGHT_BRIGHTNESS = [1, 30, 100]
 
 definition(
-  name: "Sleep Number Controller v2",
+  name: "Sleep Number Controller",
   namespace: "rvrolyk",
   author: "Russ Vrolyk",
   description: "Control your Sleep Number Flexfit bed.",
@@ -74,7 +74,7 @@ def appButtonHandler(btn) {
 }
 
 def homePage() {
-  def devices = getBedDevices()
+  def currentDevices = getBedDeviceData()
 
   dynamicPage(name: "homePage") {
     if (state.paused) {
@@ -98,13 +98,16 @@ def homePage() {
       if (!settings.login || !settings.password) {
         paragraph "Add login and password to find beds"
       } else {
-        if (devices.size() > 0) {
+        if (currentDevices.size() > 0) {
           paragraph "Current beds"
-          devices.each { device ->
-            def output = "${device.getState().bedId}  (dev:${device.id}) / ${device.label} / ${device.getState().side}"
-            if (device.getState().type) {
-              output += " / ${device.getState().type}"
+          currentDevices.each { device ->
+            String output = ""
+            if (device.isChild) {
+              output += "            "
+            } else {
+              output += device.bedId
             }
+            output += " (<a href=\"/device/edit/${device.deviceId}\">dev:${device.deviceId}</a>) / ${device.name} / ${device.side} / ${device.type}"
             paragraph output
           }
           paragraph "<br>Note: <i>To remove a device remove it from the Devices list</i>"
@@ -219,12 +222,13 @@ def initializeBedInfo() {
 
 /**
  * Gets all bed child devices even if they're in a virtual container.
- * Will not return the virtual container(s)
+ * Will not return the virtual container(s) or children of a parent
+ * device.
  */
 def getBedDevices() {
   children = []
   // If any child is a virtual container, iterate that too
-  getChildDevices().each() { child ->
+  getChildDevices().each { child ->
     if (child.hasAttribute("containerSize")) {
       children.addAll(child.childList())
     } else {
@@ -232,6 +236,55 @@ def getBedDevices() {
     }
   }
   return children
+}
+
+/**
+ * Returns a list of maps of all bed devices, even those that are child devices.
+ * The map keys are: name, type, side, deviceId, bedId, isChild
+ */
+List<Map> getBedDeviceData() {
+  // Start with all bed devices.
+  def devices = getBedDevices()
+  List<Map> output = []
+  devices.each { device -> 
+    def side = device.getState().side
+    def bedId = device.getState().bedId
+    def type = device.getState()?.type ?: "Parent"
+    
+    output << [
+      name: device.label,
+      type: type,
+      side: side,
+      deviceId: device.id,
+      bedId: bedId,
+      isChild: false,
+    ]
+    device.getChildDevices().each { child ->
+      output << [
+        name: child.label,
+        type: device.getChildType(child.deviceNetworkId),
+        side: side,
+        deviceId: child.id,
+        bedId: bedId,
+        isChild: true,
+      ]
+    }
+  }
+  return output
+}
+
+List<String> getBedDeviceTypes() {
+  def data = getBedDeviceData()
+  // TODO: Consider splitting this by side or even by bed.
+  // SKipping for now as most are probably using the same device types
+  // per side and probably only have one bed.
+  return data.collect { it.type }
+}
+
+// Use with #schedule as apparently it's not good to mix #runIn method call
+// and #schedule method call.
+def scheduledRefreshChildDevices() {
+  refreshChildDevices()
 }
 
 def refreshChildDevices() {
@@ -257,10 +310,10 @@ def refreshChildDevices(ignored, ignoredDevId) {
 def setRefreshInterval(val, ignored) {
   debug "setRefreshInterval(${val})"
   if (val && val > 0) {
-    schedule("0 /${val} * * * ?", "refreshChildDevices")
+    schedule("0 /${val} * * * ?", "scheduledRefreshChildDevices")
   } else {
     debug "Resetting interval to ${settings.refreshInterval}"
-    schedule("0 /${settings.refreshInterval} * * * ?", "refreshChildDevices")
+    schedule("0 /${settings.refreshInterval} * * * ?", "scheduledRefreshChildDevices")
   }
 }
 
@@ -298,6 +351,7 @@ def presenceText(presence) {
 }
 
 def selectBedPage(params) {
+  initializeBedInfo()
   app.updateSetting("newDeviceName", "")
   dynamicPage(name: "selectBedPage") {
     if (!params?.bedId) {
@@ -309,7 +363,7 @@ def selectBedPage(params) {
     section {
       paragraph """<b>Instructions</b>
 Enter a name, then choose whether or not to use child devices or a virtual container for the devices and then choose the types of devices to create.
-Note that if using child devices, the parent device will host all the special commands along with bed specific status while the children are simple
+Note that if using child devices, the parent device will contain all the special commands along with bed specific status while the children are simple
 switches or dimmers.  Otherwise, all devices are the same on Hubitat, the only difference is how they behave to dim and on/off commands.  This is so that they may be used with external assistants such as Google Assistant or Amazon Alexa.  If you don't care about such use cases (and only want RM control or just presence), you can just use the presence type.
 <br>
 See <a href="https://community.hubitat.com/t/release-virtual-container-driver/4440" target=_blank>this post</a> for virtual container.
@@ -320,13 +374,11 @@ Side: ${params.side}
 Presence: ${presenceText(params.presence)}
 """ 
     }
-    // TODO: Consider showing only valid options for foundation and foot warmer.  That is, if warming is not a component,
-    // don't show it and if base is not a component, don't show head or foot.
     section {
       input "newDeviceName", "text", title: "Device Name", defaultValue: settings.newDeviceName ?: params.label,
           description: "What prefix do you want for the devices?", submitOnChange: true,
           required: true
-      input "useChildDevices", "bool", title: "Use child devices?", defaultValue: true,
+      input "useChildDevices", "bool", title: "Use child devices? (recommended)", defaultValue: true,
          submitOnChange: true
       if (!settings.useChildDevices) {
         input "useContainer", "bool", title: "Use virtual container?", defaultValue: false,
@@ -349,19 +401,24 @@ Presence: ${presenceText(params.presence)}
       input "createFootControl", "bool",
          title: "Create device to control the foot of the ${params.side.toLowerCase()} side?",
          defaultValue: true, submitOnChange: true
-      paragraph "A foot type device exposes on/off as switching the foot warming on or off.  Dimming will change the heat levels (1: low, 2: medium, 3: high)."
-      input "createFootWarmer", "bool",
-         title: "Create device to control the foot warmer of the ${params.side.toLowerCase()} side?",
-         defaultValue: true, submitOnChange: true
+      if (state.bedInfo[params.bedId].components.contains("Warming")) {
+        paragraph "A foot type device exposes on/off as switching the foot warming on or off.  Dimming will change the heat levels (1: low, 2: medium, 3: high)."
+        input "createFootWarmer", "bool",
+           title: "Create device to control the foot warmer of the ${params.side.toLowerCase()} side?",
+           defaultValue: true, submitOnChange: true
+      }
       if (settings.useChildDevices) {
+        determineUnderbedLightSetup(params.bedId)
         paragraph "Underbed lighting creates a dimmer allowing the light to be turned on or off at different levels with timer based on parent device preference."
         input "createUnderbedLighting", "bool",
          title: "Create device to control the underbed lighting of the ${params.side.toLowerCase()} side?",
            defaultValue: false, submitOnChange: true
-        paragraph "Outlet creates a switch allowing foundation outlet for this side to be turned on or off."
-        input "createOutlet", "bool",
-         title: "Create device to control the outlet of the ${params.side.toLowerCase()} side?",
-           defaultValue: false, submitOnChange: true
+        if (state.bedInfo[params.bedId].outlets.size > 1) {
+          paragraph "Outlet creates a switch allowing foundation outlet for this side to be turned on or off."
+          input "createOutlet", "bool",
+           title: "Create device to control the outlet of the ${params.side.toLowerCase()} side?",
+             defaultValue: false, submitOnChange: true
+        }
       }
     }
     section {
@@ -392,10 +449,6 @@ Presence: ${presenceText(params.presence)}
         msg += "<li>${createDeviceLabel(newDeviceName, 'foot warmer')}</li>"
         types.add("foot warmer")
       }
-// TODO: Store that lighting and outlets were created so we can poll for the status.
-// states.bedInfo makes logical sense but then we need to persist that data differently
-// so we don't purge it as easily.  The other option would be to fetch it from parent
-// device which may be cleaner as it allows deletion to reflect on polling.
       if (settings.createUnderbedLighting) {
         msg += "<li>${createDeviceLabel(newDeviceName, 'underbed light')}</li>"
         types.add("underbed light")
@@ -465,7 +518,7 @@ def createBedPage(params) {
     }
     // If we are using child devices then we create a presence device and
     // all others are children of it.
-    params.types.each{ type ->
+    params.types.each { type ->
       if (type != "presence") {
         def childId = deviceId + "-" + type.replaceAll(" ", "")
         switch (type) {
@@ -486,7 +539,7 @@ def createBedPage(params) {
       }
     }
   } else {
-    params.types.each{ type ->
+    params.types.each { type ->
       def deviceId = "sleepnumber.${params.bedId}.${params.side}.${type.replaceAll(' ', '_')}"
       if (existingDevices.find{ it.data.vcId == deviceId }) {
         log.info "Not creating device ${deviceId}, it already exists"
@@ -525,7 +578,7 @@ def createBedPage(params) {
       def info = "<ol>"
       devices.each { device ->
         info += "<li>"
-        info += "Label: ${device.label}"
+        info += "${device.label}"
         if (!params.useChildDevices) {
           info += "<br>Bed ID: ${device.getState().bedId}"
           info += "<br>Side: ${device.getState().side}"
@@ -643,19 +696,20 @@ def processBedData(responseData) {
   def outletData = [:]
   def underbedLightData = [:]
   
+  def deviceTypes = getBedDeviceTypes()
   
   for (def device : getBedDevices()) {
-    // Make sure the various bed state info is set up so we can use it later.
-    if (!state?.bedInfo || !state?.bedInfo[bed.bedId] || !state?.bedInfo[bed.bedId]?.components) {
-      log.warn "state.bedInfo somehow lost, re-caching it"
-      initializeBedInfo()
-    }
     if (!outletData.get(device.getState().bedId)) {
       outletData[device.getState().bedId] = [:]
       underbedLightData[device.getState().bedId] = [:]
     }
         
     for (def bed : responseData.beds) {
+      // Make sure the various bed state info is set up so we can use it later.
+      if (!state?.bedInfo || !state?.bedInfo[bed.bedId] || !state?.bedInfo[bed.bedId]?.components) {
+        log.warn "state.bedInfo somehow lost, re-caching it"
+        initializeBedInfo()
+      }
       if (device.getState().bedId == bed.bedId) {
         if (!bedFailures.get(bed.bedId) && !privacyStatus.get(bed.bedId)) {
           privacyStatus[bed.bedId] = getPrivacyMode(bed.bedId)
@@ -676,15 +730,17 @@ def processBedData(responseData) {
         }
         if (!bedFailures.get(bed.bedId)
             && !footwarmingStatus.get(bed.bedId)
-            && state.bedInfo[bed.bedId].components.contains("Warming")) {
-          // Only try to update the warming state if the bed actually has it.
+            && state.bedInfo[bed.bedId].components.contains("Warming")
+            && (deviceTypes.contains("foot warmer") || deviceTypes.contains("footwarmer"))) {
+          // Only try to update the warming state if the bed actually has it
+          // and there's a device for it.
           footwarmingStatus[bed.bedId] = getFootWarmingStatus(device.getState().bedId)
           if (!footwarmingStatus.get(bed.bedId)) {
             bedFailures[bed.bedId] = true
           } 
         }
         // If there's underbed lighting or outlets then poll for that data as well.
-        if (device.getChildDevice(device.getChildNetworkId("underbedlight"))) {
+        if (deviceTypes.contains("underbedlight")) {
           determineUnderbedLightSetup(bed.bedId)
           if (!outletData[bed.bedId][3]) {
             outletData[bed.bedId][3] = getOutletState(bed.bedId, 3)
@@ -701,7 +757,7 @@ def processBedData(responseData) {
             outletData[bed.bedId][4] = outletData[bed.bedId][3] 
           }
         }
-        if (device.getChildDevice(device.getChildNetworkId("outlet"))) {
+        if (deviceTypes.contains("outlet")) {
           if (!outletData[device.getState().bedId][1]) {
             outletData[bed.bedId][1] = getOutletState(bed.bedId, 1)
             outletData[bed.bedId][2] = getOutletState(bed.bedId, 2)

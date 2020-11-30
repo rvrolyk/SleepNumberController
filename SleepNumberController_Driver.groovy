@@ -557,7 +557,7 @@ def setStatus(Map params) {
             childDimmerLevel("underbedlight", dimmerLevel)
             break
         }
-        // Send an event with the key name to catalog it.
+        // Send an event with the key name to catalog it and set the attribute.
         sendEvent name: param.key, value: value
       }
     } else {
@@ -715,10 +715,16 @@ void componentOn(device) {
       setUnderbedLightState("On", underbedLightTimer)
       break
     case "head":
-      log.info "Child type head does not support on"
+      // For now, just share the same preset as the parent.
+      // TODO: Add "head" preset pref if it turns out people use this.
+      log.info("Head turned on.")
+      on()
       break
     case "foot":
-      log.info "Child type foot does not support on"
+      // For now, just share the same preset as the parent.
+      // TODO: Add "foot" preset pref if it turns out people use this.
+      log.info("Foot turned on.")
+      on()
       break
     case "footwarmer":
       setFootWarmingState(footWarmerLevel, footWarmerTimer)
@@ -730,7 +736,6 @@ void componentOn(device) {
       log.warn "Unknown child device type ${type}, not turning on"
       break
   }
-  device.sendEvent name:"switch", value: "on"
 }
 
 void componentOff(device) {
@@ -744,10 +749,12 @@ void componentOff(device) {
       setUnderbedLightState("Off")
       break
     case "head":
-      log.info "Child type head does not support off"
+      log.info("Head turned off, setting bed flat")
+      off()
       break
     case "foot":
-      log.info "Child type foot does not support off"
+      log.info("Foot turned off, setting bed flat")
+      off()
       break
     case "footwarmer":
       setFootWarmingState("Off")
@@ -759,7 +766,6 @@ void componentOff(device) {
       log.warn "Unknown child device type ${type}, not turning off"
       break
   }
-  device.sendEvent name:"switch", value: "off"
 }
 
 void componentSetLevel(device, level) {
@@ -827,7 +833,6 @@ void componentSetLevel(device, level, ramp) {
       log.warn "Unknown child device type ${type}, not setting level"
       break
   }
-  sendEvent name: "level", value: level
 }
 
 void childOn(childType) {
