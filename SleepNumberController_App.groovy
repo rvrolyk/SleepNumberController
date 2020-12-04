@@ -320,22 +320,45 @@ def setRefreshInterval(val, ignored) {
 def findBedPage() {
   def responseData = getBedData()
   def devices = getBedDevices()
+  def sidesSeen = []
+  def childDevices = []
   dynamicPage(name: "findBedPage") {
     if (responseData.beds.size() > 0) {
       responseData.beds.each { bed ->
         section("Bed: ${bed.bedId}") {
-          def leftPresence = bed.leftSide.isInBed
-          def rightPresence = bed.rightSide.isInBed
-          def leftName = ""
-          def rightName = ""
           if (devices.size() > 0) {
-            leftName = devices.find{ it.getState().bedId == bed.bedId && it.getState().side == "Left" }?.label
-            rightName = devices.find{ it.getState().bedId == bed.bedId && it.getState().side == "Right" }?.label
+            for (def dev : devices) {
+              if (!dev.getState().type || dev.getState()?.type == "presence") {
+                if (!dev.getState().type) {
+                  childDevices << dev.getState().side
+                }
+                sidesSeen << dev.getState().side
+                href "selectBedPage", title: dev.label, description: "Click to modify",
+                    params: [bedId: bed.bedId, side: dev.getState().side, label: dev.label]
+              }
+            }
+            if (childDevices.size() < 2) {
+              input "createNewChildDevices", "bool", title: "Create new child device types", defaultValue: false, submitOnChange: true
+              if (settings.createNewChildDevices) {
+                if (!childDevices.contains("Left")) {
+                  href "selectBedPage", title: "Left Side", description: "Click to create",
+                      params: [bedId: bed.bedId, side: "Left", label: ""]
+                }
+                if (!childDevices.contains("Right")) {
+                  href "selectBedPage", title: "Right Side", description: "Click to create",
+                      params: [bedId: bed.bedId, side: "Right", label: ""]
+                }
+              }
+            }
           }
-          href "selectBedPage", title: leftName ?: "Left Side", description: presenceText(leftPresence),
-              params: [bedId: bed.bedId, side: "Left", presence: leftStatus, label: leftName]
-          href "selectBedPage", title: rightName ?: "Right Side", description: presenceText(rightPresence),
-              params: [bedId: bed.bedId, side: "Right", presence: rightStatus, label: rightName]
+          if (!sidesSeen.contains("Left")) {
+            href "selectBedPage", title: "Left Side", description: "Click to create",
+                params: [bedId: bed.bedId, side: "Left", label: ""]
+          }
+          if (!sidesSeen.contains("Right")) {
+            href "selectBedPage", title: "Right Side", description: "Click to create",
+                params: [bedId: bed.bedId, side: "Right", label: ""]
+          }
         }
       }
     } else {
@@ -371,7 +394,6 @@ See <a href="https://community.hubitat.com/t/release-virtual-container-driver/44
         paragraph """<b>Device information</b>
 Bed ID: ${params.bedId}
 Side: ${params.side}
-Presence: ${presenceText(params.presence)}
 """ 
     }
     section {
@@ -569,7 +591,7 @@ def createBedPage(params) {
     section {
       def header = "Created new devices"
       if (params.useChildDevices) {
-        header += " as child devices"
+        header += " using child devices"
       } else if (params.useContainer) {
         header += " in container ${params.containerName}"
       }
@@ -1365,11 +1387,20 @@ def httpRequest(path, method = this.&get, body = null, query = null, alreadyTrie
       return httpRequest(path, method, body, queryString, true)
     } else {
       // There was some other error so retry if that hasn't already been done
-      // otherwise give up.
-      if (!alreadyTriedRequest) {
+      // otherwise give up.  Not Found errors won't improve with retry to don't
+      // bother.
+      if (!alreadyTriedRequest && !e.toString().contains("Not Found")) {
         log.error "Retrying failed request ${statusParams}\n${e}"
         return httpRequest(path, method, body, queryString, true)
       } else {
+        if (e.toString().contains("Not Found")) {
+          // Don't bother polluting logs for Not Found errors as they are likely
+          // either intentional (trying to figure out if outlet exists) or a code
+          // bug.  In the latter case we still want diagnostic data so we use
+          // debug logging.
+          debug "Error making request ${statusParams}\n${e}"
+          return result
+        }
         log.error "Error making request ${statusParams}\n${e}"
         state.status = "API Error"
         return result
@@ -1395,4 +1426,3 @@ def put(Map params, Closure closure) {
 }
 
 // vim: tabstop=2 shiftwidth=2 expandtab
-

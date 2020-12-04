@@ -109,7 +109,7 @@ metadata {
 
   preferences {
     section("Settings:") {
-      input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
+      input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
       input name: "presetLevel", type: "enum", title: "Bed preset level for 'on'", options: PRESET_NAMES.collect{ it.key }, defaultValue: "Favorite"
       input name: "footWarmerLevel", type: "enum", title: "Foot warmer level for 'on'", options: HEAT_TEMPS.collect{ it.key }, defaultValue: "Medium"
       input name: "footWarmerTimer", type: "enum", title: "Foot warmer duration for 'on'", options: HEAT_TIMES.collect{ it.key }, defaultValue: "30m"
@@ -471,11 +471,12 @@ def setStatus(Map params) {
   }
   // No type means we are using parent/child devices.
   def validAttributes = device.supportedAttributes.collect{ it.name }
-  params.each {param ->
+  params.each { param ->
     if (param.key in validAttributes) {
       def attributeValue = device."current${param.key.capitalize()}"
       def value = param.value
-      // Translate heat temp to something more meaningful but leave the other values alone
+      // Translate some of the values into something more meaningful for comparison
+      // but leave the other values alone
       if (param.key == "footWarmingTemp") {
         value = HEAT_TEMPS.find{ it.value == value }
         if (value == null) {
@@ -483,7 +484,17 @@ def setStatus(Map params) {
         } else {
           value = value.key
         }
+      } else if (param.key == "underbedLightBrightness") {
+        def brightnessValuesToNames = UNDERBED_LIGHT_BRIGHTNESS.collectEntries{
+            e -> [(e.value): e.key]
+        }
+        value = brightnessValuesToNames.get(value)
+        if (value == null) {
+          log.error "Invalid underbedLightBrightness ${param.value}, using Low"
+          value = "Low"
+        }
       }
+
       if (attributeValue.toString() != value.toString()) {
         debug "Setting ${param.key} to ${value}, it was ${attributeValue}"
         // Figure out what child device to send to based on the key.
@@ -549,11 +560,8 @@ def setStatus(Map params) {
             // Nothing to send to the child for this.
             break
           case "underbedLightBrightness":
-            def inverse = UNDERBED_LIGHT_BRIGHTNESS.collectEntries{ e -> [(e.value): e.key] }
             // We use 1,2 or 3 for the dimmer value and this correlates to the array index.
-            def dimmerLevel = (inverse.keySet() as ArrayList).indexOf(value) + 1
-            // Convert the device value to the string.
-            value = inverse.get(value)
+            def dimmerLevel = (UNDERBED_LIGHT_BRIGHTNESS.keySet() as ArrayList).indexOf(value) + 1
             childDimmerLevel("underbedlight", dimmerLevel)
             break
         }
@@ -838,7 +846,7 @@ void componentSetLevel(device, level, ramp) {
 void childOn(childType) {
   def child = getChildDevice(getChildNetworkId(childType))
   if (!child) {
-    log.error "No child for type ${childType} found"
+    debug "childOn: No child for type ${childType} found"
     return
   }
   List<Map> evts = []
@@ -853,7 +861,7 @@ void childOn(childType) {
 void childOff(childType) {
   def child = getChildDevice(getChildNetworkId(childType))
   if (!child) {
-    log.error "No child for type ${childType} found"
+    debug "childOff: No child for type ${childType} found"
     return
   }
   child.parse([[name: "switch", value: "off", descriptionText: "${child.displayName} was turned off"]])
@@ -862,12 +870,14 @@ void childOff(childType) {
 void childDimmerLevel(childType, level) {
   def child = getChildDevice(getChildNetworkId(childType))
   if (!child) {
-    log.error "No child for type ${childType} found"
+    debug "childDimmerLevel: No child for type ${childType} found"
     return
   }
   List<Map> evts = []
   String currentValue = child.currentValue("switch")
-  if (currentValue == "off") {
+  // We don't want to override the state for underbed lighting because a level may be set
+  // when it's in "Auto" in which case it's not "on".
+  if (currentValue == "off" && childType != "underbedlight") {
     evts.add([name: "switch", value: "on", descriptionText: "${child.displayName} was turned on"])
   }
   evts.add([name: "level", value: level, descriptionText: "${child.displayName} level was set to ${level}"])
@@ -883,6 +893,4 @@ void componentStopLevelChange(device) {
 }
 
 
-
 // vim: tabstop=2 shiftwidth=2 expandtab
-
