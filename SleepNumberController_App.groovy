@@ -761,7 +761,8 @@ def processBedData(responseData) {
             bedFailures[bed.bedId] = true
           } 
         }
-        // If there's underbed lighting or outlets then poll for that data as well.
+        // If there's underbed lighting or outlets then poll for that data as well.  Don't poll
+        // otherwise since it's just another network request and may be unwanted.
         if (deviceTypes.contains("underbedlight")) {
           determineUnderbedLightSetup(bed.bedId)
           if (!outletData[bed.bedId][3]) {

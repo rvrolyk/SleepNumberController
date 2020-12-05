@@ -143,9 +143,7 @@ def updated() {
 
 def uninstalled() {
   // Delete all the children when this is uninstalled.
-  childDevices.each { child ->
-    deleteChildDevice(child.deviceNetworkId)
-  }
+  childDevices.each { deleteChildDevice(it.deviceNetworkId) }
 }
 
 def parse(String description) {
@@ -238,7 +236,7 @@ def isPresent() {
 
 def arrived() {
   debug "arrived()"
-  if (!isPresent() && state.type == "presence") {
+  if (!isPresent() && (!state?.type || state?.type == "presence")) {
     log.info "${device.displayName} arrived"
     sendEvent name: "presence", value: "present"
   }
@@ -246,7 +244,7 @@ def arrived() {
 
 def departed() {
   debug "departed()"
-  if (isPresent() && state.type == "presence") {
+  if (isPresent() && (!state?.type || state?.type == "presence")) {
     log.info "${device.displayName} departed"
     sendEvent name: "presence", value: "not present"
     if (enableSleepData) {
@@ -490,7 +488,7 @@ def setStatus(Map params) {
         }
         value = brightnessValuesToNames.get(value)
         if (value == null) {
-          log.error "Invalid underbedLightBrightness ${param.value}, using Low"
+          log.warn "Invalid underbedLightBrightness ${param.value}, using Low"
           value = "Low"
         }
       }
@@ -499,11 +497,9 @@ def setStatus(Map params) {
         debug "Setting ${param.key} to ${value}, it was ${attributeValue}"
         // Figure out what child device to send to based on the key.
         switch (param.key) {
-          case "headPosition":
-            childDimmerLevel("head", value)
-            break
-          case "footPosition":
-            childDimmerLevel("foot", value)
+          case "sleepNumber":
+            // This is for this device so just send the event.
+            sendEvent name: "level", value: value
             break
           case "positionPreset":
             if (value == "Flat") {
@@ -515,6 +511,12 @@ def setStatus(Map params) {
               // when not at preset level, the behavior (if not the indicator) seems logical.
               sendEvent name: "switch", value: "on"
             }
+            break
+          case "headPosition":
+            childDimmerLevel("head", value)
+            break
+          case "footPosition":
+            childDimmerLevel("foot", value)
             break
           case "footWarmingTemp":
             def level = 0
@@ -533,14 +535,11 @@ def setStatus(Map params) {
                   break
             }
             if (level > 0) {
+              childOn("footwarmer")
               childDimmerLevel("footwarmer", level)
             } else {
               childOff("footwarmer")
             }
-            break
-          case "sleepNumber":
-            // This is for this device so just send the event.
-            sendEvent name: "level", value: value
             break
           case "outletState":
             if (value == "On") {
@@ -556,13 +555,16 @@ def setStatus(Map params) {
               childOff("underbedlight")
             }
             break
-          case "underbedLightTimer":
-            // Nothing to send to the child for this.
-            break
           case "underbedLightBrightness":
-            // We use 1,2 or 3 for the dimmer value and this correlates to the array index.
+            // We use 1, 2 or 3 for the dimmer value and this correlates to the array index.
             def dimmerLevel = (UNDERBED_LIGHT_BRIGHTNESS.keySet() as ArrayList).indexOf(value) + 1
+            // Note that we don't set the light to on with a dimmer change since
+            // the brightness can be set with the light in auto.
             childDimmerLevel("underbedlight", dimmerLevel)
+            break
+          case "underbedLightTimer":
+            // Nothing to send to the child for this as genericComponentDimmer only answers to
+            // switch and level events.
             break
         }
         // Send an event with the key name to catalog it and set the attribute.
@@ -780,9 +782,9 @@ void componentSetLevel(device, level) {
   componentSetLevel(device, level, null)
 }
 
-void componentSetLevel(device, level, ramp) {
+void componentSetLevel(device, level, duration) {
   def type = getChildType(device.deviceNetworkId)
-  debug "componentSetLevel $type $level $ramp"
+  debug "componentSetLevel $type $level $duration"
   switch (type) {
     case "outlet": 
       log.info "Child type outlet does not support level"
@@ -804,13 +806,13 @@ void componentSetLevel(device, level, ramp) {
           log.error "Invalid level for underbed light.  Only 1, 2 or 3 is valid"
           return
       }
-      def duration = underbedLightTimer
-      if (ramp != null && UNDERBED_LIGHT_TIMES.values().contains(ramp)) {
-        debug "Using provided ramp time of ${ramp}"
-        duration = ramp
+      def presetDuration = underbedLightTimer
+      if (duration != null && UNDERBED_LIGHT_TIMES.values().contains(duration)) {
+        debug "Using provided duration time of ${duration}"
+        presetDuration = duration
       }
-      debug "Set underbed light on to ${val} for duration ${duration}"
-      setUnderbedLightState("On", duration, val)
+      debug "Set underbed light on to ${val} for duration ${presetDuration}"
+      setUnderbedLightState("On", presetDuration, val)
       break
     case "head":
       setBedPosition(level, ACTUATOR_TYPES.get("head"))
@@ -849,13 +851,11 @@ void childOn(childType) {
     debug "childOn: No child for type ${childType} found"
     return
   }
-  List<Map> evts = []
-  evts.add([name:"switch", value:"on", descriptionText:"${child.displayName} was turned on"])
+  child.parse([[name:"switch", value:"on", descriptionText:"${child.displayName} was turned on"]])
   if (child.getSupportedCommands().contains("setLevel")) {
-    Integer currentValue = cd.currentValue("level").toInteger()
+    Integer currentValue = child.currentValue("level").toInteger()
     childDimmerLevel(childType, currentValue)
   }
-  child.parse(evts)
 }
 
 void childOff(childType) {
@@ -873,15 +873,8 @@ void childDimmerLevel(childType, level) {
     debug "childDimmerLevel: No child for type ${childType} found"
     return
   }
-  List<Map> evts = []
   String currentValue = child.currentValue("switch")
-  // We don't want to override the state for underbed lighting because a level may be set
-  // when it's in "Auto" in which case it's not "on".
-  if (currentValue == "off" && childType != "underbedlight") {
-    evts.add([name: "switch", value: "on", descriptionText: "${child.displayName} was turned on"])
-  }
-  evts.add([name: "level", value: level, descriptionText: "${child.displayName} level was set to ${level}"])
-  child.parse(evts)    
+  child.parse([[name: "level", value: level, descriptionText: "${child.displayName} level was set to ${level}"]])
 }
 
 void componentStartLevelChange(device, direction) {
