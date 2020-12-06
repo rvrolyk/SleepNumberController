@@ -59,10 +59,32 @@ preferences {
   page name: "diagnosticsPage"
 }
 
+def appButtonHandler(btn) {
+  if (btn == "pause") {
+    state.paused = !state.paused
+    if (state.paused) {
+      debug "Paused, unscheduling..."
+      unschedule()
+      unsubscribe()
+      updateLabel()
+    } else {
+      initialize()
+    }
+  }
+}
+
 def homePage() {
-  def devices = getBedDevices()
+  def currentDevices = getBedDeviceData()
 
   dynamicPage(name: "homePage") {
+    if (state.paused) {
+      state.pauseButtonName = "Resume"
+    } else {
+      state.pauseButtonName = "Pause"
+    }
+    section("") {
+      input name: "pause", type: "button", title: state.pauseButtonName
+    }
     section("<b>Settings</b>") {
       input name: "login", type: "text", title: "sleepnumber.com email",
           description: "Email address you use with Sleep Number", submitOnChange: true
@@ -76,16 +98,23 @@ def homePage() {
       if (!settings.login || !settings.password) {
         paragraph "Add login and password to find beds"
       } else {
-        if (devices.size() > 0) {
+        if (currentDevices.size() > 0) {
           paragraph "Current beds"
-          devices.each { device ->
-            paragraph  "${device.getState().bedId}  (dev:${device.id}) / ${device.label} / ${device.getState().side} / ${device.getState().type}"
+          currentDevices.each { device ->
+            String output = ""
+            if (device.isChild) {
+              output += "            "
+            } else {
+              output += device.bedId
+            }
+            output += " (<a href=\"/device/edit/${device.deviceId}\">dev:${device.deviceId}</a>) / ${device.name} / ${device.side} / ${device.type}"
+            paragraph output
           }
           paragraph "<br>Note: <i>To remove a device remove it from the Devices list</i>"
         }
         // Only show bed search if user entered creds
         if (settings.login && settings.password) {
-          href "findBedPage", title: "Create New Bed", description: "Search for beds"
+          href "findBedPage", title: "Create or Modify Bed", description: "Search for beds"
         }
       }
     }
@@ -116,6 +145,7 @@ def homePage() {
 
 def installed() {
   initialize()
+  state.paused = false
 }
 
 def updated() {
@@ -140,16 +170,20 @@ def updateLabel() {
   if (!app.label.contains("<span") && state?.displayName != app.label) {
     state.displayName = app.label
   }
-  if (state?.status) {
+  if (state?.status || state?.paused) {
+    def status = state?.status
     String label = "${state.displayName} <span style=color:"
-    if (state.status == "Online") {
+    if (state?.paused) {
+      status = "(Paused)"
+      label += "red"
+    } else if (state.status == "Online") {
       label += "green"
     } else if (state.status.contains("Login")) {
       label += "red"
     } else {
       label += "orange"
     }
-    label += ">${state.status}</span>"
+    label += ">${status}</span>"
     app.updateLabel(label)
   }
 }
@@ -159,6 +193,7 @@ def initializeBedInfo() {
   def info = getBeds()
   state.bedInfo = [:]
   info.beds.each() { bed ->
+    debug "Bed id ${bed.bedId}"
     if (!state.bedInfo.containsKey(bed.bedId)) {
       state.bedInfo[bed.bedId] = [:]
     }
@@ -173,18 +208,27 @@ def initializeBedInfo() {
         components << component.type
       }
     }
-    state.bedInfo[bed.bedId].components = components
+    if (!components) {
+      log.info "No components found, assuming 'Base' at minimum"
+      components << "Base"
+    } else {
+      state.bedInfo[bed.bedId].components = components
+    }
+  }
+  if (!state.bedInfo) {
+    log.warn "No bed state set up"
   }
 }
 
 /**
  * Gets all bed child devices even if they're in a virtual container.
- * Will not return the virtual container(s)
+ * Will not return the virtual container(s) or children of a parent
+ * device.
  */
 def getBedDevices() {
   children = []
   // If any child is a virtual container, iterate that too
-  getChildDevices().each() { child ->
+  getChildDevices().each { child ->
     if (child.hasAttribute("containerSize")) {
       children.addAll(child.childList())
     } else {
@@ -194,7 +238,52 @@ def getBedDevices() {
   return children
 }
 
-def refreshChildDevices1() {
+/**
+ * Returns a list of maps of all bed devices, even those that are child devices.
+ * The map keys are: name, type, side, deviceId, bedId, isChild
+ */
+List<Map> getBedDeviceData() {
+  // Start with all bed devices.
+  def devices = getBedDevices()
+  List<Map> output = []
+  devices.each { device -> 
+    def side = device.getState().side
+    def bedId = device.getState().bedId
+    def type = device.getState()?.type ?: "Parent"
+    
+    output << [
+      name: device.label,
+      type: type,
+      side: side,
+      deviceId: device.id,
+      bedId: bedId,
+      isChild: false,
+    ]
+    device.getChildDevices().each { child ->
+      output << [
+        name: child.label,
+        type: device.getChildType(child.deviceNetworkId),
+        side: side,
+        deviceId: child.id,
+        bedId: bedId,
+        isChild: true,
+      ]
+    }
+  }
+  return output
+}
+
+List<String> getBedDeviceTypes() {
+  def data = getBedDeviceData()
+  // TODO: Consider splitting this by side or even by bed.
+  // SKipping for now as most are probably using the same device types
+  // per side and probably only have one bed.
+  return data.collect { it.type }
+}
+
+// Use with #schedule as apparently it's not good to mix #runIn method call
+// and #schedule method call.
+def scheduledRefreshChildDevices() {
   refreshChildDevices()
 }
 
@@ -221,25 +310,55 @@ def refreshChildDevices(ignored, ignoredDevId) {
 def setRefreshInterval(val, ignored) {
   debug "setRefreshInterval(${val})"
   if (val && val > 0) {
-    schedule("0 /${val} * * * ?", "refreshChildDevices1")
+    schedule("0 /${val} * * * ?", "scheduledRefreshChildDevices")
   } else {
     debug "Resetting interval to ${settings.refreshInterval}"
-    schedule("0 /${settings.refreshInterval} * * * ?", "refreshChildDevices1")
+    schedule("0 /${settings.refreshInterval} * * * ?", "scheduledRefreshChildDevices")
   }
 }
 
 def findBedPage() {
   def responseData = getBedData()
+  def devices = getBedDevices()
+  def sidesSeen = []
+  def childDevices = []
   dynamicPage(name: "findBedPage") {
     if (responseData.beds.size() > 0) {
       responseData.beds.each { bed ->
         section("Bed: ${bed.bedId}") {
-          def leftPresence = bed.leftSide.isInBed
-          def rightPresence = bed.rightSide.isInBed
-          href "selectBedPage", title: "Left Side", description: presenceText(leftPresence),
-              params: [bedId: bed.bedId, side: "Left", presence: leftStatus]
-          href "selectBedPage", title: "Right Side", description: presenceText(rightPresence),
-              params: [bedId: bed.bedId, side: "Right", presence: rightStatus]
+          if (devices.size() > 0) {
+            for (def dev : devices) {
+              if (!dev.getState().type || dev.getState()?.type == "presence") {
+                if (!dev.getState().type) {
+                  childDevices << dev.getState().side
+                }
+                sidesSeen << dev.getState().side
+                href "selectBedPage", title: dev.label, description: "Click to modify",
+                    params: [bedId: bed.bedId, side: dev.getState().side, label: dev.label]
+              }
+            }
+            if (childDevices.size() < 2) {
+              input "createNewChildDevices", "bool", title: "Create new child device types", defaultValue: false, submitOnChange: true
+              if (settings.createNewChildDevices) {
+                if (!childDevices.contains("Left")) {
+                  href "selectBedPage", title: "Left Side", description: "Click to create",
+                      params: [bedId: bed.bedId, side: "Left", label: ""]
+                }
+                if (!childDevices.contains("Right")) {
+                  href "selectBedPage", title: "Right Side", description: "Click to create",
+                      params: [bedId: bed.bedId, side: "Right", label: ""]
+                }
+              }
+            }
+          }
+          if (!sidesSeen.contains("Left")) {
+            href "selectBedPage", title: "Left Side", description: "Click to create",
+                params: [bedId: bed.bedId, side: "Left", label: ""]
+          }
+          if (!sidesSeen.contains("Right")) {
+            href "selectBedPage", title: "Right Side", description: "Click to create",
+                params: [bedId: bed.bedId, side: "Right", label: ""]
+          }
         }
       }
     } else {
@@ -255,8 +374,8 @@ def presenceText(presence) {
 }
 
 def selectBedPage(params) {
-  settings.newDeviceName = null
-
+  initializeBedInfo()
+  app.updateSetting("newDeviceName", "")
   dynamicPage(name: "selectBedPage") {
     if (!params?.bedId) {
       section {
@@ -266,28 +385,36 @@ def selectBedPage(params) {
     }
     section {
       paragraph """<b>Instructions</b>
-Enter a name, then choose whether or not to use a virtual container for the devices and then choose the types of devices to create.
-Note all devices are the same on Hubitat, the only difference is how they behave to dim and on/off commands.  This is so that they may be used with external assistants such as Google Assistant or Amazon Alexa.  If you don't care about such use cases (and only want RM control or just presence), you can just use the presence type.
+Enter a name, then choose whether or not to use child devices or a virtual container for the devices and then choose the types of devices to create.
+Note that if using child devices, the parent device will contain all the special commands along with bed specific status while the children are simple
+switches or dimmers.  Otherwise, all devices are the same on Hubitat, the only difference is how they behave to dim and on/off commands.  This is so that they may be used with external assistants such as Google Assistant or Amazon Alexa.  If you don't care about such use cases (and only want RM control or just presence), you can just use the presence type.
+<br>
 See <a href="https://community.hubitat.com/t/release-virtual-container-driver/4440" target=_blank>this post</a> for virtual container.
 """
         paragraph """<b>Device information</b>
 Bed ID: ${params.bedId}
 Side: ${params.side}
-Presence: ${presenceText(params.presence)}
 """ 
     }
-    // TODO: Consider showing only valid options for foundation and foot warmer.  That is, if warming is not a component,
-    // don't show it and if base is not a component, don't show head or foot.
     section {
-      input "newDeviceName", "text", title: "Device Name",
-          description: "What do you want to call the devices?", submitOnChange: true,
+      input "newDeviceName", "text", title: "Device Name", defaultValue: settings.newDeviceName ?: params.label,
+          description: "What prefix do you want for the devices?", submitOnChange: true,
           required: true
-      input "useContainer", "bool", title: "Use virtual container?", defaultValue: true,
+      input "useChildDevices", "bool", title: "Use child devices? (recommended)", defaultValue: true,
          submitOnChange: true
+      if (!settings.useChildDevices) {
+        input "useContainer", "bool", title: "Use virtual container?", defaultValue: false,
+           submitOnChange: true
+      }
       paragraph "A presence type device exposes on/off as switching to a preset level (on) and flat (off).  Dimming will change the Sleep Number."
-      input "createPresence", "bool",
-          title: "Create presence device for ${params.side.toLowerCase()} side?",
-          defaultValue: true, submitOnChange: true
+      if (settings.useChildDevices) {
+        paragraph "This is the parent device when child devices are used"
+        settings.createPresence = true
+      } else {
+        input "createPresence", "bool",
+            title: "Create presence device for ${params.side.toLowerCase()} side?",
+            defaultValue: true, submitOnChange: true
+      }
       paragraph "A head type device exposes on/off as switching to a preset level (on) and  flat (off).  Dimming will change the head position (0 is flat, 100 is fully raised)."
       input "createHeadControl", "bool",
          title: "Create device to control the head of the ${params.side.toLowerCase()} side?",
@@ -296,16 +423,34 @@ Presence: ${presenceText(params.presence)}
       input "createFootControl", "bool",
          title: "Create device to control the foot of the ${params.side.toLowerCase()} side?",
          defaultValue: true, submitOnChange: true
-      paragraph "A foot type device exposes on/off as switching the foot warming on or off.  Dimming will change the heat levels (1: low, 2: medium, 3: high)."
-      input "createFootWarmer", "bool",
-         title: "Create device to control the foot warmer of the ${params.side.toLowerCase()} side?",
-         defaultValue: true, submitOnChange: true
+      if (state.bedInfo[params.bedId].components.contains("Warming")) {
+        paragraph "A foot type device exposes on/off as switching the foot warming on or off.  Dimming will change the heat levels (1: low, 2: medium, 3: high)."
+        input "createFootWarmer", "bool",
+           title: "Create device to control the foot warmer of the ${params.side.toLowerCase()} side?",
+           defaultValue: true, submitOnChange: true
+      }
+      if (settings.useChildDevices) {
+        determineUnderbedLightSetup(params.bedId)
+        paragraph "Underbed lighting creates a dimmer allowing the light to be turned on or off at different levels with timer based on parent device preference."
+        input "createUnderbedLighting", "bool",
+         title: "Create device to control the underbed lighting of the ${params.side.toLowerCase()} side?",
+           defaultValue: false, submitOnChange: true
+        if (state.bedInfo[params.bedId].outlets.size > 1) {
+          paragraph "Outlet creates a switch allowing foundation outlet for this side to be turned on or off."
+          input "createOutlet", "bool",
+           title: "Create device to control the outlet of the ${params.side.toLowerCase()} side?",
+             defaultValue: false, submitOnChange: true
+        }
+      }
     }
     section {
       String msg = "Will create the following devices"
       def containerName = ""
       def types = []
-      if (settings.useContainer) {
+      if (settings.useChildDevices) {
+        settings.useContainer = false
+        msg += " with each side as a primary device and each type as a child device of the side"
+      } else if (settings.useContainer) {
         containerName = "${newDeviceName} Container"
         msg += " in virtual container '${containerName}'"
       }
@@ -326,6 +471,14 @@ Presence: ${presenceText(params.presence)}
         msg += "<li>${createDeviceLabel(newDeviceName, 'foot warmer')}</li>"
         types.add("foot warmer")
       }
+      if (settings.createUnderbedLighting) {
+        msg += "<li>${createDeviceLabel(newDeviceName, 'underbed light')}</li>"
+        types.add("underbed light")
+      }
+      if (settings.createOutlet) {
+        msg += "<li>${createDeviceLabel(newDeviceName, 'outlet')}</li>"
+        types.add("outlet")
+      }
       msg += "</ol>"
       paragraph msg
       href "createBedPage", title: "Create Devices", description: null,
@@ -333,6 +486,7 @@ Presence: ${presenceText(params.presence)}
         presence: params.present,
         bedId: params.bedId,
         side: params.side,
+        useChildDevices: settings.useChildDevices,
         useContainer: settings.useContainer,
         containerName: containerName,
         types: types
@@ -351,6 +505,10 @@ String createDeviceLabel(String name, String type) {
       return "${name} Foot"
     case "foot warmer":
       return "${name} Foot Warmer"
+    case "underbed light":
+      return "${name} Underbed Light"
+    case "outlet":
+      return "${name} Outlet"
     default:
       return "${name} Unknown"
   }
@@ -363,26 +521,68 @@ def createBedPage(params) {
   }
   def existingDevices = getBedDevices()
   def devices = []
-  params.types.each { type ->
-    def deviceId = "sleepnumber.${params.bedId}.${params.side}.${type.replaceAll(' ', '_')}"
-    if (existingDevices.find{ it.data.vcId == deviceId }) {
-      log.info "Not creating device ${deviceId}, it already exists"
+  // TODO: Consider allowing more than one identical device for debug purposes.
+  if (params.useChildDevices) {
+    // Bed Ids seem to always be negative so convert to positive for the device
+    // id for better formatting.
+    def bedId = Math.abs(Long.valueOf(params.bedId))
+    def deviceId = "sleepnumber.${bedId}.${params.side}"
+    def label = createDeviceLabel(settings.newDeviceName, "presence") 
+    def parent = existingDevices.find{ it.deviceNetworkId == deviceId }
+    if (parent) {
+      log.info "Parent device ${deviceId} already exists"
     } else {
-      def label = createDeviceLabel(settings.newDeviceName, type) 
-      def device = null
-      if (container) {
-        debug "Creating new child device ${deviceId} with label ${label} in container ${params.containerName}"
-        container.appCreateDevice(label, DRIVER_NAME, NAMESPACE, deviceId)
-        // #appCreateDevice doesn't return the device so find it
-        device = container.childList().find({it.data.vcId == deviceId})
-      } else {
-        device = addChildDevice(NAMESPACE, DRIVER_NAME, deviceId, null, [label: label])
+      debug "Creating parent device ${deviceId}"
+      parent = addChildDevice(NAMESPACE, DRIVER_NAME, deviceId, null, [label: label])
+      parent.setStatus(params.presence)
+      parent.setBedId(params.bedId)
+      parent.setSide(params.side)
+      devices.add(parent)
+    }
+    // If we are using child devices then we create a presence device and
+    // all others are children of it.
+    params.types.each { type ->
+      if (type != "presence") {
+        def childId = deviceId + "-" + type.replaceAll(" ", "")
+        switch (type) {
+          case "outlet":
+            driverType = "Switch"
+            break
+          case "head":
+          case "foot":
+          case "foot warmer":
+          case "underbed light":
+            driverType = "Dimmer"
+        }
+        def newDevice = parent.createChildDevice(childId, "Generic Component ${driverType}",
+            createDeviceLabel(settings.newDeviceName, type))
+        if (newDevice) {
+          devices.add(newDevice)
+        }
       }
-      device.setStatus(params.presence)
-      device.setBedId(params.bedId)
-      device.setSide(params.side)
-      device.setType(type)
-      devices.add(device)
+    }
+  } else {
+    params.types.each { type ->
+      def deviceId = "sleepnumber.${params.bedId}.${params.side}.${type.replaceAll(' ', '_')}"
+      if (existingDevices.find{ it.data.vcId == deviceId }) {
+        log.info "Not creating device ${deviceId}, it already exists"
+      } else {
+        def label = createDeviceLabel(settings.newDeviceName, type) 
+        def device = null
+        if (container) {
+          debug "Creating new child device ${deviceId} with label ${label} in container ${params.containerName}"
+          container.appCreateDevice(label, DRIVER_NAME, NAMESPACE, deviceId)
+          // #appCreateDevice doesn't return the device so find it
+          device = container.childList().find({it.data.vcId == deviceId})
+        } else {
+          device = addChildDevice(NAMESPACE, DRIVER_NAME, deviceId, null, [label: label])
+        }
+        device.setStatus(params.presence)
+        device.setBedId(params.bedId)
+        device.setSide(params.side)
+        device.setType(type)
+        devices.add(device)
+      }
     }
   }
   // Reset the bed info since we added more.
@@ -390,14 +590,23 @@ def createBedPage(params) {
   settings.newDeviceName = null
   dynamicPage(name: "selectDevicePage") {
     section {
-      paragraph("Created new devices" + (params.useContainer ? " in container ${params.containerName}: " : ":"))
+      def header = "Created new devices"
+      if (params.useChildDevices) {
+        header += " using child devices"
+      } else if (params.useContainer) {
+        header += " in container ${params.containerName}"
+      }
+      header += ":"
+      paragraph(header)
       def info = "<ol>"
       devices.each { device ->
         info += "<li>"
-        info += "Label: ${device.label}"
-        info += "<br>Bed ID: ${device.getState().bedId}"
-        info += "<br>Side: ${device.getState().side}"
-        info += "<br>Type: ${device.getState().type}"
+        info += "${device.label}"
+        if (!params.useChildDevices) {
+          info += "<br>Bed ID: ${device.getState().bedId}"
+          info += "<br>Side: ${device.getState().side}"
+          info += "<br>Type: ${device.getState()?.type}"
+        }
         info += "</li>"
       }
       info += "</ol>"
@@ -507,9 +716,23 @@ def processBedData(responseData) {
   def bedFailures = [:]
   def loggedError = [:]
   def sleepNumberFavorites = [:]
+  def outletData = [:]
+  def underbedLightData = [:]
+  
+  def deviceTypes = getBedDeviceTypes()
   
   for (def device : getBedDevices()) {
+    if (!outletData.get(device.getState().bedId)) {
+      outletData[device.getState().bedId] = [:]
+      underbedLightData[device.getState().bedId] = [:]
+    }
+        
     for (def bed : responseData.beds) {
+      // Make sure the various bed state info is set up so we can use it later.
+      if (!state?.bedInfo || !state?.bedInfo[bed.bedId] || !state?.bedInfo[bed.bedId]?.components) {
+        log.warn "state.bedInfo somehow lost, re-caching it"
+        initializeBedInfo()
+      }
       if (device.getState().bedId == bed.bedId) {
         if (!bedFailures.get(bed.bedId) && !privacyStatus.get(bed.bedId)) {
           privacyStatus[bed.bedId] = getPrivacyMode(bed.bedId)
@@ -530,12 +753,39 @@ def processBedData(responseData) {
         }
         if (!bedFailures.get(bed.bedId)
             && !footwarmingStatus.get(bed.bedId)
-            && state.bedInfo[bed.bedId].components.contains("Warming")) {
-          // Only try to update the warming state if the bed actually has it.
+            && state.bedInfo[bed.bedId].components.contains("Warming")
+            && (deviceTypes.contains("foot warmer") || deviceTypes.contains("footwarmer"))) {
+          // Only try to update the warming state if the bed actually has it
+          // and there's a device for it.
           footwarmingStatus[bed.bedId] = getFootWarmingStatus(device.getState().bedId)
           if (!footwarmingStatus.get(bed.bedId)) {
             bedFailures[bed.bedId] = true
           } 
+        }
+        // If there's underbed lighting or outlets then poll for that data as well.  Don't poll
+        // otherwise since it's just another network request and may be unwanted.
+        if (deviceTypes.contains("underbedlight")) {
+          determineUnderbedLightSetup(bed.bedId)
+          if (!outletData[bed.bedId][3]) {
+            outletData[bed.bedId][3] = getOutletState(bed.bedId, 3)
+          }
+          if (!underbedLightData[bed.bedId]) {
+            underbedLightData[bed.bedId] = getUnderbedLightState(bed.bedId)
+            underbedLightData[bed.bedId] << getUnderbedLightBrightness(bed.bedId)
+          }
+          if (state.bedInfo[bed.bedId].outlets.size() > 1) {
+            if (!outletData[bed.bedId][4]) {
+              outletData[bed.bedId][4] = getOutletState(bed.bedId, 4)
+            }
+          } else {
+            outletData[bed.bedId][4] = outletData[bed.bedId][3] 
+          }
+        }
+        if (deviceTypes.contains("outlet")) {
+          if (!outletData[device.getState().bedId][1]) {
+            outletData[bed.bedId][1] = getOutletState(bed.bedId, 1)
+            outletData[bed.bedId][2] = getOutletState(bed.bedId, 2)
+          }
         }
 
         def bedSide = device.getState().side == "Right" ? bed.rightSide : bed.leftSide
@@ -544,6 +794,25 @@ def processBedData(responseData) {
           sleepNumber: bedSide.sleepNumber,
           privacyMode: privacyStatus[bed.bedId],
         ]
+        if (underbedLightData.get(bed.bedId)) {
+          def outletNumber = device.getState().side == "Left" ? 3 : 4
+          def state = underbedLightData[bed.bedId].enableAuto ? "Auto" :
+              outletData[bed.bedId][outletNumber].setting == 1 ? "On" : "Off"
+          def timer = state == "Auto" ? "Not set" :
+              outletData[bed.bedId][outletNumber].timer ? outletData[bed.bedId][outletNumber].timer : "Forever"
+          def brightness = underbedLightData[bed.bedId]."fs${device.getState().side}UnderbedLightPWM"
+          statusMap << [
+            underbedLightState: state,
+            underbedLightTimer: timer,
+            underbedLightBrightness: brightness,
+          ]
+        }
+        if (outletData.get(bed.bedId) && outletData[bed.bedId][1]) {
+          def outletNumber = device.getState().side == "Left" ? 1 : 2
+          statusMap << [
+            outletState: outletData[bed.bedId][outletNumber].setting == 1 ? "On" : "Off"
+          ]
+        }
         // Check for valid foundation status and footwarming status data before trying to use it
         // as it's possible the HTTP calls failed.
         if (foundationStatus.get(bed.bedId)) {
@@ -821,14 +1090,106 @@ def setSleepNumberFavorite(ignored, devId) {
   setSleepNumber(favorite, devId)
 }
 
+def getOutletState(String bedId, Integer outlet) {
+  return httpRequest("/rest/bed/${bedId}/foundation/outlet",
+        this.&get, null, [outletId: outlet])
+}
+
+def setOutletState(state, devId) {
+  def device = getBedDevices().find { devId == it.deviceNetworkId }
+  if (!device) {
+    log.error "Bed device with id ${devId} is not a valid child"
+    return
+  }
+  if (!state) {
+    log.error "Missing state"
+    return
+  }
+  def outletNum = device.getState().side == "Left" ? 1 : 2
+  setOutletState(device.getState().bedId, outletNum, state)
+}
+
+/**
+ * Sets the state of the given outlet.
+ * @param bedId: the bed id
+ * @param outletId: 1-4
+ * @param state: on or off
+ * @param timer: a valid minute duration (for outlets 3 and 4 only)
+ * Timer is the only optional parameter.
+ */
+def setOutletState(bedId, outletId, state, timer = null) {
+  if (!bedId || !outletId || !state) {
+    log.error "Not all required arguments present"
+    return
+  }
+
+  if (timer && !VALID_LIGHT_TIMES.contains(timer)) {
+    log.error "Invalid underbed light timer ${timer}.  Valid values are ${VALID_LIGHT_TIMES}"
+    return
+  }
+
+  state = (state ?: "").toLowerCase()
+
+  if (outletId < 3) {
+    // No timer is valid for outlets other than 3 and 4
+    timer = null
+  } else {
+    timer = timer ?: 0
+  }
+  body = [
+    timer: timer,
+    setting: state == "on" ? 1 : 0,
+    outletId: outletId
+  ]
+  httpRequest("/rest/bed/${bedId}/foundation/outlet", this.&put, body)
+  runIn(10, "refreshChildDevices") 
+}
+
+def getUnderbedLightState(String bedId) {
+  httpRequest("/rest/bed/${bedId}/foundation/underbedLight", this.&get)
+}
+
+def getUnderbedLightBrightness(String bedId) {
+  determineUnderbedLightSetup(bedId)
+  def brightness = httpRequest("/rest/bed/${bedId}/foundation/system", this.&get)
+  if (state.bedInfo[bedId].outlets.size() <= 1) {
+    // Strangely if there's only one light then the `right` side is the set value
+    // so just set them both the same.
+    brightness.fsLeftUnderbedLightPWM = brightness.fsRightUnderbedLightPWM
+  }
+  return brightness
+}
+
+/**
+ * Determines how many underbed light exists and sets up state.
+ */
+def determineUnderbedLightSetup(String bedId) {
+  if (!state.bedInfo[bedId].outlets) {
+    debug "Determining underbed lighting outlets for ${bedId}"
+    // Determine if this bed has 1 or 2 underbed lighting outlets and store for future use.
+    def outlet3 = getOutletState(bedId, 3)
+    def outlet4 = getOutletState(bedId, 4)
+    def outlets = []
+    if (outlet3) {
+      outlets << 3
+    }
+    if (outlet4) {
+      outlets << 4
+    }
+    state.bedInfo[bedId].outlets = outlets
+  }
+}
+
 /**
  * Sets the underbed lighting per given params.
- * At least one parameter is required or this is a no-op.
  * If only timer is given, state is assumed to be `on`.
- * The params map may include:
+ * If the foundation has outlet 3 and 4 then the bed side
+ * will be used to determine which to enable.
+ * The params map must include:
  * state: on, off, auto
+ * And may include:
  * timer: valid minute duration
- * brightness: low, medium, high
+ * brighness: low, medium, high
  */
 def setUnderbedLightState(params, devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
@@ -837,28 +1198,19 @@ def setUnderbedLightState(params, devId) {
     return
   }
 
-  if (!params.state
-      && !params.timer
-      && !params.brightness) {
-    log.error "No params present"
+  if (!params.state) {
+    log.error "Missing param state"
     return
   }
 
-  if (params.timer && !VALID_LIGHT_TIMES.contains(params.timer)) {
-    log.error "Invalid underbed light timer ${params.timer}.  Valid values are ${VALID_LIGHT_TIMES}"
-    return
-  }
-
-  params.state = (params.state ?: "").toLowerCase()
-
-  // If there's a timer but no state, state should be 'on'
-  if (params.timer && !params.state) {
-    params.state = "on"
-  }
+  params.state = params.state.toLowerCase()
 
   // A timer with a state of auto makes no sense, choose to honor state vs. timer.
   if (params.state == "auto") {
     params.timer = 0
+  }
+  if (params.timer) {
+    params.state = "on"
   }
 
   if (params.brightness && !VALID_LIGHT_BRIGHTNESS.contains(params.brightness)) {
@@ -872,23 +1224,36 @@ def setUnderbedLightState(params, devId) {
   ]
   httpRequest("/rest/bed/${device.getState().bedId}/foundation/underbedLight", this.&put, body)
 
-  // Now set outlet data.
-  body = [
-    timer: params.timer ?: 0,
-    setting: params.state == "on" ? 1 : 0,
-    outletId: 3 /* The underbed light.  Does this ever change? */
-  ]
-  httpRequest("/rest/bed/${device.getState().bedId}/foundation/outlet", this.&put, body)
+  determineUnderbedLightSetup(device.getState().bedId)
+  def rightBrightness = params.brightness
+  def leftBrightness = params.brightness
+  def outletNum = 3
+  if (state.bedInfo[device.getState().bedId].outlets.size() > 1) {
+    // Two outlets so set the side corresponding to the device rather than
+    // defaulting to 3 (which should be a single light)
+    if (device.getState().side == "Left") {
+      outletNum = 3
+      rightBrightness = null
+      leftBrightness = params.brightness
+    } else {
+      outletNum = 4
+      rightBrightness = params.brightness
+      leftBrightness = null
+    }
+  }
 
-  // If brightness was given then set it.  Strangely, though PWM (whatever that is) is broken
-  // down by side, the API expects both to be set to the same value.
+  setOutletState(device.getState().bedId, outletNum,
+      params.state == "auto" ? "off" : params.state, params.timer)
+
+  // If brightness was given then set it.
   if (params.brightness) {
     body = [
-      rightUnderbedLightPWM: params.brightness,
-      leftUnderbedLightPWM: params.brightness
+      rightUnderbedLightPWM: rightBrightness,
+      leftUnderbedLightPWM: leftBrightness
     ]
     httpRequest("/rest/bed/${device.getState().bedId}/foundation/system", this.&put, body)
   }
+  runIn(10, "refreshChildDevices") 
 }
 
 
@@ -1024,11 +1389,20 @@ def httpRequest(path, method = this.&get, body = null, query = null, alreadyTrie
       return httpRequest(path, method, body, queryString, true)
     } else {
       // There was some other error so retry if that hasn't already been done
-      // otherwise give up.
-      if (!alreadyTriedRequest) {
+      // otherwise give up.  Not Found errors won't improve with retry to don't
+      // bother.
+      if (!alreadyTriedRequest && !e.toString().contains("Not Found")) {
         log.error "Retrying failed request ${statusParams}\n${e}"
         return httpRequest(path, method, body, queryString, true)
       } else {
+        if (e.toString().contains("Not Found")) {
+          // Don't bother polluting logs for Not Found errors as they are likely
+          // either intentional (trying to figure out if outlet exists) or a code
+          // bug.  In the latter case we still want diagnostic data so we use
+          // debug logging.
+          debug "Error making request ${statusParams}\n${e}"
+          return result
+        }
         log.error "Error making request ${statusParams}\n${e}"
         state.status = "API Error"
         return result

@@ -36,12 +36,19 @@ A driver and app to allow management of Sleep Number flexible bases in Hubitat. 
 1. Enter your Sleep Number username and password and click `Create New Bed`
 1. Follow the remaining pages to set up one or more devices for each side of the bed
 
+As of version 3, you may create bed devices as a parent/child device.  This is strongly recommended
+if you intend to use devices for the head, foot, etc as it reduces the number of devices by one (no
+virtual container) and simplifies the device logic by relying on Hubitat maintained component drivers.
+ Additionally, I may opt to remove support for the old structure in the future to simplify the code.
+
+Underbed lighting and outlets are also supported in the parent/child structure but not the old one.
+
 # Usage
 
-I've attempted to allow multiple device types to be set up (using the same driver) in order to expose multiple capabilities
-via Amazon Alexa or Google Assistant.  If you only care about usage via Rule Machine, you can ignore all but the primary *presence*
-device type as every device exposes the same commands.  Note that not all commands are exposed at the level needed for external
-support; commands supported directly are noted below and functionality is described.
+I've attempted to allow multiple device types to be set up in order to expose multiple capabilities
+via Amazon Alexa or Google Assistant.  If you only care about usage via Rule Machine, you can ignore all but the primary 
+device type.  Note that not all commands are exposed at the level needed for external support; commands supported directly
+are noted below and functionality is described.
 
 ## Supported Commands
 
