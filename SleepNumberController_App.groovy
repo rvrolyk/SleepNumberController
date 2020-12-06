@@ -521,6 +521,7 @@ def createBedPage(params) {
   }
   def existingDevices = getBedDevices()
   def devices = []
+  // TODO: Consider allowing more than one identical device for debug purposes.
   if (params.useChildDevices) {
     // Bed Ids seem to always be negative so convert to positive for the device
     // id for better formatting.

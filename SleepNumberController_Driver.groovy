@@ -236,7 +236,7 @@ def isPresent() {
 
 def arrived() {
   debug "arrived()"
-  if (!isPresent() && (!state?.type || state?.type == "presence")) {
+  if (!isPresent() && isPresenceOrParent()) {
     log.info "${device.displayName} arrived"
     sendEvent name: "presence", value: "present"
   }
@@ -244,7 +244,7 @@ def arrived() {
 
 def departed() {
   debug "departed()"
-  if (isPresent() && (!state?.type || state?.type == "presence")) {
+  if (isPresent() && isPresenceOrParent()) {
     log.info "${device.displayName} departed"
     sendEvent name: "presence", value: "not present"
     if (enableSleepData) {
@@ -390,7 +390,7 @@ def setUnderbedLightState(state, timer = "Forever", brightness = "High") {
 }
 
 def getSleepData() {
-  if (state?.type != "presence") {
+  if (isPresenceOrParent()) {
     log.error "Sleep data only available on presence (main) device, this is ${state.type}"
     return
   }
@@ -682,6 +682,10 @@ def setType(val) {
   } 
   state.typeInfo = msg
   state.type = val
+}
+
+def isPresenceOrParent() {
+  return !state?.type || state?.type == "presence"
 }
 
 //-----------------------------------------------------------------------------
