@@ -66,7 +66,7 @@ metadata {
     attribute "privacyMode", "enum", ["on", "off"]
     attribute "underbedLightTimer", "string" // String so we can use "Forever"
     attribute "underbedLightState", "enum", UNDERBED_LIGHT_STATES
-    attribute "underbedLightBrightness", "enum", UNDERBED_LIGHT_BRIGHTNESS.collect{ it.key } 
+    attribute "underbedLightBrightness", "enum", UNDERBED_LIGHT_BRIGHTNESS.collect{ it.key }
     attribute "outletState", "enum", OUTLET_STATES
     // Attributes for sleep IQ data
     attribute "sleepMessage", "string"
@@ -679,7 +679,7 @@ def setType(val) {
     case "foot warmer":
       msg += "off switches foot warming off, on will set it to preferred value for preferred time. Dimming changes the heat levels (1: low, 2: medium, 3: high)."
       break
-  } 
+  }
   state.typeInfo = msg
   state.type = val
 }
@@ -722,7 +722,7 @@ void componentOn(device) {
   def type = getChildType(device.deviceNetworkId)
   debug "componentOn $type"
   switch (type) {
-    case "outlet": 
+    case "outlet":
       setOutletState("On")
       break
     case "underbedlight":

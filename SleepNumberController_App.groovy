@@ -246,11 +246,11 @@ List<Map> getBedDeviceData() {
   // Start with all bed devices.
   def devices = getBedDevices()
   List<Map> output = []
-  devices.each { device -> 
+  devices.each { device ->
     def side = device.getState().side
     def bedId = device.getState().bedId
     def type = device.getState()?.type ?: "Parent"
-    
+
     output << [
       name: device.label,
       type: type,
@@ -527,7 +527,7 @@ def createBedPage(params) {
     // id for better formatting.
     def bedId = Math.abs(Long.valueOf(params.bedId))
     def deviceId = "sleepnumber.${bedId}.${params.side}"
-    def label = createDeviceLabel(settings.newDeviceName, "presence") 
+    def label = createDeviceLabel(settings.newDeviceName, "presence")
     def parent = existingDevices.find{ it.deviceNetworkId == deviceId }
     if (parent) {
       log.info "Parent device ${deviceId} already exists"
@@ -567,7 +567,7 @@ def createBedPage(params) {
       if (existingDevices.find{ it.data.vcId == deviceId }) {
         log.info "Not creating device ${deviceId}, it already exists"
       } else {
-        def label = createDeviceLabel(settings.newDeviceName, type) 
+        def label = createDeviceLabel(settings.newDeviceName, type)
         def device = null
         if (container) {
           debug "Creating new child device ${deviceId} with label ${label} in container ${params.containerName}"
@@ -718,15 +718,15 @@ def processBedData(responseData) {
   def sleepNumberFavorites = [:]
   def outletData = [:]
   def underbedLightData = [:]
-  
+
   def deviceTypes = getBedDeviceTypes()
-  
+
   for (def device : getBedDevices()) {
     if (!outletData.get(device.getState().bedId)) {
       outletData[device.getState().bedId] = [:]
       underbedLightData[device.getState().bedId] = [:]
     }
-        
+
     for (def bed : responseData.beds) {
       // Make sure the various bed state info is set up so we can use it later.
       if (!state?.bedInfo || !state?.bedInfo[bed.bedId] || !state?.bedInfo[bed.bedId]?.components) {
@@ -749,7 +749,7 @@ def processBedData(responseData) {
           foundationStatus[bed.bedId] = getFoundationStatus(device.getState().bedId, device.getState().side)
           if (!foundationStatus.get(bed.bedId)) {
             bedFailures[bed.bedId] = true
-          } 
+          }
         }
         if (!bedFailures.get(bed.bedId)
             && !footwarmingStatus.get(bed.bedId)
@@ -778,7 +778,7 @@ def processBedData(responseData) {
               outletData[bed.bedId][4] = getOutletState(bed.bedId, 4)
             }
           } else {
-            outletData[bed.bedId][4] = outletData[bed.bedId][3] 
+            outletData[bed.bedId][4] = outletData[bed.bedId][3]
           }
         }
         if (deviceTypes.contains("outlet")) {
@@ -923,7 +923,7 @@ def setFoundationAdjustment(Map params, devId) {
   // just wait until it should be done and then refresh once.  
   // We add an extra second just to increase the odds that it's actually done.
   def waitTime = params.actuator == "H" ? 36 : 19
-  runIn(waitTime, "refreshChildDevices") 
+  runIn(waitTime, "refreshChildDevices")
 }
 
 /**
@@ -1010,7 +1010,7 @@ def setFoundationPreset(preset, devId) {
   httpRequest("/rest/bed/${device.getState().bedId}/foundation/preset", this.&put, body)
   // It takes ~35 seconds for a FlexFit3 head to go from 0-100 (or back) and about 18 seconds for the foot.
   // I didn't run a time per preset so just wait 35 seconds which is the longest this should take.
-  runIn(35, "refreshChildDevices") 
+  runIn(35, "refreshChildDevices")
 }
 
 def stopFoundationMovement(ignored, devId) {
