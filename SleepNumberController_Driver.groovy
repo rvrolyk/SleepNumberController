@@ -493,83 +493,81 @@ def setStatus(Map params) {
         }
       }
 
-      if (attributeValue.toString() != value.toString()) {
-        debug "Setting ${param.key} to ${value}, it was ${attributeValue}"
-        // Figure out what child device to send to based on the key.
-        switch (param.key) {
-          case "sleepNumber":
-            // This is for this device so just send the event.
-            sendEvent name: "level", value: value
-            break
-          case "positionPreset":
-            if (value == "Flat") {
-              sendEvent name: "switch", value: "off"
-            } else if (value == presetLevel) {
-              // On if the level is the desired preset.
-              // Note this means it's off even when raised if it doesn't match a preset which
-              // may not make sense given there is a level.  But since it can be "turned on"
-              // when not at preset level, the behavior (if not the indicator) seems logical.
-              sendEvent name: "switch", value: "on"
-            }
-            break
-          case "headPosition":
-            childDimmerLevel("head", value)
-            break
-          case "footPosition":
-            childDimmerLevel("foot", value)
-            break
-          case "footWarmingTemp":
-            def level = 0
-            switch (value) {
-                case "Off":
-                  level = 0
-                  break
-                case "Low":
-                  level = 1
-                  break
-                case "Medium":
-                  level = 2
-                  break
-                case "High":
-                  level = 3
-                  break
-            }
-            if (level > 0) {
-              childOn("footwarmer")
-              childDimmerLevel("footwarmer", level)
-            } else {
-              childOff("footwarmer")
-            }
-            break
-          case "outletState":
-            if (value == "On") {
-              childOn("outlet")
-            } else {
-              childOff("outlet")
-            }
-            break
-          case "underbedLightState":
-            if (value == "On") {
-              childOn("underbedlight")
-            } else {
-              childOff("underbedlight")
-            }
-            break
-          case "underbedLightBrightness":
-            // We use 1, 2 or 3 for the dimmer value and this correlates to the array index.
-            def dimmerLevel = (UNDERBED_LIGHT_BRIGHTNESS.keySet() as ArrayList).indexOf(value) + 1
-            // Note that we don't set the light to on with a dimmer change since
-            // the brightness can be set with the light in auto.
-            childDimmerLevel("underbedlight", dimmerLevel)
-            break
-          case "underbedLightTimer":
-            // Nothing to send to the child for this as genericComponentDimmer only answers to
-            // switch and level events.
-            break
-        }
-        // Send an event with the key name to catalog it and set the attribute.
-        sendEvent name: param.key, value: value
+      debug "Setting ${param.key} to ${value}, it was ${attributeValue}"
+      // Figure out what child device to send to based on the key.
+      switch (param.key) {
+        case "sleepNumber":
+          // This is for this device so just send the event.
+          sendEvent name: "level", value: value
+          break
+        case "positionPreset":
+          if (value == "Flat") {
+            sendEvent name: "switch", value: "off"
+          } else if (value == presetLevel) {
+            // On if the level is the desired preset.
+            // Note this means it's off even when raised if it doesn't match a preset which
+            // may not make sense given there is a level.  But since it can be "turned on"
+            // when not at preset level, the behavior (if not the indicator) seems logical.
+            sendEvent name: "switch", value: "on"
+          }
+          break
+        case "headPosition":
+          childDimmerLevel("head", value)
+          break
+        case "footPosition":
+          childDimmerLevel("foot", value)
+          break
+        case "footWarmingTemp":
+          def level = 0
+          switch (value) {
+              case "Off":
+                level = 0
+                break
+              case "Low":
+                level = 1
+                break
+              case "Medium":
+                level = 2
+                break
+              case "High":
+                level = 3
+                break
+          }
+          if (level > 0) {
+            childOn("footwarmer")
+            childDimmerLevel("footwarmer", level)
+          } else {
+            childOff("footwarmer")
+          }
+          break
+        case "outletState":
+          if (value == "On") {
+            childOn("outlet")
+          } else {
+            childOff("outlet")
+          }
+          break
+        case "underbedLightState":
+          if (value == "On") {
+            childOn("underbedlight")
+          } else {
+            childOff("underbedlight")
+          }
+          break
+        case "underbedLightBrightness":
+          // We use 1, 2 or 3 for the dimmer value and this correlates to the array index.
+          def dimmerLevel = (UNDERBED_LIGHT_BRIGHTNESS.keySet() as ArrayList).indexOf(value) + 1
+          // Note that we don't set the light to on with a dimmer change since
+          // the brightness can be set with the light in auto.
+          childDimmerLevel("underbedlight", dimmerLevel)
+          break
+        case "underbedLightTimer":
+          // Nothing to send to the child for this as genericComponentDimmer only answers to
+          // switch and level events.
+          break
       }
+      // Send an event with the key name to catalog it and set the attribute.
+      sendEvent name: param.key, value: value
     } else {
       log.error "Invalid attribute ${param.key}"
     }
