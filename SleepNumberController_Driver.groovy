@@ -390,7 +390,7 @@ def setUnderbedLightState(state, timer = "Forever", brightness = "High") {
 }
 
 def getSleepData() {
-  if (isPresenceOrParent()) {
+  if (!isPresenceOrParent()) {
     log.error "Sleep data only available on presence (main) device, this is ${state.type}"
     return
   }
