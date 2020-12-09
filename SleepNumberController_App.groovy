@@ -208,12 +208,7 @@ def initializeBedInfo() {
         components << component.type
       }
     }
-    if (!components) {
-      log.info "No components found, assuming 'Base' at minimum"
-      components << "Base"
-    } else {
-      state.bedInfo[bed.bedId].components = components
-    }
+    state.bedInfo[bed.bedId].components = components
   }
   if (!state.bedInfo) {
     log.warn "No bed state set up"
@@ -740,17 +735,18 @@ def processBedData(responseData) {
             bedFailures[bed.bedId] = true
           } 
         }
-        // It is possible to have a mattress without the base so this only works when base is a component.
-        // Due to splitting out integrated bases in #initializeBedInfo, this also skips integrated bases
-        // which lack foundation status.
+        // Note that it is possible to have a mattress without the base.  Prior, this used the presence of "Base"
+        // in the bed status but it turns out SleepNumber doesn't always include that even when the base is
+        // adjustable.  So instead, this relies on the devices the user created.
         if (!bedFailures.get(bed.bedId)
             && !foundationStatus.get(bed.bedId)
-            && state.bedInfo[bed.bedId].components.contains("Base")) {
+            && (deviceTypes.contains("head") || deviceTypes.contains("foot"))) {
           foundationStatus[bed.bedId] = getFoundationStatus(device.getState().bedId, device.getState().side)
           if (!foundationStatus.get(bed.bedId)) {
             bedFailures[bed.bedId] = true
           }
         }
+        // So far, the presence of "Warming" in the bed status indicates a foot warmer.
         if (!bedFailures.get(bed.bedId)
             && !footwarmingStatus.get(bed.bedId)
             && state.bedInfo[bed.bedId].components.contains("Warming")

@@ -847,13 +847,25 @@ void componentSetLevel(device, level, duration) {
   }
 }
 
+
+Boolean childValueChanged(child, name, newValue) {
+  if (name == "level") {
+    Integer currentValue = child.currentValue(name).toInteger()
+    return currentValue != newValue
+  } else {
+    String currentValue = child.currentValue(name)
+    return currentValue != newValue
+  }
+}
+
 void childOn(childType) {
   def child = getChildDevice(getChildNetworkId(childType))
   if (!child) {
     debug "childOn: No child for type ${childType} found"
     return
   }
-  child.parse([[name:"switch", value:"on", descriptionText:"${child.displayName} was turned on"]])
+  if (!childValueChanged(child, "switch", "on")) return
+  child.parse([[name:"switch", value:"on", descriptionText: "${child.displayName} was turned on"]])
   if (child.getSupportedCommands().contains("setLevel")) {
     Integer currentValue = child.currentValue("level").toInteger()
     childDimmerLevel(childType, currentValue)
@@ -866,6 +878,7 @@ void childOff(childType) {
     debug "childOff: No child for type ${childType} found"
     return
   }
+  if (!childValueChanged(child, "switch", "off")) return
   child.parse([[name: "switch", value: "off", descriptionText: "${child.displayName} was turned off"]])
 }
 
@@ -875,7 +888,7 @@ void childDimmerLevel(childType, level) {
     debug "childDimmerLevel: No child for type ${childType} found"
     return
   }
-  String currentValue = child.currentValue("switch")
+  if (!childValueChanged(child, "level", level)) return
   child.parse([[name: "level", value: level, descriptionText: "${child.displayName} level was set to ${level}"]])
 }
 

@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "minimumHEVersion": "2.2.2",
-  "dateReleased": "2020-12-07",
-  "releaseNotes": "Small bug for sleep data",
+  "dateReleased": "2020-12-09",
+  "releaseNotes": "Use head/foot device existence to gate foundation status checks.\nAlso fix child updates to avoid updates without new values",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",
   "payPalUrl": "https://www.paypal.com/paypalme/rvrolyk",
