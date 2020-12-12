@@ -760,27 +760,49 @@ def processBedData(responseData) {
         }
         // If there's underbed lighting or outlets then poll for that data as well.  Don't poll
         // otherwise since it's just another network request and may be unwanted.
-        if (deviceTypes.contains("underbedlight")) {
+        if (!bedFailures.get(bed.bedId) && deviceTypes.contains("underbedlight")) {
           determineUnderbedLightSetup(bed.bedId)
           if (!outletData[bed.bedId][3]) {
             outletData[bed.bedId][3] = getOutletState(bed.bedId, 3)
+            if (!outletData[bed.bedId][3]) {
+              bedFailures[bed.bedId] = true
+            }
           }
-          if (!underbedLightData[bed.bedId]) {
+          if (!bedFailures.get(bed.bedId) && !underbedLightData[bed.bedId]) {
             underbedLightData[bed.bedId] = getUnderbedLightState(bed.bedId)
-            underbedLightData[bed.bedId] << getUnderbedLightBrightness(bed.bedId)
+            if (!underbedLightData.get(bed.bedId)) {
+              bedFailures[bed.bedId] = true
+            } else {
+              def brightnessData = getUnderbedLightBrightness(bed.bedId)
+              if (!brightnessData) {
+                bedFailures[bed.bedId] = true
+              } else {
+                underbedLightData[bed.bedId] << brightnessData
+              }
+            }
           }
           if (state.bedInfo[bed.bedId].outlets.size() > 1) {
-            if (!outletData[bed.bedId][4]) {
+            if (!bedFailures.get(bed.bedId) && !outletData[bed.bedId][4]) {
               outletData[bed.bedId][4] = getOutletState(bed.bedId, 4)
+              if (!outletData[bed.bedId][4]) {
+                bedFailures[bed.bedId] = true
+              }
             }
           } else {
             outletData[bed.bedId][4] = outletData[bed.bedId][3]
           }
         }
-        if (deviceTypes.contains("outlet")) {
+        if (!bedFailures.get(bed.bedId) && deviceTypes.contains("outlet")) {
           if (!outletData[device.getState().bedId][1]) {
             outletData[bed.bedId][1] = getOutletState(bed.bedId, 1)
-            outletData[bed.bedId][2] = getOutletState(bed.bedId, 2)
+            if (!outletData[bed.bedId][1]) {
+              bedFailures[bed.bedId] = true
+            } else {
+              outletData[bed.bedId][2] = getOutletState(bed.bedId, 2)
+              if (!outletData[bed.bedId][2]) {
+                bedFailures[bed.bedId] = true
+              }
+            }
           }
         }
 
@@ -792,11 +814,11 @@ def processBedData(responseData) {
         ]
         if (underbedLightData.get(bed.bedId)) {
           def outletNumber = device.getState().side == "Left" ? 3 : 4
-          def state = underbedLightData[bed.bedId].enableAuto ? "Auto" :
-              outletData[bed.bedId][outletNumber].setting == 1 ? "On" : "Off"
+          def state = underbedLightData[bed.bedId]?.enableAuto ? "Auto" :
+              outletData[bed.bedId][outletNumber]?.setting == 1 ? "On" : "Off"
           def timer = state == "Auto" ? "Not set" :
-              outletData[bed.bedId][outletNumber].timer ? outletData[bed.bedId][outletNumber].timer : "Forever"
-          def brightness = underbedLightData[bed.bedId]."fs${device.getState().side}UnderbedLightPWM"
+              outletData[bed.bedId][outletNumber]?.timer ? outletData[bed.bedId][outletNumber]?.timer : "Forever"
+          def brightness = underbedLightData[bed.bedId]?."fs${device.getState().side}UnderbedLightPWM"
           statusMap << [
             underbedLightState: state,
             underbedLightTimer: timer,
@@ -806,7 +828,7 @@ def processBedData(responseData) {
         if (outletData.get(bed.bedId) && outletData[bed.bedId][1]) {
           def outletNumber = device.getState().side == "Left" ? 1 : 2
           statusMap << [
-            outletState: outletData[bed.bedId][outletNumber].setting == 1 ? "On" : "Off"
+            outletState: outletData[bed.bedId][outletNumber]?.setting == 1 ? "On" : "Off"
           ]
         }
         // Check for valid foundation status and footwarming status data before trying to use it
