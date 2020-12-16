@@ -36,6 +36,15 @@ A driver and app to allow management of Sleep Number flexible bases in Hubitat. 
 1. Enter your Sleep Number username and password and click `Create New Bed`
 1. Follow the remaining pages to set up one or more devices for each side of the bed
 
+You may select a refresh interval that varies based on time of data or a fixed one.  If you
+are only using this for automation (not presence), I suggest a fixed one of 30 minutes or more since
+automation will trigger a refresh anyway.  If you are using this for presence then I suggest a
+variable refresh in order to avoid sending a lot of extra traffic to the SleepIQ servers.  For example,
+you may choose to use every 30 minutes during the day but when you're normally in bed, reduce to every
+minute or two.  The app will only change back to the day schedule when day start time and both sides
+of the bed are away is true.  This will avoid reducing polling if you're still actively in bed (and
+may want presence).
+
 As of version 3, you may create bed devices as a parent/child device.  This is strongly recommended
 if you intend to use devices for the head, foot, etc as it reduces the number of devices by one (no
 virtual container) and simplifies the device logic by relying on Hubitat maintained component drivers.
