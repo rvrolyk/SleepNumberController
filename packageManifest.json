@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "3.0.4",
+  "version": "3.0.5",
   "minimumHEVersion": "2.2.2",
-  "dateReleased": "2020-12-12",
-  "releaseNotes": "Improve lighting and outlet error handling so one error will cause other requests to be skipped.",
+  "dateReleased": "2020-12-16",
+  "releaseNotes": "Add ability to use a variable refresh interval based on time of day",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",
   "payPalUrl": "https://www.paypal.com/paypalme/rvrolyk",
