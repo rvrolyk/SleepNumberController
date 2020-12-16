@@ -90,8 +90,23 @@ def homePage() {
           description: "Email address you use with Sleep Number", submitOnChange: true
       input name: "password", type: "password", title: "sleepnumber.com password",
           description: "Password you use with Sleep Number", submitOnChange: true
-      input name: "refreshInterval", type: "number", title: "Refresh Interval (minutes)",
-          description: "How often to refresh bed state", defaultValue: 1
+      // User may opt for constant refresh or a variable one.
+      def defaultVariableRefresh = settings.refreshInterval == null
+      input "variableRefresh", "bool", title: "Use variable refresh interval? (recommended)", defaultValue: defaultVariableRefresh,
+         submitOnChange: true
+      if (defaultVariableRefresh || settings.variableRefresh) {
+        input name: "dayInterval", type: "number", title: "Daytime Refresh Interval (minutes)",
+            description: "How often to refresh bed state during the day", defaultValue: 30
+        input name: "dayStart", type: "time", title: "Day start time",
+            description: "Time when day will start if both sides are out of bed for more than 5 minutes", submitOnChange: true
+          input name: "nightInterval", type: "number", title: "Nighttime Refresh Interval (minutes)",
+              description: "How often to refresh bed state during the night", defaultValue: 1
+        input name: "nightStart", type: "time", title: "Night start time",
+            description: "Time when night will start", submitOnChange: true
+      } else {
+        input name: "refreshInterval", type: "number", title: "Refresh Interval (minutes)",
+            description: "How often to refresh bed state", defaultValue: 1
+      }
     }
 
     section("<b>Bed Management</b>") {
@@ -155,11 +170,13 @@ def updated() {
 }
 
 def initialize() {
-  if (settings.refreshInterval > 0) {
-    setRefreshInterval(settings.refreshInterval, 0)
-  } else {
+  if (settings.refreshInterval <= 0 && !settings.variableRefresh) {
     log.error "Invalid refresh interval ${settings.refreshInterval}"
   }
+  if (settings.variableRefresh && (settings.dayInterval <= 0 || settings.nightInterval <= 0)) {
+    log.error "Invalid refresh intervals ${settings.dayInterval} or ${settings.nightInterval}"
+  }
+  setRefreshInterval(0 /* force picking from settings */, 0 /* ignored */)
   initializeBedInfo()
   refreshChildDevices()
   updateLabel()
@@ -280,6 +297,11 @@ List<String> getBedDeviceTypes() {
 // and #schedule method call.
 def scheduledRefreshChildDevices() {
   refreshChildDevices()
+  if (settings.variableRefresh) {
+    // If we're using variable refresh then try to reconfigure it since bed states
+    // have been updated and we may be in daytime.
+    configureVariableRefreshInterval()
+  }
 }
 
 def refreshChildDevices() {
@@ -307,8 +329,39 @@ def setRefreshInterval(val, ignored) {
   if (val && val > 0) {
     schedule("0 /${val} * * * ?", "scheduledRefreshChildDevices")
   } else {
-    debug "Resetting interval to ${settings.refreshInterval}"
-    schedule("0 /${settings.refreshInterval} * * * ?", "scheduledRefreshChildDevices")
+    if (!settings.variableRefresh) {
+      debug "Resetting interval to ${settings.refreshInterval}"
+      schedule("0 /${settings.refreshInterval} * * * ?", "scheduledRefreshChildDevices")
+    } else {
+      configureVariableRefreshInterval()
+    }
+  }
+}
+
+/**
+ * Configures a variable refresh interval schedule so that polling happens slowly
+ * during the day but at night can poll quicker in order to detect things like presence
+ * faster.  Daytime will be used if the time is between day and night _and_ no presence
+ * is detected.
+ */
+def configureVariableRefreshInterval() {
+  // Gather presence state of all child devices
+  def presentChildren = getBedDevices().findAll {
+    (!it.getState().type || it.getState()?.type == "presence") && it.isPresent()
+  }
+  def now = new Date()
+  if (timeOfDayIsBetween(toDateTime(settings.dayStart), toDateTime(settings.nightStart), now)
+      && !presentChildren) {
+    // Only log and schedule if we haven't already done so.
+    if (state?.variableRefresh != "day") {
+      log.info "Setting interval to day; daytime and no beds present. Refreshing every ${settings.dayInterval} minutes."
+      schedule("0 /${settings.dayInterval} * * * ?", "scheduledRefreshChildDevices")
+      state.variableRefresh = "day"
+    }
+  } else if (state?.variableRefresh != "night") {
+    log.info "Setting interval to night. Refreshing every ${settings.nightInterval} minutes."
+    schedule("0 /${settings.nightInterval} * * * ?", "scheduledRefreshChildDevices")
+    state.variableRefresh = "night"
   }
 }
 
