@@ -58,7 +58,10 @@ preferences {
   page name: "createBedPage"
   page name: "diagnosticsPage"
 }
-/*
+
+/**
+ * Required handler for pause button.
+ */
 def appButtonHandler(btn) {
   if (btn == "pause") {
     state.paused = !state.paused
@@ -71,7 +74,7 @@ def appButtonHandler(btn) {
       initialize()
     }
   }
-}*/
+}
 
 def homePage() {
   List currentDevices = getBedDeviceData()
@@ -313,10 +316,13 @@ void refreshChildDevices() {
   getBedData()
   updateLabel()
 }
-/*
-void refreshChildDevices(ignored, ignoredDevId) {
+
+/**
+ * Called by driver when user triggers poll.
+ */
+void refreshChildDevices(Map ignored, Integer ignoredDevId) {
   refreshChildDevices()
-}*/
+}
 
 /**
  * Sets the refresh interval or resets to the app setting value if
@@ -775,7 +781,7 @@ def processBedData(Map responseData) {
   List deviceTypes = getBedDeviceTypes()
 
   for (def device : getBedDevices()) {
-    String bedId=device.getState().bedId.toString()
+    String bedId = device.getState().bedId.toString()
     String bedSideStr = device.getState().side
     if (!outletData.get(bedId)) {
       outletData[bedId] = [:]
