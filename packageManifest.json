@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "3.0.5",
+  "version": "3.0.6",
   "minimumHEVersion": "2.2.2",
-  "dateReleased": "2020-12-16",
-  "releaseNotes": "Add ability to use a variable refresh interval based on time of day",
+  "dateReleased": "2020-12-17",
+  "releaseNotes": "Internal cleanup",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",
   "payPalUrl": "https://www.paypal.com/paypalme/rvrolyk",
