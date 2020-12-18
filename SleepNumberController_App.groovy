@@ -320,7 +320,7 @@ void refreshChildDevices() {
 /**
  * Called by driver when user triggers poll.
  */
-void refreshChildDevices(Map ignored, Integer ignoredDevId) {
+void refreshChildDevices(Map ignored, String ignoredDevId) {
   refreshChildDevices()
 }
 
@@ -331,7 +331,7 @@ void refreshChildDevices(Map ignored, Integer ignoredDevId) {
  * but quicker, say 1 minute, is desired when presence is first detected or it's
  * a particular time of day.
  */
-void setRefreshInterval(Integer val, Integer ignored) {
+void setRefreshInterval(BigDecimal val, String ignoredDevId) {
   debug "setRefreshInterval(${val})"
   def random = new Random()
   Integer randomInt = random.nextInt(40) + 4
@@ -981,7 +981,7 @@ def getFootWarmingStatus(String bedId) {
  * Params must be a Map containing keys actuator and position.
  * The side is derived from the specified device.
  */
-def setFoundationAdjustment(Map params, devId) {
+def setFoundationAdjustment(Map params, String devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
@@ -1014,13 +1014,13 @@ def setFoundationAdjustment(Map params, devId) {
  * Params must be a Map containing keys temp and timer.
  * The side is derived from the specified device.
  */
-def setFootWarmingState(Map params, devId) {
+def setFootWarmingState(Map params, String devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
     return
   }
-  if (params?.temp != null || params?.timer == null) {
+  if (params?.temp == null || params?.timer == null) {
     log.error "Missing param values, temp and timer are required"
     return
   }
@@ -1045,7 +1045,7 @@ def setFootWarmingState(Map params, devId) {
  * Params must be a map containing keys preset and timer.
  * The side is derived from the specified device.
  */
-def setFoundationTimer(Map params, devId) {
+def setFoundationTimer(Map params, String devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
@@ -1076,7 +1076,7 @@ def setFoundationTimer(Map params, devId) {
 /**
  * The side is derived from the specified device.
  */
-def setFoundationPreset(preset, devId) {
+def setFoundationPreset(Integer preset, String devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
@@ -1097,7 +1097,7 @@ def setFoundationPreset(preset, devId) {
   runIn(35, "refreshChildDevices")
 }
 
-def stopFoundationMovement(ignored, devId) {
+def stopFoundationMovement(Map ignored, String devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
@@ -1116,7 +1116,7 @@ def stopFoundationMovement(ignored, devId) {
 /**
  * The side is derived from the specified device.
  */
-def setSleepNumber(number, devId) {
+def setSleepNumber(BigDecimal number, String devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
@@ -1137,7 +1137,7 @@ def getPrivacyMode(String bedId) {
   return httpRequest("/rest/bed/${bedId}/pauseMode", this.&get)?.pauseMode
 }
 
-def setPrivacyMode(Boolean mode, devId) {
+def setPrivacyMode(Boolean mode, String devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
@@ -1153,7 +1153,7 @@ def getSleepNumberFavorite(String bedId) {
   return httpRequest("/rest/bed/${bedId}/sleepNumberFavorite", this.&get)
 }
 
-def setSleepNumberFavorite(ignored, devId) {
+def setSleepNumberFavorite(String ignored, String devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
@@ -1179,18 +1179,18 @@ def getOutletState(String bedId, Integer outlet) {
         this.&get, null, [outletId: outlet])
 }
 
-def setOutletState(state, devId) {
+def setOutletState(String outletState, String devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
     return
   }
-  if (!state) {
-    log.error "Missing state"
+  if (!outletState) {
+    log.error "Missing outletState"
     return
   }
   def outletNum = device.getState().side == "Left" ? 1 : 2
-  setOutletState(device.getState().bedId, outletNum, state)
+  setOutletState(device.getState().bedId, outletNum, outletState)
 }
 
 /**
@@ -1201,8 +1201,8 @@ def setOutletState(state, devId) {
  * @param timer: a valid minute duration (for outlets 3 and 4 only)
  * Timer is the only optional parameter.
  */
-def setOutletState(bedId, outletId, state, timer = null) {
-  if (!bedId || !outletId || !state) {
+def setOutletState(String bedId, Integer outletId, String outletState, Integer timer = null) {
+  if (!bedId || !outletId || !outletState) {
     log.error "Not all required arguments present"
     return
   }
@@ -1212,7 +1212,7 @@ def setOutletState(bedId, outletId, state, timer = null) {
     return
   }
 
-  state = (state ?: "").toLowerCase()
+  outletState = (outletState ?: "").toLowerCase()
 
   if (outletId < 3) {
     // No timer is valid for outlets other than 3 and 4
@@ -1275,7 +1275,7 @@ def determineUnderbedLightSetup(String bedId) {
  * timer: valid minute duration
  * brighness: low, medium, high
  */
-def setUnderbedLightState(params, devId) {
+def setUnderbedLightState(Map params, String devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
@@ -1341,7 +1341,7 @@ def setUnderbedLightState(params, devId) {
 }
 
 
-def getSleepData(ignored, devId) {
+def getSleepData(Map ignored, String devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
