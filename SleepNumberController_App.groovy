@@ -180,7 +180,7 @@ def initialize() {
   if (settings.variableRefresh && (settings.dayInterval <= 0 || settings.nightInterval <= 0)) {
     log.error "Invalid refresh intervals ${settings.dayInterval} or ${settings.nightInterval}"
   }
-  setRefreshInterval(0 /* force picking from settings */, 0 /* ignored */)
+  setRefreshInterval(0 /* force picking from settings */, "" /* ignored */)
   initializeBedInfo()
   refreshChildDevices()
   updateLabel()
