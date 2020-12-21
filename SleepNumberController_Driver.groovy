@@ -849,11 +849,10 @@ void componentSetLevel(device, level, duration) {
 
 
 Boolean childValueChanged(child, name, newValue) {
+  String currentValue = child.currentValue(name)
   if (name == "level") {
-    Integer currentValue = child.currentValue(name).toInteger()
-    return currentValue != newValue
+    return currentValue != null ? currentValue.toInteger() != newValue : true
   } else {
-    String currentValue = child.currentValue(name)
     return currentValue != newValue
   }
 }
@@ -866,10 +865,6 @@ void childOn(childType) {
   }
   if (!childValueChanged(child, "switch", "on")) return
   child.parse([[name:"switch", value:"on", descriptionText: "${child.displayName} was turned on"]])
-  if (child.getSupportedCommands().contains("setLevel")) {
-    Integer currentValue = child.currentValue("level").toInteger()
-    childDimmerLevel(childType, currentValue)
-  }
 }
 
 void childOff(childType) {
