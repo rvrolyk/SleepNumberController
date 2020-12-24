@@ -94,7 +94,7 @@ def homePage() {
       input name: "password", type: "password", title: "sleepnumber.com password",
           description: "Password you use with Sleep Number", submitOnChange: true
       // User may opt for constant refresh or a variable one.
-      def defaultVariableRefresh = settings.refreshInterval == null
+      def defaultVariableRefresh = settings.variableRefresh != null && !settings.variableRefresh ? false : settings.refreshInterval == null
       input "variableRefresh", "bool", title: "Use variable refresh interval? (recommended)", defaultValue: defaultVariableRefresh,
          submitOnChange: true
       if (defaultVariableRefresh || settings.variableRefresh) {
@@ -530,11 +530,11 @@ Side: ${params.side}
         msg += "<li>${createDeviceLabel(newDeviceName, 'foot warmer')}</li>"
         types.add("foot warmer")
       }
-      if (settings.createUnderbedLighting) {
+      if (settings.createUnderbedLighting && settings.useChildDevices) {
         msg += "<li>${createDeviceLabel(newDeviceName, 'underbed light')}</li>"
         types.add("underbed light")
       }
-      if (settings.createOutlet) {
+      if (settings.createOutlet && settings.useChildDevices) {
         msg += "<li>${createDeviceLabel(newDeviceName, 'outlet')}</li>"
         types.add("outlet")
       }
@@ -949,6 +949,7 @@ def processBedData(Map responseData) {
 }
 
 def convertHexToNumber(value) {
+  if (value == "" || value == null) return 0
   try {
     return Integer.parseInt(value, 16)
   } catch (Exception e) {
@@ -1513,3 +1514,4 @@ def put(Map params, Closure closure) {
 }
 
 // vim: tabstop=2 shiftwidth=2 expandtab
+

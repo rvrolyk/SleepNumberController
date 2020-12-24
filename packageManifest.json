@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "3.0.7",
+  "version": "3.0.8",
   "minimumHEVersion": "2.2.2",
-  "dateReleased": "2020-12-21",
-  "releaseNotes": "Fix bug fetching levels when unset",
+  "dateReleased": "2020-12-23",
+  "releaseNotes": "Minor bug fixes and stop using untyped objects in driver",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",
   "payPalUrl": "https://www.paypal.com/paypalme/rvrolyk",
