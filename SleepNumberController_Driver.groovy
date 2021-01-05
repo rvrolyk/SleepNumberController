@@ -37,6 +37,7 @@ import groovy.transform.Field
 @Field final Map UNDERBED_LIGHT_BRIGHTNESS = [Low: 1, Medium: 30, High: 100]
 @Field final Map UNDERBED_LIGHT_TIMES = ["Forever": 0, "15m": 15, "30m": 30, "45m": 45, "1h": 60, "2h": 120, "3h": 180]
 @Field final ArrayList OUTLET_STATES = ["On", "Off"]
+@Field final String DNI_SEPARATOR = "-"
 
 metadata {
   definition(name: "Sleep Number Bed",
@@ -66,7 +67,7 @@ metadata {
     attribute "privacyMode", "enum", ["on", "off"]
     attribute "underbedLightTimer", "string" // String so we can use "Forever"
     attribute "underbedLightState", "enum", UNDERBED_LIGHT_STATES
-    attribute "underbedLightBrightness", "enum", UNDERBED_LIGHT_BRIGHTNESS.collect{ it.key } 
+    attribute "underbedLightBrightness", "enum", UNDERBED_LIGHT_BRIGHTNESS.collect{ it.key }
     attribute "outletState", "enum", OUTLET_STATES
     // Attributes for sleep IQ data
     attribute "sleepMessage", "string"
@@ -119,17 +120,17 @@ metadata {
   }
 }
 
-def installed() {
+void installed() {
   debug "installed()"
   updated()
 }
 
-def logsOff() {
+void logsOff() {
   log.warn "debug logging disabled..."
   device.updateSetting "logEnable", [value: "false", type: "bool"]
 }
 
-def updated() {
+void updated() {
   debug "updated()"
   if (logEnable) {
     runIn(1800, logsOff)
@@ -141,23 +142,23 @@ def updated() {
   poll()
 }
 
-def uninstalled() {
+void uninstalled() {
   // Delete all the children when this is uninstalled.
   childDevices.each { deleteChildDevice(it.deviceNetworkId) }
 }
 
-def parse(String description) {
+void parse(String description) {
   debug "parse() - Description: ${description}"
 }
 
 // Required by Polling capability
-def poll() {
+void poll() {
   debug "poll()"
   sendToParent "refreshChildDevices"
 }
 
 // Required by Switch capability
-def on() {
+void on() {
   sendEvent name: "switch", value: "on"
   if (state?.type == "foot warmer") {
     debug "on(): foot warmer"
@@ -169,7 +170,7 @@ def on() {
 }
 
 // Required by Switch capability
-def off() {
+void off() {
   sendEvent name: "switch", value: "off"
   if (state?.type == "foot warmer") {
     debug "off(): foot warmer"
@@ -181,12 +182,12 @@ def off() {
 }
 
 // setLevel required by SwitchLevel capability
-// including one with duration (which we ignore).
-def setLevel(val, duration) {
+// including one with duration (which we currently ignore).
+void setLevel(Number val, Number duration) {
   setLevel(val)
 }
 
-def setLevel(val) {
+void setLevel(Number val) {
   if (state?.type) {
     switch (state.type) {
       case "presence":
@@ -230,11 +231,11 @@ def setLevel(val) {
 }
 
 // Required by PresenceSensor capability
-def isPresent() {
+boolean isPresent() {
   return device.currentValue("presence") == "present"
 }
 
-def arrived() {
+void arrived() {
   debug "arrived()"
   if (!isPresent() && isPresenceOrParent()) {
     log.info "${device.displayName} arrived"
@@ -242,7 +243,7 @@ def arrived() {
   }
 }
 
-def departed() {
+void departed() {
   debug "departed()"
   if (isPresent() && isPresenceOrParent()) {
     log.info "${device.displayName} departed"
@@ -253,7 +254,7 @@ def departed() {
   }
 }
 
-def setPresence(val) {
+void setPresence(Boolean val) {
   debug "setPresence(${val})"
   if (val) {
     arrived()
@@ -262,12 +263,12 @@ def setPresence(val) {
   }
 }
 
-def setBedId(val) {
+void setBedId(String val) {
   debug "setBedId(${va}l)"
   state.bedId = val
 }
 
-def setSide(val) {
+void setSide(String val) {
   debug "setSide(${val})"
   if (!SIDES.contains(val)) {
     log.error "Invalid side ${val}, possible values are ${SIDES}"
@@ -275,12 +276,12 @@ def setSide(val) {
   state.side = val
 }
 
-def setRefreshInterval(val) {
+void setRefreshInterval(Number val) {
   debug "setRefreshInterval(${val})"
   sendToParent "setRefreshInterval", val
 }
 
-def setSleepNumber(val) {
+void setSleepNumber(Number val) {
   debug "setSleepNumber(${val})"
   if (val > 0 && val <= 100) {
     sendToParent "setSleepNumber", val
@@ -289,7 +290,7 @@ def setSleepNumber(val) {
   }
 }
 
-def setBedPosition(val, actuator = null) {
+void setBedPosition(Number val, String actuator = null) {
   debug "setBedPosition(${val})"
   def type = actuator ?: ACTUATOR_TYPES.get(state.type)
   if (!type) {
@@ -303,20 +304,33 @@ def setBedPosition(val, actuator = null) {
   }
 }
 
-def setFootWarmingState(temp = "OFF", timer = "30m") {
+void setFootWarmingState(String temp = "OFF", String timer = "30m") {
+  debug "setWarmerState(${temp}, ${timer})"
+  if (!HEAT_TIMES.get(timer)) {
+    log.error "Invalid warming time ${timer}"
+    return
+  }
+  setFootWarmingState(temp, HEAT_TIMES.get(timer))
+}
+
+void setFootWarmingState(String temp = "OFF", Number duration) {
   debug "setWarmerState(${temp}, ${duration})"
   if (HEAT_TEMPS.get(temp) == null) {
     log.error "Invalid warming temp ${temp}"
     return
   }
-  if (!HEAT_TIMES.get(timer)) {
-    log.error "Invalid warming time ${timer}"
+  if (duration == null) {
+    log.error "Invalid warming time ${duration}"
     return
   }
-  sendToParent "setFootWarmingState", [temp: HEAT_TEMPS.get(temp), timer: HEAT_TIMES.get(timer)]
+  if (!HEAT_TIMES.values().contains(duration.toInteger())) {
+    log.error "Invalid warming time ${duration}"
+    return
+  }
+  sendToParent "setFootWarmingState", [temp: HEAT_TEMPS.get(temp), timer: duration.toInteger()]
 }
 
-def setBedPreset(preset) {
+void setBedPreset(String preset) {
   debug "setBedPreset(${preset})"
   if (preset == null || PRESET_NAMES.get(preset) == null) {
     log.error "Invalid preset ${preset}"
@@ -325,7 +339,7 @@ def setBedPreset(preset) {
   sendToParent "setFoundationPreset", PRESET_NAMES.get(preset)
 }
 
-def setBedPresetTimer(preset, timer) {
+void setBedPresetTimer(String preset, String timer) {
   debug "setBedPresetTimer(${preset}, ${timer})"
   if (preset == null || PRESET_NAMES.get(preset) == null) {
     log.error "Invalid preset ${preset}"
@@ -338,17 +352,17 @@ def setBedPresetTimer(preset, timer) {
   sendToParent "setFoundationTimer", [preset: PRESET_NAMES.get(preset), timer: PRESET_TIMES.get(timer)]
 }
 
-def stopBedPosition() {
+void stopBedPosition() {
   debug "stopBedPostion()"
   sendToParent "stopFoundationMovement"
 }
 
-def enablePrivacyMode() {
+void enablePrivacyMode() {
   debug "enablePrivacyMode()"
   sendToParent "setPrivacyMode", true
 }
 
-def disablePrivacyMode() {
+void disablePrivacyMode() {
   debug "disablePrivacyMode()"
   sendToParent "setPrivacyMode", false
 }
@@ -356,12 +370,12 @@ def disablePrivacyMode() {
 /**
  * Sets the SleepNumber to the preset favorite.
  */
-def setSleepNumberFavorite() {
+void setSleepNumberFavorite() {
   debug "setSleepNumberFavorite()"
   sendToParent "setSleepNumberFavorite"
 }
 
-def setOutletState(state) {
+void setOutletState(String state) {
   debug "setOutletState(${state})"
   if (state == null || !OUTLET_STATES.contains(state)) {
     log.error "Invalid state ${state}"
@@ -370,7 +384,7 @@ def setOutletState(state) {
   sendToParent "setOutletState", state
 }
 
-def setUnderbedLightState(state, timer = "Forever", brightness = "High") {
+void setUnderbedLightState(String state, String timer = "Forever", String brightness = "High") {
   debug "setUnderbedLightState(${state}, ${timer}, ${brightness})"
   if (state == null || !UNDERBED_LIGHT_STATES.contains(state)) {
     log.error "Invalid state ${state}"
@@ -389,15 +403,15 @@ def setUnderbedLightState(state, timer = "Forever", brightness = "High") {
     brightness: UNDERBED_LIGHT_BRIGHTNESS.get(brightness)]
 }
 
-def getSleepData() {
-  if (isPresenceOrParent()) {
+void getSleepData() {
+  if (!isPresenceOrParent()) {
     log.error "Sleep data only available on presence (main) device, this is ${state.type}"
     return
   }
-  def data = sendToParent "getSleepData"
+  Map data = sendToParent "getSleepData"
   debug "sleep data ${data}"
 
-  if (data.sleepSessionCount == 0) {
+  if (!data || data.sleepSessionCount == 0) {
     log.info "No sleep sessions found, skipping update"
     return
   }
@@ -457,15 +471,16 @@ def getSleepData() {
   sendEvent name: "sessionSummary", value: summaryTile
 }
 
-def convertSecondsToTimeString(int secondsToConvert) {
+String convertSecondsToTimeString(int secondsToConvert) {
   new GregorianCalendar(0, 0, 0, 0, 0, secondsToConvert, 0).time.format("HH:mm:ss")
 }
 
 // Method used by parent app to set bed state
-def setStatus(Map params) {
+void setStatus(Map params) {
   debug "setStatus(${params})"
   if (state?.type) {
-    return setStatusOld(params)
+    setStatusOld(params)
+    return
   }
   // No type means we are using parent/child devices.
   def validAttributes = device.supportedAttributes.collect{ it.name }
@@ -493,83 +508,81 @@ def setStatus(Map params) {
         }
       }
 
-      if (attributeValue.toString() != value.toString()) {
-        debug "Setting ${param.key} to ${value}, it was ${attributeValue}"
-        // Figure out what child device to send to based on the key.
-        switch (param.key) {
-          case "sleepNumber":
-            // This is for this device so just send the event.
-            sendEvent name: "level", value: value
-            break
-          case "positionPreset":
-            if (value == "Flat") {
-              sendEvent name: "switch", value: "off"
-            } else if (value == presetLevel) {
-              // On if the level is the desired preset.
-              // Note this means it's off even when raised if it doesn't match a preset which
-              // may not make sense given there is a level.  But since it can be "turned on"
-              // when not at preset level, the behavior (if not the indicator) seems logical.
-              sendEvent name: "switch", value: "on"
-            }
-            break
-          case "headPosition":
-            childDimmerLevel("head", value)
-            break
-          case "footPosition":
-            childDimmerLevel("foot", value)
-            break
-          case "footWarmingTemp":
-            def level = 0
-            switch (value) {
-                case "Off":
-                  level = 0
-                  break
-                case "Low":
-                  level = 1
-                  break
-                case "Medium":
-                  level = 2
-                  break
-                case "High":
-                  level = 3
-                  break
-            }
-            if (level > 0) {
-              childOn("footwarmer")
-              childDimmerLevel("footwarmer", level)
-            } else {
-              childOff("footwarmer")
-            }
-            break
-          case "outletState":
-            if (value == "On") {
-              childOn("outlet")
-            } else {
-              childOff("outlet")
-            }
-            break
-          case "underbedLightState":
-            if (value == "On") {
-              childOn("underbedlight")
-            } else {
-              childOff("underbedlight")
-            }
-            break
-          case "underbedLightBrightness":
-            // We use 1, 2 or 3 for the dimmer value and this correlates to the array index.
-            def dimmerLevel = (UNDERBED_LIGHT_BRIGHTNESS.keySet() as ArrayList).indexOf(value) + 1
-            // Note that we don't set the light to on with a dimmer change since
-            // the brightness can be set with the light in auto.
-            childDimmerLevel("underbedlight", dimmerLevel)
-            break
-          case "underbedLightTimer":
-            // Nothing to send to the child for this as genericComponentDimmer only answers to
-            // switch and level events.
-            break
-        }
-        // Send an event with the key name to catalog it and set the attribute.
-        sendEvent name: param.key, value: value
+      debug "Setting ${param.key} to ${value}, it was ${attributeValue}"
+      // Figure out what child device to send to based on the key.
+      switch (param.key) {
+        case "sleepNumber":
+          // This is for this device so just send the event.
+          sendEvent name: "level", value: value
+          break
+        case "positionPreset":
+          if (value == "Flat") {
+            sendEvent name: "switch", value: "off"
+          } else if (value == presetLevel) {
+            // On if the level is the desired preset.
+            // Note this means it's off even when raised if it doesn't match a preset which
+            // may not make sense given there is a level.  But since it can be "turned on"
+            // when not at preset level, the behavior (if not the indicator) seems logical.
+            sendEvent name: "switch", value: "on"
+          }
+          break
+        case "headPosition":
+          childDimmerLevel("head", value)
+          break
+        case "footPosition":
+          childDimmerLevel("foot", value)
+          break
+        case "footWarmingTemp":
+          def level = 0
+          switch (value) {
+              case "Off":
+                level = 0
+                break
+              case "Low":
+                level = 1
+                break
+              case "Medium":
+                level = 2
+                break
+              case "High":
+                level = 3
+                break
+          }
+          if (level > 0) {
+            childOn("footwarmer")
+            childDimmerLevel("footwarmer", level)
+          } else {
+            childOff("footwarmer")
+          }
+          break
+        case "outletState":
+          if (value == "On") {
+            childOn("outlet")
+          } else {
+            childOff("outlet")
+          }
+          break
+        case "underbedLightState":
+          if (value == "On") {
+            childOn("underbedlight")
+          } else {
+            childOff("underbedlight")
+          }
+          break
+        case "underbedLightBrightness":
+          // We use 1, 2 or 3 for the dimmer value and this correlates to the array index.
+          def dimmerLevel = (UNDERBED_LIGHT_BRIGHTNESS.keySet() as ArrayList).indexOf(value) + 1
+          // Note that we don't set the light to on with a dimmer change since
+          // the brightness can be set with the light in auto.
+          childDimmerLevel("underbedlight", dimmerLevel)
+          break
+        case "underbedLightTimer":
+          // Nothing to send to the child for this as genericComponentDimmer only answers to
+          // switch and level events.
+          break
       }
+      // Send an event with the key name to catalog it and set the attribute.
+      sendEvent name: param.key, value: value
     } else {
       log.error "Invalid attribute ${param.key}"
     }
@@ -577,7 +590,7 @@ def setStatus(Map params) {
 }
 
 // Used to set individual device states.
-def setStatusOld(Map params) {
+void setStatusOld(Map params) {
   debug "setStatusOld(${params})"
   def validAttributes = device.supportedAttributes.collect{ it.name }
   params.each{param ->
@@ -640,17 +653,17 @@ def setStatusOld(Map params) {
   }
 }
 
-def sendToParent(method, data = null) {
+Map sendToParent(String method, Object data = null) {
   debug "sending to parent ${method}, ${data}"
   if (device.parentDeviceId) {
     // Send via virtual container method
-    parent.childComm method, data, device.deviceNetworkId
+    return parent.childComm(method, data, device.deviceNetworkId)
   } else {
-    parent."${method}" data, device.deviceNetworkId
+    return parent."${method}"(data, device.deviceNetworkId)
   }
 }
 
-def debug(msg) {
+void debug(String msg) {
   if (logEnable) {
     log.debug msg
   }
@@ -660,7 +673,7 @@ def debug(msg) {
 // Methods specific to old device support
 //-----------------------------------------------------------------------------
 
-def setType(val) {
+void setType(String val) {
   debug "setType(${val})"
   if (!TYPES.contains(val)) {
     log.error "Invalid type ${val}, possible values are ${TYPES}"
@@ -679,12 +692,12 @@ def setType(val) {
     case "foot warmer":
       msg += "off switches foot warming off, on will set it to preferred value for preferred time. Dimming changes the heat levels (1: low, 2: medium, 3: high)."
       break
-  } 
+  }
   state.typeInfo = msg
   state.type = val
 }
 
-def isPresenceOrParent() {
+boolean isPresenceOrParent() {
   return !state?.type || state?.type == "presence"
 }
 
@@ -692,7 +705,7 @@ def isPresenceOrParent() {
 // Methods specific to child device support
 //-----------------------------------------------------------------------------
 
-def createChildDevice(String childNetworkId, String componentDriver, String label) {
+com.hubitat.app.DeviceWrapper createChildDevice(String childNetworkId, String componentDriver, String label) {
   // Make sure the child doesn't already exist.
   def child = getChildDevice(childNetworkId)
   if (getChildDevice(childNetworkId)) {
@@ -705,24 +718,24 @@ def createChildDevice(String childNetworkId, String componentDriver, String labe
   }
 }
 
-def getChildNetworkId(name) {
-  return device.deviceNetworkId + "-" + name
+String getChildNetworkId(String name) {
+  return device.deviceNetworkId + DNI_SEPARATOR + name
 }
 
-def componentRefresh(device) {
+void componentRefresh(com.hubitat.app.DeviceWrapper device) {
   poll()
 }
 
-def getChildType(String childNetworkId) {
+String getChildType(String childNetworkId) {
   // network id is $parentId-type
   return childNetworkId.substring(device.deviceNetworkId.length() + 1)
 }
 
-void componentOn(device) {
+void componentOn(com.hubitat.app.DeviceWrapper device) {
   def type = getChildType(device.deviceNetworkId)
   debug "componentOn $type"
   switch (type) {
-    case "outlet": 
+    case "outlet":
       setOutletState("On")
       break
     case "underbedlight":
@@ -752,7 +765,7 @@ void componentOn(device) {
   }
 }
 
-void componentOff(device) {
+void componentOff(com.hubitat.app.DeviceWrapper device) {
   def type = getChildType(device.deviceNetworkId)
   debug "componentOff $type"
   switch (type) {
@@ -782,11 +795,11 @@ void componentOff(device) {
   }
 }
 
-void componentSetLevel(device, level) {
+void componentSetLevel(com.hubitat.app.DeviceWrapper device, Number level) {
   componentSetLevel(device, level, null)
 }
 
-void componentSetLevel(device, level, duration) {
+void componentSetLevel(com.hubitat.app.DeviceWrapper device, Number level, Number duration) {
   def type = getChildType(device.deviceNetworkId)
   debug "componentSetLevel $type $level $duration"
   switch (type) {
@@ -840,8 +853,13 @@ void componentSetLevel(device, level, duration) {
           log.error "Invalid level for warmer state.  Only 1, 2 or 3 is valid"
           return
       }
-      debug "Set warmer level to ${val}"
-      setFootWarmingState(val)
+      Number presetDuration = HEAT_TIMES.get(footWarmerTimer)
+      if (duration != null && HEAT_TIMES.values().contains(duration.toInteger())) {
+        debug "Using provided duration time of ${duration}"
+        presetDuration = duration
+      }
+      debug "Set warmer level to ${val} for ${presetDuration}"
+      setFootWarmingState(val, presetDuration)
       break
     default:
       log.warn "Unknown child device type ${type}, not setting level"
@@ -849,43 +867,51 @@ void componentSetLevel(device, level, duration) {
   }
 }
 
-void childOn(childType) {
+
+boolean childValueChanged(com.hubitat.app.DeviceWrapper device, String name, Object newValue) {
+  String currentValue = device.currentValue(name)
+  if (name == "level") {
+    return currentValue != null ? currentValue.toInteger() != newValue : true
+  } else {
+    return currentValue != newValue
+  }
+}
+
+void childOn(String childType) {
   def child = getChildDevice(getChildNetworkId(childType))
   if (!child) {
     debug "childOn: No child for type ${childType} found"
     return
   }
-  child.parse([[name:"switch", value:"on", descriptionText:"${child.displayName} was turned on"]])
-  if (child.getSupportedCommands().contains("setLevel")) {
-    Integer currentValue = child.currentValue("level").toInteger()
-    childDimmerLevel(childType, currentValue)
-  }
+  if (!childValueChanged(child, "switch", "on")) return
+  child.parse([[name:"switch", value:"on", descriptionText: "${child.displayName} was turned on"]])
 }
 
-void childOff(childType) {
+void childOff(String childType) {
   def child = getChildDevice(getChildNetworkId(childType))
   if (!child) {
     debug "childOff: No child for type ${childType} found"
     return
   }
+  if (!childValueChanged(child, "switch", "off")) return
   child.parse([[name: "switch", value: "off", descriptionText: "${child.displayName} was turned off"]])
 }
 
-void childDimmerLevel(childType, level) {
+void childDimmerLevel(String childType, Number level) {
   def child = getChildDevice(getChildNetworkId(childType))
   if (!child) {
     debug "childDimmerLevel: No child for type ${childType} found"
     return
   }
-  String currentValue = child.currentValue("switch")
+  if (!childValueChanged(child, "level", level)) return
   child.parse([[name: "level", value: level, descriptionText: "${child.displayName} level was set to ${level}"]])
 }
 
-void componentStartLevelChange(device, direction) {
+void componentStartLevelChange(com.hubitat.app.DeviceWrapper device, String direction) {
   log.info "startLevelChange not supported"
 }
 
-void componentStopLevelChange(device) {
+void componentStopLevelChange(com.hubitat.app.DeviceWrapper device) {
   log.info "stopLevelChange not supported"
 }
 
