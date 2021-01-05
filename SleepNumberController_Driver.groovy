@@ -653,13 +653,13 @@ void setStatusOld(Map params) {
   }
 }
 
-void sendToParent(String method, Object data = null) {
+def sendToParent(String method, Object data = null) {
   debug "sending to parent ${method}, ${data}"
   if (device.parentDeviceId) {
     // Send via virtual container method
-    parent.childComm method, data, device.deviceNetworkId
+    return parent.childComm(method, data, device.deviceNetworkId)
   } else {
-    parent."${method}" data, device.deviceNetworkId
+    return parent."${method}"(data, device.deviceNetworkId)
   }
 }
 
