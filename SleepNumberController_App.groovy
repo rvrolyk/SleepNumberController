@@ -23,6 +23,12 @@
  *    https://github.com/ClassicTim1/SleepNumberManager/blob/master/FlexBase/SmartApp.groovy
  */
 import groovy.transform.Field
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.Semaphore
+
+@Field static ConcurrentLinkedQueue requestQueue = new ConcurrentLinkedQueue()
+@Field static Semaphore mutex = new Semaphore(1)
+@Field static Long lastLockTime = 0
 
 @Field final String DRIVER_NAME = "Sleep Number Bed"
 @Field final String NAMESPACE = "rvrolyk"
@@ -1443,44 +1449,47 @@ void httpRequestQueue(Map args, int duration) {
     query: args.query,
     runAfter: args.runAfter,
   ]
-  // Add the new request to the end of the queue.
-  List q = atomicState.requestQueue == null ? [] : atomicState.requestQueue
-  q.add(request)
-  atomicState.requestQueue = q
-  handleRequestQueue(true)
+  requestQueue.add(request)
+  handleRequestQueue()
 }
 
-void popRequestQueue() {
-  if (!atomicState.requestQueue.isEmpty()) {
-    List q = atomicState.requestQueue
-    q.removeAt(0)
-    atomicState.requestQueue = q
-  }
-}
-
-void handleRequestQueue(boolean firstCall = false) {
-  if (atomicState.requestQueue.isEmpty()) {
-    return
-  }
-  List q = atomicState.requestQueue
+// Only this method should be setting releaseLock to true.
+void handleRequestQueue(boolean releaseLock = false) {
+  if (releaseLock) mutex.release()
+  if (requestQueue.isEmpty()) return
   // Get the oldest request in the queue to run.
-  // It's not removed until the request duration is exceeded.
-  Map request = q.first()
-  // If this was just called we only want to issue an HTTP
-  // request if the queue is a single entry (which would be the new one).
-  // Otherwise it means we're still processing a request and need to wait.
-  if ((firstCall && q.size() == 1) || !firstCall) {
+  try {
+    if (!mutex.tryAcquire()) {
+      // If we can't obtain the lock it means one of two things:
+      // 1. There's an existing operation and we should rightly skip.  In this case,
+      //    the last thing the method does is re-run itself so this will clear itself up.
+      // 2. There's an unintended failure which has lead to a failed lock release.  We detect
+      //    this by checking the last time the lock was held and releasing the mutex if it's
+      //    been too long.
+      if ((now() - lastLockTime) > 120000 /* 2 minutes */) {
+        log.warn "HTTP queue lock was held for more than 2 minutes, forcing release"
+        mutex.release()
+        // In this case we should re-run.
+        handleRequestQueue()
+      }
+      return
+    }
+    lastLockTime = now()
+    Map request = requestQueue.poll()
     httpRequest(request.path, this.&put, request.body, request.query)
+
+    // Try to process more requests and release the lock since this request
+    // shoudl be complete.
+    runInMillis((request.duration * 1000), "handleRequestQueue", [data: true])
+
+    // If there was something to run after this then set that up as well.
+    if (request.runAfter) {
+      runIn(request.duration, request.runAfter)
+    }
+  } catch(e) {
+    log.error "Failed to run HTTP queue: ${e}"
+    mutex.release()
   }
-  runIn(request.duration, "popRequestQueue")
-  if (request.runAfter) {
-    runIn(request.duration, request.runAfter)
-  }
-  // Try to process more requests.  We can't count on this being the only
-  // one since a subsequent call may come in during the 'duration' this is
-  // running for. We use millis in order to handle the queue
-  // 500ms after popping it.
-  runInMillis((request.duration * 1000) + 500, "handleRequestQueue")
 }
 
 def httpRequest(String path, Closure method = this.&get, Map body = null, Map query = null, boolean alreadyTriedRequest = false) {
