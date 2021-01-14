@@ -1209,7 +1209,7 @@ def setOutletState(String outletState, String devId) {
  * Sets the state of the given outlet.
  * @param bedId: the bed id
  * @param outletId: 1-4
- * @param state: on or off
+ * @param outletState: on or off
  * @param timer: a valid minute duration (for outlets 3 and 4 only)
  * Timer is the only optional parameter.
  */
@@ -1234,7 +1234,7 @@ def setOutletState(String bedId, Integer outletId, String outletState, Integer t
   }
   Map body = [
     timer: timer,
-    setting: state == "on" ? 1 : 0,
+    setting: outletState == "on" ? 1 : 0,
     outletId: outletId
   ]
   httpRequestQueue(5, path: "/rest/bed/${bedId}/foundation/outlet",
