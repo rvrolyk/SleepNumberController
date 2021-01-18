@@ -1209,7 +1209,7 @@ def setOutletState(String outletState, String devId) {
  * Sets the state of the given outlet.
  * @param bedId: the bed id
  * @param outletId: 1-4
- * @param outletState: on or off
+ * @param state: on or off
  * @param timer: a valid minute duration (for outlets 3 and 4 only)
  * Timer is the only optional parameter.
  */
@@ -1337,7 +1337,6 @@ def setUnderbedLightState(Map params, String devId) {
       leftBrightness = null
     }
   }
-
   setOutletState(device.getState().bedId, outletNum,
       params.state == "auto" ? "off" : params.state, params.timer)
 
@@ -1467,10 +1466,17 @@ void handleRequestQueue(boolean releaseLock = false) {
       //    this by checking the last time the lock was held and releasing the mutex if it's
       //    been too long.
       if ((now() - lastLockTime) > 120000 /* 2 minutes */) {
-        log.warn "HTTP queue lock was held for more than 2 minutes, forcing release"
-        mutex.release()
-        // In this case we should re-run.
-        handleRequestQueue()
+        // Due to potential race setting and reading the lock time,
+        // wait 2s and check again before breaking it.  This should be rare so waiting
+        // an additional 2s should be fine.
+        log.info "HTTP queue lock potentially held for more than 2 minutes, confirming before releasing"
+        pauseExecution(2000)
+        if ((now() - lastLockTime) > 120000 /* 2 minutes */) {
+          log.warn "HTTP queue lock was held for more than 2 minutes, forcing release"
+          mutex.release()
+          // In this case we should re-run.
+          handleRequestQueue()
+        }
       }
       return
     }
@@ -1479,7 +1485,7 @@ void handleRequestQueue(boolean releaseLock = false) {
     httpRequest(request.path, this.&put, request.body, request.query)
 
     // Try to process more requests and release the lock since this request
-    // shoudl be complete.
+    // should be complete.
     runInMillis((request.duration * 1000), "handleRequestQueue", [data: true])
 
     // If there was something to run after this then set that up as well.
@@ -1587,3 +1593,4 @@ def put(Map params, Closure closure) {
 }
 
 // vim: tabstop=2 shiftwidth=2 expandtab
+
