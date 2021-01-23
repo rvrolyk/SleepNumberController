@@ -408,7 +408,7 @@ void getSleepData() {
     log.error "Sleep data only available on presence (main) device, this is ${state.type}"
     return
   }
-  def data = sendToParent "getSleepData"
+  Map data = sendToParent "getSleepData"
   debug "sleep data ${data}"
 
   if (!data || data.sleepSessionCount == 0) {
@@ -653,7 +653,7 @@ void setStatusOld(Map params) {
   }
 }
 
-def sendToParent(String method, Object data = null) {
+Map sendToParent(String method, Object data = null) {
   debug "sending to parent ${method}, ${data}"
   if (device.parentDeviceId) {
     // Send via virtual container method

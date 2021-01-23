@@ -18,11 +18,17 @@
  *  If modifying this project, please keep the above header intact and add your comments/credits below - Thank you!
  * 
  *  Thanks to Nathan Jacobson and Tim Parsons for their work on SmartThings apps that do this.  This isn't a copy
- *  of those but leverages prior work they"ve done for the API calls and bed management.
+ *  of those but leverages prior work they've done for the API calls and bed management.
  *    https://github.com/natecj/SmartThings/blob/master/smartapps/natecj/sleepiq-manager.src/sleepiq-manager.groovy
  *    https://github.com/ClassicTim1/SleepNumberManager/blob/master/FlexBase/SmartApp.groovy
  */
 import groovy.transform.Field
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.Semaphore
+
+@Field static ConcurrentLinkedQueue requestQueue = new ConcurrentLinkedQueue()
+@Field static Semaphore mutex = new Semaphore(1)
+@Field static Long lastLockTime = 0
 
 @Field final String DRIVER_NAME = "Sleep Number Bed"
 @Field final String NAMESPACE = "rvrolyk"
@@ -982,7 +988,7 @@ def getFootWarmingStatus(String bedId) {
  * Params must be a Map containing keys actuator and position.
  * The side is derived from the specified device.
  */
-def setFoundationAdjustment(Map params, String devId) {
+void setFoundationAdjustment(Map params, String devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
@@ -1002,20 +1008,22 @@ def setFoundationAdjustment(Map params, String devId) {
     side: device.getState().side[0],
     position: params.position
   ]
-  httpRequest("/rest/bed/${device.getState().bedId}/foundation/adjustment/micro", this.&put, body)
   // It takes ~35 seconds for a FlexFit3 head to go from 0-100 (or back) and about 18 seconds for the foot.
-  // Since we only really care about refreshing the device at the end (whereas the app shows the bed move), we
-  // just wait until it should be done and then refresh once.  
-  // We add an extra second just to increase the odds that it's actually done.
-  def waitTime = params.actuator == "H" ? 36 : 19
-  runIn(waitTime, "refreshChildDevices")
+  // The timing appears to be linear which means it's 0.35 seconds per level adjusted for the head and 0.18
+  // for the foot.
+  int currentPosition = params.actuator == "H" ? device.currentValue("headPosition") : device.currentValue("footPosition")
+  int positionDelta = Math.abs(params.position - currentPosition)
+  float movementDuration = params.actuator == "H" ? 0.35 : 0.18
+  int waitTime = Math.round(movementDuration * positionDelta) + 1
+  httpRequestQueue(waitTime, path: "/rest/bed/${device.getState().bedId}/foundation/adjustment/micro",
+      body: body, runAfter: "refreshChildDevices")
 }
 
 /**
  * Params must be a Map containing keys temp and timer.
  * The side is derived from the specified device.
  */
-def setFootWarmingState(Map params, String devId) {
+void setFootWarmingState(Map params, String devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
@@ -1037,9 +1045,9 @@ def setFootWarmingState(Map params, String devId) {
     "footWarmingTemp${device.getState().side}": params.temp,
     "footWarmingTimer${device.getState().side}": params.timer
   ]
-  httpRequest("/rest/bed/${device.getState().bedId}/foundation/footwarming", this.&put, body)
-  // Shouldn't take too long for the bed to reflect the new state, wait 10s just to be safe
-  runIn(10, "refreshChildDevices")
+  // Shouldn't take too long for the bed to reflect the new state, wait 5s just to be safe
+  httpRequestQueue(5, path: "/rest/bed/${device.getState().bedId}/foundation/footwarming",
+      body: body, runAfter: "refreshChildDevices")
 }
 
 /**
@@ -1070,8 +1078,8 @@ def setFoundationTimer(Map params, String devId) {
     positionTimer: params.timer
   ]
   httpRequest("/rest/bed/${device.getState().bedId}/foundation/adjustment", this.&put, body)
-  // Shouldn't take too long for the bed to reflect the new state, wait 10s just to be safe
-  runIn(10, "refreshChildDevices")
+  // Shouldn't take too long for the bed to reflect the new state, wait 5s just to be safe
+  runIn(5, "refreshChildDevices")
 }
 
 /**
@@ -1092,10 +1100,11 @@ def setFoundationPreset(Integer preset, String devId) {
     preset : preset,
     side: device.getState().side[0],
   ]
-  httpRequest("/rest/bed/${device.getState().bedId}/foundation/preset", this.&put, body)
   // It takes ~35 seconds for a FlexFit3 head to go from 0-100 (or back) and about 18 seconds for the foot.
-  // I didn't run a time per preset so just wait 35 seconds which is the longest this should take.
-  runIn(35, "refreshChildDevices")
+  // Rather than attempt to derive the preset relative to the current state so we can compute
+  // the time (as we do for adjustment), we just use the maximum.
+  httpRequestQueue(35, path: "/rest/bed/${device.getState().bedId}/foundation/preset",
+      body: body, runAfter: "refreshChildDevices")
 }
 
 def stopFoundationMovement(Map ignored, String devId) {
@@ -1111,7 +1120,7 @@ def stopFoundationMovement(Map ignored, String devId) {
     side: device.getState().side[0],
   ]
   httpRequest("/rest/bed/${device.getState().bedId}/foundation/motion", this.&put, body)
-  runIn(10, "refreshChildDevices")
+  runIn(5, "refreshChildDevices")
 }
 
 /**
@@ -1129,8 +1138,9 @@ def setSleepNumber(BigDecimal number, String devId) {
     sleepNumber: number,
     side: device.getState().side[0]
   ]
-  httpRequest("/rest/bed/${device.getState().bedId}/sleepNumber", this.&put, body)
-  runIn(30, "refreshChildDevices") 
+  // Not sure how long it takes to inflate or deflate so just wait 20s
+  httpRequestQueue(20, path: "/rest/bed/${device.getState().bedId}/sleepNumber",
+      body: body, runAfter: "refreshChildDevices") 
 }
 
 def getPrivacyMode(String bedId) {
@@ -1145,6 +1155,7 @@ def setPrivacyMode(Boolean mode, String devId) {
     return
   }
   def pauseMode = mode ? "on" : "off"
+  // Cloud request so no need to queue.
   httpRequest("/rest/bed/${device.getState().bedId}/pauseMode", this.&put, null, [mode: pauseMode])
   runIn(2, "refreshChildDevices")
 }
@@ -1223,11 +1234,11 @@ def setOutletState(String bedId, Integer outletId, String outletState, Integer t
   }
   Map body = [
     timer: timer,
-    setting: state == "on" ? 1 : 0,
+    setting: outletState == "on" ? 1 : 0,
     outletId: outletId
   ]
-  httpRequest("/rest/bed/${bedId}/foundation/outlet", this.&put, body)
-  runIn(10, "refreshChildDevices") 
+  httpRequestQueue(5, path: "/rest/bed/${bedId}/foundation/outlet",
+      body: body, runAfter: "refreshChildDevices") 
 }
 
 def getUnderbedLightState(String bedId) {
@@ -1326,7 +1337,7 @@ def setUnderbedLightState(Map params, String devId) {
       leftBrightness = null
     }
   }
-
+    log.trace("State: ${params.state}")
   setOutletState(device.getState().bedId, outletNum,
       params.state == "auto" ? "off" : params.state, params.timer)
 
@@ -1342,7 +1353,7 @@ def setUnderbedLightState(Map params, String devId) {
 }
 
 
-def getSleepData(Map ignored, String devId) {
+Map getSleepData(Map ignored, String devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
@@ -1375,7 +1386,7 @@ def getSleepData(Map ignored, String devId) {
 
   debug "Getting sleep data for ${ids[device.getState().side]}"
   // Interval can be W1 for a week, D1 for a day and M1 for a month.
-  httpRequest("/rest/sleepData", this.&get, null, [
+  return httpRequest("/rest/sleepData", this.&get, null, [
       interval: "D1",
       sleeper: ids[device.getState().side],
       includeSlices: false,
@@ -1419,7 +1430,78 @@ void login() {
   }
 }
 
-def httpRequest(String path, method = this.&get, Map body = null, Map query = null, Boolean alreadyTriedRequest = false) {
+/**
+ * Adds a PUT HTTP request to the queue with the expectation that it will take approximaly `duration`
+ * time to run.  This means other enqueued requests may run after `duration`. 
+ * Args may be:
+ * body: Map
+ * query: Map
+ * path: String
+ * runAfter: String (name of handler method to run after delay)
+ */
+void httpRequestQueue(Map args, int duration) {
+  // Creating new classes appears to be forbidden so instead we just use a map to represent the
+  // HTTP request data we want to persist in the queue.
+  Map request = [
+    duration: duration,
+    path: args.path,
+    body: args.body,
+    query: args.query,
+    runAfter: args.runAfter,
+  ]
+  requestQueue.add(request)
+    log.trace "added request ${request}"
+  handleRequestQueue()
+}
+
+// Only this method should be setting releaseLock to true.
+void handleRequestQueue(boolean releaseLock = false) {
+  if (releaseLock) mutex.release()
+  if (requestQueue.isEmpty()) return
+  // Get the oldest request in the queue to run.
+  try {
+    if (!mutex.tryAcquire()) {
+      // If we can't obtain the lock it means one of two things:
+      // 1. There's an existing operation and we should rightly skip.  In this case,
+      //    the last thing the method does is re-run itself so this will clear itself up.
+      // 2. There's an unintended failure which has lead to a failed lock release.  We detect
+      //    this by checking the last time the lock was held and releasing the mutex if it's
+      //    been too long.
+      // RACE HERE. if lock time hasnt been updsted in this thread yet it will incorrectly move forward
+      if ((now() - lastLockTime) > 120000 /* 2 minutes */) {
+        // Due to potential race setting and reading the lock time,
+        // wait 2s and check again before breaking it
+        pauseExecution(2000)
+        if ((now() - lastLockTime) > 120000 /* 2 minutes */) {
+          log.warn "HTTP queue lock was held for more than 2 minutes, forcing release"
+          mutex.release()
+          // In this case we should re-run.
+          handleRequestQueue()
+        }
+      }
+      return
+    }
+    lastLockTime = now()
+    log.trace "acquired mutex at ${lastLockTime}"
+    Map request = requestQueue.poll()
+      log.trace "now running request ${request}"
+    httpRequest(request.path, this.&put, request.body, request.query)
+
+    // Try to process more requests and release the lock since this request
+    // should be complete.
+    runInMillis((request.duration * 1000), "handleRequestQueue", [data: true])
+
+    // If there was something to run after this then set that up as well.
+    if (request.runAfter) {
+      runIn(request.duration, request.runAfter)
+    }
+  } catch(e) {
+    log.error "Failed to run HTTP queue: ${e}"
+    mutex.release()
+  }
+}
+
+def httpRequest(String path, Closure method = this.&get, Map body = null, Map query = null, boolean alreadyTriedRequest = false) {
   def result = [:]
   if (!state.session || !state.session.key) {
     if (alreadyTriedRequest) {

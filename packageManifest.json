@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "3.0.9",
+  "version": "3.1.0",
   "minimumHEVersion": "2.2.2",
-  "dateReleased": "2021-01-04",
-  "releaseNotes": "Fix return type in driver that was breaking getSleepData",
+  "dateReleased": "2021-01-23",
+  "releaseNotes": "Add request queue for foundation requests",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",
   "payPalUrl": "https://www.paypal.com/paypalme/rvrolyk",
