@@ -274,7 +274,6 @@ List getBedDevices() {
  * The map keys are: name, type, side, deviceId, bedId, isChild
  */
 List<Map> getBedDeviceData() {
-  maybeLogError "foo"
   // Start with all bed devices.
   List devices = getBedDevices()
   List<Map> output = []
