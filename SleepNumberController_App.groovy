@@ -29,6 +29,7 @@ import java.util.concurrent.Semaphore
 @Field static ConcurrentLinkedQueue requestQueue = new ConcurrentLinkedQueue()
 @Field static Semaphore mutex = new Semaphore(1)
 @Field static Long lastLockTime = 0
+@Field static Long lastErrorLogTime = 0
 
 @Field final String DRIVER_NAME = "Sleep Number Bed"
 @Field final String NAMESPACE = "rvrolyk"
@@ -106,12 +107,16 @@ def homePage() {
       if (defaultVariableRefresh || settings.variableRefresh) {
         input name: "dayInterval", type: "number", title: "Daytime Refresh Interval (minutes)",
             description: "How often to refresh bed state during the day", defaultValue: 30
-        input name: "dayStart", type: "time", title: "Day start time",
-            description: "Time when day will start if both sides are out of bed for more than 5 minutes", submitOnChange: true
-          input name: "nightInterval", type: "number", title: "Nighttime Refresh Interval (minutes)",
+        input name: "nightInterval", type: "number", title: "Nighttime Refresh Interval (minutes)",
               description: "How often to refresh bed state during the night", defaultValue: 1
-        input name: "nightStart", type: "time", title: "Night start time",
-            description: "Time when night will start", submitOnChange: true
+        input "variableRefreshModes", "bool", title: "Use modes to control variable refresh interval", defaultValue: false, submitOnChange: true
+        if (settings.variableRefreshModes) {
+          input name: "nightMode", type: "mode", title: "Modes for night (anything else will be day)", multiple: true, submitOnChange: true
+        } else {
+          input name: "dayStart", type: "time", title: "Day start time",
+              description: "Time when day will start if both sides are out of bed for more than 5 minutes", submitOnChange: true
+          input name: "nightStart", type: "time", title: "Night start time", description: "Time when night will start", submitOnChange: true
+        }
       } else {
         input name: "refreshInterval", type: "number", title: "Refresh Interval (minutes)",
             description: "How often to refresh bed state", defaultValue: 1
@@ -160,6 +165,7 @@ def homePage() {
       label title: "Assign an app name", required: false, defaultValue: defaultName
       input name: "modes", type: "mode", title: "Set for specific mode(s)", required: false, multiple: true, submitOnChange: true
       input "logEnable", "bool", title: "Enable debug logging?", defaultValue: false, required: true, submitOnChange: true
+      input "limitErrorLogsMin", "number", title: "How often to allow error logs (minutes), 0 for all the time", defaultValue: 0, submitOnChange: true 
       if (settings.login && settings.password) {
         href "diagnosticsPage", title: "Diagnostics", description: "Show diagnostic info"
       }
@@ -185,6 +191,9 @@ def initialize() {
   }
   if (settings.variableRefresh && (settings.dayInterval <= 0 || settings.nightInterval <= 0)) {
     log.error "Invalid refresh intervals ${settings.dayInterval} or ${settings.nightInterval}"
+  }
+  if (settings.variableRefreshModes) {
+    subscribe(location, "mode", configureVariableRefreshInterval)
   }
   setRefreshInterval(0 /* force picking from settings */, "" /* ignored */)
   initializeBedInfo()
@@ -265,6 +274,7 @@ List getBedDevices() {
  * The map keys are: name, type, side, deviceId, bedId, isChild
  */
 List<Map> getBedDeviceData() {
+  maybeLogError "foo"
   // Start with all bed devices.
   List devices = getBedDevices()
   List<Map> output = []
@@ -358,27 +368,46 @@ void setRefreshInterval(BigDecimal val, String ignoredDevId) {
  * during the day but at night can poll quicker in order to detect things like presence
  * faster.  Daytime will be used if the time is between day and night _and_ no presence
  * is detected.
+ * If user opted to use modes, this just checks the mode and sets the appropriate polling
+ * based on that.
  */
+void configureVariableRefreshInterval(evt) {
+  configureVariableRefreshInterval()
+}
 void configureVariableRefreshInterval() {
-  // Gather presence state of all child devices
-  List presentChildren = getBedDevices().findAll {
-    (!it.getState().type || it.getState()?.type == "presence") && it.isPresent()
-  }
-  Date now = new Date()
-  def random = new Random()
-  Integer randomInt = random.nextInt(40) + 4
-  if (timeOfDayIsBetween(toDateTime(settings.dayStart), toDateTime(settings.nightStart), now)
-      && presentChildren.size() == 0) {
-    // Only log and schedule if we haven't already done so.
-    if (state.variableRefresh != "day") {
-      log.info "Setting interval to day; daytime and no beds present. Refreshing every ${settings.dayInterval} minutes."
-      schedule("${randomInt} /${settings.dayInterval} * * * ?", "scheduledRefreshChildDevices")
-      state.variableRefresh = "day"
+  boolean night = false
+
+  if (settings.variableRefreshModes) {
+    if (settings.nightMode.contains(location.mode)) {
+      night = true
+    } else {
+      night = false
     }
-  } else if (state.variableRefresh != "night") {
+  } else {
+    // Gather presence state of all child devices
+    List presentChildren = getBedDevices().findAll {
+      (!it.getState().type || it.getState()?.type == "presence") && it.isPresent()
+    }
+    Date now = new Date()
+    if (timeOfDayIsBetween(toDateTime(settings.dayStart), toDateTime(settings.nightStart), now)
+        && presentChildren.size() == 0) {
+      night = false
+    } else {
+      night = true
+    }
+  }
+
+  Random random = new Random()
+  Integer randomInt = random.nextInt(40) + 4
+
+  if (night && state.variableRefresh != "night") {
     log.info "Setting interval to night. Refreshing every ${settings.nightInterval} minutes."
     schedule("${randomInt} /${settings.nightInterval} * * * ?", "scheduledRefreshChildDevices")
     state.variableRefresh = "night"
+  } else if (state.variableRefresh != "day") {
+    log.info "Setting interval to day. Refreshing every ${settings.dayInterval} minutes."
+    schedule("${randomInt} /${settings.dayInterval} * * * ?", "scheduledRefreshChildDevices")
+    state.variableRefresh = "day"
   }
 }
 
@@ -719,7 +748,7 @@ def diagnosticsPage(params) {
             try {
               body = parseJson(params.requestBody)
             } catch (groovy.json.JsonException e) {
-              log.error "${params.requestBody} : ${e}"
+              maybeLogError "${params.requestBody} : ${e}"
             }
           }
           Map query
@@ -727,7 +756,7 @@ def diagnosticsPage(params) {
             try {
               query = parseJson(params.requestQuery)
             } catch (groovy.json.JsonException e) {
-              log.error "${params.requestQuery} : ${e}"
+              maybeLogError "${params.requestQuery} : ${e}"
             }
           }
           def response = httpRequest((String)params.requestPath,
@@ -1357,7 +1386,7 @@ Map getSleepData(Map ignored, String devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
-      return
+    return
   }
   def bedId = device.getState().bedId
   def ids = [:]
@@ -1420,12 +1449,12 @@ void login() {
           state.session.cookies = state.session.cookies + it.value.split(";")[0] + ";"
         }
       } else {
-        log.error "login Failure: (${response.status}) ${response.data}"
+        maybeLogError "login Failure: (${response.status}) ${response.data}"
         state.status = "Login Error"
       }
     }
   } catch (Exception e) {
-    log.error "login Error: ${e}"
+    maybeLogError "login Error: ${e}"
     state.status = "Login Error"
   }
 }
@@ -1496,7 +1525,7 @@ void handleRequestQueue(boolean releaseLock = false) {
       runIn(request.duration, request.runAfter)
     }
   } catch(e) {
-    log.error "Failed to run HTTP queue: ${e}"
+    maybeLogError "Failed to run HTTP queue: ${e}"
     mutex.release()
   }
 }
@@ -1505,7 +1534,7 @@ def httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
   def result = [:]
   if (!state.session || !state.session.key) {
     if (alreadyTriedRequest) {
-      log.error "Already attempted login but still no session key, giving up"
+      maybeLogError "Already attempted login but still no session key, giving up"
       return result
     } else {
       login()
@@ -1544,7 +1573,7 @@ def httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
       if (response.success) {
         result = response.data
       } else {
-        log.error "Failed request for ${path} ${queryString} with payload ${payload}:(${response.status}) ${response.data}"
+        maybeLogError "Failed request for ${path} ${queryString} with payload ${payload}:(${response.status}) ${response.data}"
         state.status = "API Error"
       }
     }
@@ -1560,7 +1589,7 @@ def httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
       // otherwise give up.  Not Found errors won't improve with retry to don't
       // bother.
       if (!alreadyTriedRequest && !e.toString().contains("Not Found")) {
-        log.error "Retrying failed request ${statusParams}\n${e}"
+        maybeLogError "Retrying failed request ${statusParams}\n${e}"
         return httpRequest(path, method, body, query, true)
       } else {
         if (e.toString().contains("Not Found")) {
@@ -1571,11 +1600,23 @@ def httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
           debug "Error making request ${statusParams}\n${e}"
           return result
         }
-        log.error "Error making request ${statusParams}\n${e}"
+        maybeLogError "Error making request ${statusParams}\n${e}"
         state.status = "API Error"
         return result
       }
     }
+  }
+}
+
+/**
+ * Only logs an error message if one wasn't logged within the last
+ * N minutes where N is configurable.
+ */
+void maybeLogError(String msg) {
+  if (!settings.limitErrorLogsMin /* off */
+      || (now() - lastErrorLogTime) > (settings.limitErrorLogsMin * 60 * 1000)) {
+    log.error msg
+    lastErrorLogTime = now()
   }
 }
 

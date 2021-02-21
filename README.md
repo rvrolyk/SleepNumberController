@@ -43,7 +43,9 @@ variable refresh in order to avoid sending a lot of extra traffic to the SleepIQ
 you may choose to use every 30 minutes during the day but when you're normally in bed, reduce to every
 minute or two.  The app will only change back to the day schedule when day start time and both sides
 of the bed are away is true.  This will avoid reducing polling if you're still actively in bed (and
-may want presence).
+may want presence).  Instead of using fixed time periods to control the refresh interval, you may
+also use modes by selecting *Use modes to control variable refresh interval* and then selecting
+the modes you'd like to treat as night.
 
 As of version 3, you may create bed devices as a parent/child device.  This is strongly recommended
 if you intend to use devices for the head, foot, etc as it reduces the number of devices by one (no
@@ -51,6 +53,19 @@ virtual container) and simplifies the device logic by relying on Hubitat maintai
  Additionally, I may opt to remove support for the old structure in the future to simplify the code.
 
 Underbed lighting and outlets are also supported in the parent/child structure but not the old one.
+
+## Logging
+
+During normal operation, no changes are necessary to the logging in the app or devices.  If you're experiencing
+problems, turning on debug logging in the app will cause it to emit more information about the requests and responses
+being seen.
+
+If you frequently have internet issues and would like to cut down on the amount of error logging about retries,
+you may enter a value greater than 0 in *How often to allow error logs*.  This value should be an integer greater
+than 0 to indicate how many minutes between error logs are permitted.  The system already tries to limit logging
+to one error during each poll (indicating a retry) but you may use this control to show an error for every N periods.
+For example, if your poll period is every minute you'd normally see an error each minute when the internet is down.
+However, if this were set to 15 then you'd see an error every 15 minutes instead.
 
 # Usage
 
