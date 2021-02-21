@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "3.1.1",
+  "version": "3.1.2",
   "minimumHEVersion": "2.2.2",
-  "dateReleased": "2021-02-20",
-  "releaseNotes": "Now use modes for refresh periods. Also adds ability to control how frequently an error is logged.",
+  "dateReleased": "2021-02-21",
+  "releaseNotes": "Remove bogus log message",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",
   "payPalUrl": "https://www.paypal.com/paypalme/rvrolyk",
