@@ -388,8 +388,8 @@ void configureVariableRefreshInterval() {
       (!it.getState().type || it.getState()?.type == "presence") && it.isPresent()
     }
     Date now = new Date()
-    if (timeOfDayIsBetween(toDateTime(settings.dayStart), toDateTime(settings.nightStart), now)
-        && presentChildren.size() == 0) {
+    if (timeOfDayIsBetween(toDateTime(settings.dayStart), toDateTime(settings.nightStart), now)) {
+      if (presentChildren.size() > 0) return // if someone is still in bed, don't change anything
       night = false
     } else {
       night = true
@@ -399,10 +399,13 @@ void configureVariableRefreshInterval() {
   Random random = new Random()
   Integer randomInt = random.nextInt(40) + 4
 
-  if (night && state.variableRefresh != "night") {
-    log.info "Setting interval to night. Refreshing every ${settings.nightInterval} minutes."
-    schedule("${randomInt} /${settings.nightInterval} * * * ?", "scheduledRefreshChildDevices")
-    state.variableRefresh = "night"
+  if (night) {
+    // Don't bother setting the schedule if we are already set to night.
+    if (state.variableRefresh != "night") {
+      log.info "Setting interval to night. Refreshing every ${settings.nightInterval} minutes."
+      schedule("${randomInt} /${settings.nightInterval} * * * ?", "scheduledRefreshChildDevices")
+      state.variableRefresh = "night"
+    }
   } else if (state.variableRefresh != "day") {
     log.info "Setting interval to day. Refreshing every ${settings.dayInterval} minutes."
     schedule("${randomInt} /${settings.dayInterval} * * * ?", "scheduledRefreshChildDevices")
@@ -1478,7 +1481,6 @@ void httpRequestQueue(Map args, int duration) {
     runAfter: args.runAfter,
   ]
   requestQueue.add(request)
-    log.trace "added request ${request}"
   handleRequestQueue()
 }
 
@@ -1510,9 +1512,7 @@ void handleRequestQueue(boolean releaseLock = false) {
       return
     }
     lastLockTime = now()
-    log.trace "acquired mutex at ${lastLockTime}"
     Map request = requestQueue.poll()
-      log.trace "now running request ${request}"
     httpRequest(request.path, this.&put, request.body, request.query)
 
     // Try to process more requests and release the lock since this request
