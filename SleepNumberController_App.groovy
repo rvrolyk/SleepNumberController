@@ -493,7 +493,8 @@ Side: ${params.side}
 """ 
     }
     section {
-      input "newDeviceName", "text", title: "Device Name", defaultValue: settings.newDeviceName ?: params.label,
+      def name = settings.newDeviceName?.trim() ? settings.newDeviceName : params.label?.trim() ? params.label : newDeviceName
+      input "newDeviceName", "text", title: "Device Name", defaultValue: name,
           description: "What prefix do you want for the devices?", submitOnChange: true,
           required: true
       input "useChildDevices", "bool", title: "Use child devices? (recommended)", defaultValue: true,
