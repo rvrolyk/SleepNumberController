@@ -105,9 +105,9 @@ def homePage() {
       input "variableRefresh", "bool", title: "Use variable refresh interval? (recommended)", defaultValue: defaultVariableRefresh,
          submitOnChange: true
       if (defaultVariableRefresh || settings.variableRefresh) {
-        input name: "dayInterval", type: "number", title: "Daytime Refresh Interval (minutes)",
+        input name: "dayInterval", type: "number", title: "Daytime Refresh Interval (minutes; 0-59)",
             description: "How often to refresh bed state during the day", defaultValue: 30
-        input name: "nightInterval", type: "number", title: "Nighttime Refresh Interval (minutes)",
+        input name: "nightInterval", type: "number", title: "Nighttime Refresh Interval (minutes; 0-59)",
               description: "How often to refresh bed state during the night", defaultValue: 1
         input "variableRefreshModes", "bool", title: "Use modes to control variable refresh interval", defaultValue: false, submitOnChange: true
         if (settings.variableRefreshModes) {
@@ -118,7 +118,7 @@ def homePage() {
           input name: "nightStart", type: "time", title: "Night start time", description: "Time when night will start", submitOnChange: true
         }
       } else {
-        input name: "refreshInterval", type: "number", title: "Refresh Interval (minutes)",
+        input name: "refreshInterval", type: "number", title: "Refresh Interval (minutes; 0-59)",
             description: "How often to refresh bed state", defaultValue: 1
       }
     }
