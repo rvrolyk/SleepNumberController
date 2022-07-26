@@ -164,6 +164,7 @@ def homePage() {
       }
       label title: "Assign an app name", required: false, defaultValue: defaultName
       input name: "modes", type: "mode", title: "Set for specific mode(s)", required: false, multiple: true, submitOnChange: true
+      input name: "switchToDisable", type: "capability.switch", title: "Switch to disable refreshes", required: false, submitOnChange: true
       input "logEnable", "bool", title: "Enable debug logging?", defaultValue: false, required: true, submitOnChange: true
       input "limitErrorLogsMin", "number", title: "How often to allow error logs (minutes), 0 for all the time", defaultValue: 0, submitOnChange: true 
       if (settings.login && settings.password) {
@@ -326,6 +327,12 @@ void scheduledRefreshChildDevices() {
 void refreshChildDevices() {
   // Only refresh if mode is a selected one
   if (settings.modes && !settings.modes.contains(location.mode)) {
+    debug "Skipping refresh, not the right mode"
+    return
+  }
+  // If there's a switch defined and it's on, don't bother refreshing at all
+  if (settings.switchToDisable && settings.switchToDisable.currentValue("switch") == "on") {
+    debug "Skipping refresh, switch to disable is on"
     return
   }
   getBedData()
