@@ -46,6 +46,7 @@ import java.util.concurrent.Semaphore
 @Field final ArrayList VALID_PRESETS = [1, 2, 3, 4, 5, 6]
 @Field final ArrayList VALID_LIGHT_TIMES = [15, 30, 45, 60, 120, 180]
 @Field final ArrayList VALID_LIGHT_BRIGHTNESS = [1, 30, 100]
+@Field final Map<String, String> LOG_LEVELS = ["0": "Off", "1": "Debug", "2": "Info", "3": "Warn"]
 
 definition(
   name: "Sleep Number Controller",
@@ -165,8 +166,9 @@ def homePage() {
       label title: "Assign an app name", required: false, defaultValue: defaultName
       input name: "modes", type: "mode", title: "Set for specific mode(s)", required: false, multiple: true, submitOnChange: true
       input name: "switchToDisable", type: "capability.switch", title: "Switch to disable refreshes", required: false, submitOnChange: true
-      input "logEnable", "bool", title: "Enable debug logging?", defaultValue: false, required: true, submitOnChange: true
-      input "limitErrorLogsMin", "number", title: "How often to allow error logs (minutes), 0 for all the time", defaultValue: 0, submitOnChange: true 
+      input "enableDebugLogging", "bool", title: "Enable debug logging for 30m?", defaultValue: false, required: true, submitOnChange: true
+      input "logLevel", "enum", title: "Choose the logging level", defaultValue: "2", submitOnChange: true, options: LOG_LEVELS
+      input "limitErrorLogsMin", "number", title: "How often to allow error logs (minutes), 0 for all the time. <br><font size=-1>(Only applies when log level is not off)</font> ", defaultValue: 0, submitOnChange: true 
       if (settings.login && settings.password) {
         href "diagnosticsPage", title: "Diagnostics", description: "Show diagnostic info"
       }
@@ -184,6 +186,17 @@ def updated() {
   unschedule()
   state.variableRefresh = ""
   initialize()
+  if (enableDebugLogging) {
+    runIn(1800, logsOff)
+  }
+}
+
+void logsOff() {
+  if (enableDebugLogging) {
+    // Log this information regardless of user setting.
+    log.info "debug logging disabled..."
+    app.updateSetting "enableDebugLogging", [value: "false", type: "bool"]
+  }
 }
 
 def initialize() {
@@ -227,9 +240,9 @@ void updateLabel() {
 
 void initializeBedInfo() {
   debug "Setting up bed info"
-  def info = getBeds()
+  def bedInfo = getBeds()
   state.bedInfo = [:]
-  info.beds.each() { Map bed ->
+  bedInfo.beds.each() { Map bed ->
     debug "Bed id ${bed.bedId}"
     if (!state.bedInfo.containsKey(bed.bedId)) {
       state.bedInfo[bed.bedId] = [:]
@@ -248,7 +261,7 @@ void initializeBedInfo() {
     state.bedInfo[bed.bedId].components = components
   }
   if (!state.bedInfo) {
-    log.warn "No bed state set up"
+    warn "No bed state set up"
   }
 }
 
@@ -409,12 +422,12 @@ void configureVariableRefreshInterval() {
   if (night) {
     // Don't bother setting the schedule if we are already set to night.
     if (state.variableRefresh != "night") {
-      log.info "Setting interval to night. Refreshing every ${settings.nightInterval} minutes."
+      info "Setting interval to night. Refreshing every ${settings.nightInterval} minutes."
       schedule("${randomInt} /${settings.nightInterval} * * * ?", "scheduledRefreshChildDevices")
       state.variableRefresh = "night"
     }
   } else if (state.variableRefresh != "day") {
-    log.info "Setting interval to day. Refreshing every ${settings.dayInterval} minutes."
+    info "Setting interval to day. Refreshing every ${settings.dayInterval} minutes."
     schedule("${randomInt} /${settings.dayInterval} * * * ?", "scheduledRefreshChildDevices")
     state.variableRefresh = "day"
   }
@@ -634,7 +647,7 @@ def createBedPage(params) {
     def label = createDeviceLabel(settings.newDeviceName, "presence")
     def parent = existingDevices.find{ it.deviceNetworkId == deviceId }
     if (parent) {
-      log.info "Parent device ${deviceId} already exists"
+      info "Parent device ${deviceId} already exists"
     } else {
       debug "Creating parent device ${deviceId}"
       parent = addChildDevice(NAMESPACE, DRIVER_NAME, deviceId, null, [label: label])
@@ -669,7 +682,7 @@ def createBedPage(params) {
     params.types.each { type ->
       def deviceId = "sleepnumber.${params.bedId}.${params.side}.${type.replaceAll(' ', '_')}"
       if (existingDevices.find{ it.data.vcId == deviceId }) {
-        log.info "Not creating device ${deviceId}, it already exists"
+        info "Not creating device ${deviceId}, it already exists"
       } else {
         def label = createDeviceLabel(settings.newDeviceName, type)
         def device = null
@@ -702,19 +715,19 @@ def createBedPage(params) {
       }
       header += ":"
       paragraph(header)
-      def info = "<ol>"
+      def displayInfo = "<ol>"
       devices.each { device ->
-        info += "<li>"
-        info += "${device.label}"
+        displayInfo += "<li>"
+        displayInfo += "${device.label}"
         if (!params.useChildDevices) {
-          info += "<br>Bed ID: ${device.getState().bedId}"
-          info += "<br>Side: ${device.getState().side}"
-          info += "<br>Type: ${device.getState()?.type}"
+          displayInfo += "<br>Bed ID: ${device.getState().bedId}"
+          displayInfo += "<br>Side: ${device.getState().side}"
+          displayInfo += "<br>Type: ${device.getState()?.type}"
         }
-        info += "</li>"
+        displayInfo += "</li>"
       }
-      info += "</ol>"
-      paragraph info
+      displayInfo += "</ol>"
+      paragraph displayInfo
     }
     section {
       href "findBedPage", title: "Back to Bed List", description: null
@@ -723,9 +736,9 @@ def createBedPage(params) {
 }
 
 def diagnosticsPage(params) {
-  def info = getBeds()
+  def bedInfo = getBeds()
   dynamicPage(name: "diagnosticsPage") {
-    info.beds.each { Map bed ->
+    bedInfo.beds.each { Map bed ->
       section("Bed: ${bed.bedId}") {
         def bedOutput = "<ul>"
         bedOutput += "<li>Size: ${bed.size}"
@@ -836,7 +849,7 @@ def processBedData(Map responseData) {
     for (def bed : (List)responseData.beds) {
       // Make sure the various bed state info is set up so we can use it later.
       if (!state?.bedInfo || !state?.bedInfo[bed.bedId] || !state?.bedInfo[bed.bedId]?.components) {
-        log.warn "state.bedInfo somehow lost, re-caching it"
+        warn "state.bedInfo somehow lost, re-caching it"
         initializeBedInfo()
       }
       if (bedId == bed.bedId) {
@@ -1376,7 +1389,6 @@ def setUnderbedLightState(Map params, String devId) {
       leftBrightness = null
     }
   }
-    log.trace("State: ${params.state}")
   setOutletState(device.getState().bedId, outletNum,
       params.state == "auto" ? "off" : params.state, params.timer)
 
@@ -1415,7 +1427,7 @@ Map getSleepData(Map ignored, String devId) {
           side = "Right"
           break
         default:
-          log.warn "Unknown sleeper info: ${sleeper}"
+          warn "Unknown sleeper info: ${sleeper}"
       }
       if (side) {
         ids[side] = sleeper.sleeperId
@@ -1511,7 +1523,7 @@ void handleRequestQueue(boolean releaseLock = false) {
         // wait 2s and check again before breaking it
         pauseExecution(2000)
         if ((now() - lastLockTime) > 120000 /* 2 minutes */) {
-          log.warn "HTTP queue lock was held for more than 2 minutes, forcing release"
+          warn "HTTP queue lock was held for more than 2 minutes, forcing release"
           mutex.release()
           // In this case we should re-run.
           handleRequestQueue()
@@ -1588,7 +1600,7 @@ def httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
   } catch (Exception e) {
     if (e.toString().contains("Unauthorized") && !alreadyTriedRequest) {
       // The session is invalid so retry login before giving up.
-      log.info "Unauthorized, retrying login"
+      info "Unauthorized, retrying login"
       login()
       return httpRequest(path, method, body, query, true)
     } else {
@@ -1620,6 +1632,9 @@ def httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
  * N minutes where N is configurable.
  */
 void maybeLogError(String msg) {
+  if (logLevel.toInteger() == 0) {
+    return
+  }
   if (!settings.limitErrorLogsMin /* off */
       || (now() - lastErrorLogTime) > (settings.limitErrorLogsMin * 60 * 1000)) {
     log.error msg
@@ -1628,8 +1643,20 @@ void maybeLogError(String msg) {
 }
 
 void debug(String msg) {
-  if (logEnable) {
+  if (enableDebugLogging || logLevel.toInteger() == 1) {
     log.debug msg
+  }
+}
+
+void info(String msg) {
+  if (enableDebugLogging || (logLevel.toInteger() >= 1 && logLevel.toInteger() < 3)) {
+    log.info msg
+  }
+}
+
+void warn(String msg) {
+  if (enableDebugLogging || logLevel.toInteger() > 0) {
+     log.warn msg
   }
 }
 
