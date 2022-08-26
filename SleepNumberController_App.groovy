@@ -1632,7 +1632,7 @@ def httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
  * N minutes where N is configurable.
  */
 void maybeLogError(String msg) {
-  if (logLevel.toInteger() == 0) {
+  if (logLevel != null && logLevel.toInteger() == 0) {
     return
   }
   if (!settings.limitErrorLogsMin /* off */
@@ -1643,19 +1643,20 @@ void maybeLogError(String msg) {
 }
 
 void debug(String msg) {
-  if (enableDebugLogging || logLevel.toInteger() == 1) {
+  if (enableDebugLogging || (logLevel != null && logLevel.toInteger() == 1)) {
     log.debug msg
   }
 }
 
 void info(String msg) {
-  if (enableDebugLogging || (logLevel.toInteger() >= 1 && logLevel.toInteger() < 3)) {
+  if (enableDebugLogging || logLevel == null
+      || (logLevel.toInteger() >= 1 && logLevel.toInteger() < 3)) {
     log.info msg
   }
 }
 
 void warn(String msg) {
-  if (enableDebugLogging || logLevel.toInteger() > 0) {
+  if (enableDebugLogging || logLevel == null || logLevel.toInteger() > 0) {
      log.warn msg
   }
 }
