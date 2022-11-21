@@ -25,6 +25,7 @@
 import groovy.transform.Field
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Semaphore
+import org.json.JSONObject
 
 @Field static ConcurrentLinkedQueue requestQueue = new ConcurrentLinkedQueue()
 @Field static Semaphore mutex = new Semaphore(1)
@@ -1449,6 +1450,9 @@ void login() {
   debug "Logging in"
   state.session = null
   try {
+    JSONObject jsonBody = new JSONObject();
+    jsonBody.put("login", settings.login)
+    jsonBody.put("password", settings.password)
     Map params = [
       uri: API_URL + "/rest/login",
       requestContentType: "application/json",
@@ -1458,7 +1462,7 @@ void login() {
         "User-Agent": USER_AGENT,
         "DNT": "1",
       ],
-      body: "{'login':'${settings.login}', 'password':'${settings.password}'}=",
+      body: jsonBody.toString(),
       timeout: 20
     ]
     httpPut(params) { response ->
