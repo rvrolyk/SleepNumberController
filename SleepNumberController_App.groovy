@@ -318,12 +318,19 @@ List<Map> getBedDeviceData() {
   return output
 }
 
-List<String> getBedDeviceTypes() {
+/*
+ * Returns devices types for a supplied bedId as a unique set of values.
+ * Given there is no need to map specific sides to a device type, keeping this simple for now, but associating
+ * at least to the supplied bedID. The only consumer of this function already iterates by bed.
+*/
+Set<String> getBedDeviceTypes(String bedId) {
   List data = getBedDeviceData()
-  // TODO: Consider splitting this by side or even by bed.
-  // SKipping for now as most are probably using the same device types
-  // per side and probably only have one bed.
-  return data.collect { it.type }
+  Set typeList = data.collect { if ((String)it.bedId == bedId) { return it.type } }
+
+  // cull NULL entries
+  typeList = typeList.findAll()
+
+  return typeList
 }
 
 // Use with #schedule as apparently it's not good to mix #runIn method call
@@ -436,20 +443,24 @@ void configureVariableRefreshInterval() {
 def findBedPage() {
   def responseData = getBedData()
   List devices = getBedDevices()
-  def sidesSeen = []
   def childDevices = []
   dynamicPage(name: "findBedPage") {
-    if (responseData.beds.size() > 0) {
+    if (responseData && responseData.beds.size() > 0) {
       responseData.beds.each { bed ->
+        def sidesSeen = []
         section("Bed: ${bed.bedId}") {
           if (devices.size() > 0) {
             for (def dev : devices) {
+              if (dev.getState().bedId != bed.bedId) {
+                debug "bedId's don't match, skipping"
+                continue
+              }
               if (!dev.getState().type || dev.getState()?.type == "presence") {
                 if (!dev.getState().type) {
                   childDevices << dev.getState().side
                 }
                 sidesSeen << dev.getState().side
-                href "selectBedPage", title: dev.label, description: "Click to modify",
+                href "selectBedPage", name: "Bed: ${bed.bedId}", title: dev.label, description: "Click to modify",
                     params: [bedId: bed.bedId, side: dev.getState().side, label: dev.label]
               }
             }
@@ -457,22 +468,22 @@ def findBedPage() {
               input "createNewChildDevices", "bool", title: "Create new child device types", defaultValue: false, submitOnChange: true
               if (settings.createNewChildDevices) {
                 if (!childDevices.contains("Left")) {
-                  href "selectBedPage", title: "Left Side", description: "Click to create",
+                  href "selectBedPage", name: "Bed: ${bed.bedId}", title: "Left Side", description: "Click to create",
                       params: [bedId: bed.bedId, side: "Left", label: ""]
                 }
                 if (!childDevices.contains("Right")) {
-                  href "selectBedPage", title: "Right Side", description: "Click to create",
+                  href "selectBedPage", name: "Bed: ${bed.bedId}", title: "Right Side", description: "Click to create",
                       params: [bedId: bed.bedId, side: "Right", label: ""]
                 }
               }
             }
           }
           if (!sidesSeen.contains("Left")) {
-            href "selectBedPage", title: "Left Side", description: "Click to create",
+            href "selectBedPage", name: "Bed: ${bed.bedId}", title: "Left Side", description: "Click to create",
                 params: [bedId: bed.bedId, side: "Left", label: ""]
           }
           if (!sidesSeen.contains("Right")) {
-            href "selectBedPage", title: "Right Side", description: "Click to create",
+            href "selectBedPage", name: "Bed: ${bed.bedId}", title: "Right Side", description: "Click to create",
                 params: [bedId: bed.bedId, side: "Right", label: ""]
           }
         }
@@ -560,54 +571,59 @@ Side: ${params.side}
         }
       }
     }
-    section {
-      String msg = "Will create the following devices"
-      def containerName = ""
-      def types = []
-      if (settings.useChildDevices) {
-        settings.useContainer = false
-        msg += " with each side as a primary device and each type as a child device of the side"
-      } else if (settings.useContainer) {
-        containerName = "${newDeviceName} Container"
-        msg += " in virtual container '${containerName}'"
+    if (!newDeviceName?.trim()) {
+      debug "no device name entered, skipping create/modify section"
+    } else {
+      section {
+        String msg = "Will create the following devices"
+        def containerName = ""
+        def types = []
+        if (settings.useChildDevices) {
+          settings.useContainer = false
+          msg += " with each side as a primary device and each type as a child device of the side"
+        } else if (settings.useContainer) {
+          containerName = "${newDeviceName} Container"
+          msg += " in virtual container '${containerName}'"
+        }
+        msg += ":<ol>"
+        if (settings.createPresence) {
+          msg += "<li>${createDeviceLabel(newDeviceName, 'presence')}</li>"
+          types.add("presence")
+        }
+        if (settings.createHeadControl) {
+          msg += "<li>${createDeviceLabel(newDeviceName, 'head')}</li>"
+          types.add("head")
+        }
+        if (settings.createFootControl) {
+          msg += "<li>${createDeviceLabel(newDeviceName, 'foot')}</li>"
+          types.add("foot")
+        }
+        if (settings.createFootWarmer) {
+          msg += "<li>${createDeviceLabel(newDeviceName, 'foot warmer')}</li>"
+          types.add("foot warmer")
+        }
+        if (settings.createUnderbedLighting && settings.useChildDevices) {
+          msg += "<li>${createDeviceLabel(newDeviceName, 'underbed light')}</li>"
+          types.add("underbed light")
+        }
+        if (settings.createOutlet && settings.useChildDevices) {
+          msg += "<li>${createDeviceLabel(newDeviceName, 'outlet')}</li>"
+          types.add("outlet")
+        }
+        msg += "</ol>"
+        paragraph msg
+        newDeviceName = ""
+        href "createBedPage", title: "Create Devices", description: null,
+        params: [
+          presence: params.present,
+          bedId: params.bedId,
+          side: params.side,
+          useChildDevices: settings.useChildDevices,
+          useContainer: settings.useContainer,
+          containerName: containerName,
+          types: types
+        ]
       }
-      msg += ":<ol>"
-      if (settings.createPresence) {
-        msg += "<li>${createDeviceLabel(newDeviceName, 'presence')}</li>"
-        types.add("presence")
-      }
-      if (settings.createHeadControl) {
-        msg += "<li>${createDeviceLabel(newDeviceName, 'head')}</li>"
-        types.add("head")
-      }
-      if (settings.createFootControl) {
-        msg += "<li>${createDeviceLabel(newDeviceName, 'foot')}</li>"
-        types.add("foot")
-      }
-      if (settings.createFootWarmer) {
-        msg += "<li>${createDeviceLabel(newDeviceName, 'foot warmer')}</li>"
-        types.add("foot warmer")
-      }
-      if (settings.createUnderbedLighting && settings.useChildDevices) {
-        msg += "<li>${createDeviceLabel(newDeviceName, 'underbed light')}</li>"
-        types.add("underbed light")
-      }
-      if (settings.createOutlet && settings.useChildDevices) {
-        msg += "<li>${createDeviceLabel(newDeviceName, 'outlet')}</li>"
-        types.add("outlet")
-      }
-      msg += "</ol>"
-      paragraph msg
-      href "createBedPage", title: "Create Devices", description: null,
-      params: [
-        presence: params.present,
-        bedId: params.bedId,
-        side: params.side,
-        useChildDevices: settings.useChildDevices,
-        useContainer: settings.useContainer,
-        containerName: containerName,
-        types: types
-      ]
     }
   }
 }
@@ -836,8 +852,6 @@ def processBedData(Map responseData) {
   def outletData = [:]
   def underbedLightData = [:]
 
-  List deviceTypes = getBedDeviceTypes()
-
   for (def device : getBedDevices()) {
     String bedId = device.getState().bedId.toString()
     String bedSideStr = device.getState().side
@@ -846,6 +860,7 @@ def processBedData(Map responseData) {
       underbedLightData[bedId] = [:]
     }
 
+    Set deviceTypes = getBedDeviceTypes(bedId)
     for (def bed : (List)responseData.beds) {
       // Make sure the various bed state info is set up so we can use it later.
       if (!state?.bedInfo || !state?.bedInfo[bed.bedId] || !state?.bedInfo[bed.bedId]?.components) {
