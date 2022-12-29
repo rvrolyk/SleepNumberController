@@ -125,28 +125,6 @@ metadata {
     attribute sUNDERBEDLBRIGHT, sENUM, UNDERBED_LIGHT_BRIGHTNESS.collect{ it.key }
     attribute sOUTLETSTATE, sENUM, OUTLET_STATES
     // Attributes for sleep IQ data
-<<<<<<< Updated upstream:SleepNumberController_Driver.groovy
-    attribute "sleepMessage", "string"
-    attribute "sleepScore", "number"
-    attribute "restfulAverage", "string"
-    attribute "restlessAverage", "string"
-    attribute "heartRateAverage", "number"
-    attribute "HRVAverage", "number"
-    attribute "breathRateAverage", "number"
-    attribute "outOfBedTime", "string"
-    attribute "inBedTime", "string"
-    attribute "timeToSleep", "string"
-    attribute "sessionStart", "date"
-    attribute "sessionEnd", "date"
-    attribute "sleepDataRefreshTime", "date"
-    attribute "sleepIQSummary", "string"
-    attribute "sessionSummary", "string"
-    // Responsive Air state - optional based on preference since it requires another HTTP request
-    // and most users probably don't care about it.
-    attribute "responsiveAir", "enum", ["true", "false"]
-
-    command "setRefreshInterval", [[name: "interval", type: "NUMBER", constraints: ["NUMBER"]]]
-=======
     attribute "sleepMessage", sSTR
     attribute "sleepScore", sNUM
     attribute "restfulAverage", sSTR
@@ -167,7 +145,7 @@ metadata {
     attribute "responsiveAir", sENUM, ["true", "false"]
 
     command "setRefreshInterval", [[(sNM): "interval", (sTYP): "NUMBER", constraints: ["NUMBER"]]]
->>>>>>> Stashed changes:sd.groovy
+
     command "arrived"
     command "departed"
     command "setSleepNumber", [[(sNM): "sleep number", (sTYP): "NUMBER", constraints: ["NUMBER"]]]
@@ -183,33 +161,16 @@ metadata {
     command "disablePrivacyMode"
     command "getSleepData"
     command "setSleepNumberFavorite"
-<<<<<<< Updated upstream:SleepNumberController_Driver.groovy
-    command "setOutletState", [[name: "state", type: "ENUM", constraints: OUTLET_STATES]]
-    command "setUnderbedLightState", [[name: "state", type: "ENUM", constraints: UNDERBED_LIGHT_STATES],
-        [name: "timer", type: "ENUM", constraints: UNDERBED_LIGHT_TIMES.collect{ it.key }],
-        [name: "brightness", type: "ENUM", constraints: UNDERBED_LIGHT_BRIGHTNESS.collect{ it.key }]]
-    command "setResponsiveAirState", [[name: "state", type: "ENUM", constraints: ["true", "false"]]]
-=======
     command "updateSleepNumberFavorite", [[(sNM): "sleep number", (sTYP): "NUMBER", constraints: ["NUMBER"]]]
     command "setOutletState", [[(sNM): "state", (sTYP): "ENUM", constraints: OUTLET_STATES]]
     command "setUnderbedLightState", [[(sNM): "state", (sTYP): "ENUM", constraints: UNDERBED_LIGHT_STATES],
         [(sNM): "timer", (sTYP): "ENUM", constraints: UNDERBED_LIGHT_TIMES.collect{ it.key }],
         [(sNM): "brightness", (sTYP): "ENUM", constraints: UNDERBED_LIGHT_BRIGHTNESS.collect{ it.key }]]
     command "setResponsiveAirState", [[(sNM): "state", (sTYP): "ENUM", constraints: ["true", "false"]]]
->>>>>>> Stashed changes:sd.groovy
   }
 
   preferences {
     section("Settings:") {
-<<<<<<< Updated upstream:SleepNumberController_Driver.groovy
-      input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
-      input name: "presetLevel", type: "enum", title: "Bed preset level for 'on'", options: PRESET_NAMES.collect{ it.key }, defaultValue: "Favorite"
-      input name: "footWarmerLevel", type: "enum", title: "Foot warmer level for 'on'", options: HEAT_TEMPS.collect{ it.key }, defaultValue: "Medium"
-      input name: "footWarmerTimer", type: "enum", title: "Foot warmer duration for 'on'", options: HEAT_TIMES.collect{ it.key }, defaultValue: "30m"
-      input name: "underbedLightTimer", type: "enum", title: "Underbed light timer for 'on'", options: UNDERBED_LIGHT_TIMES.collect{ it.key }, defaultValue: "15m"
-      input name: "enableSleepData", type: "bool", title: "Enable sleep data collection", defaultValue: false
-      input name: "enableResponsiveAir", type: "bool", title: "Enable responsive air data", defaultValue: false
-=======
       input ((sNM): "logEnable", (sTYP): sBOOL, title: "Enable debug logging", defaultValue: false)
       input ((sNM): "presetLevel", (sTYP): sENUM, title: "Bed preset level for 'on'", options: PRESET_NAMES.collect{ it.key }, defaultValue: "Favorite")
       input ((sNM): "footWarmerLevel", (sTYP): sENUM, title: "Foot warmer level for 'on'", options: HEAT_TEMPS.collect{ it.key }, defaultValue: sMED)
@@ -217,7 +178,6 @@ metadata {
       input ((sNM): sUNDERBEDLTIMER, (sTYP): sENUM, title: "Underbed light timer for 'on'", options: UNDERBED_LIGHT_TIMES.collect{ it.key }, defaultValue: "15m")
       input ((sNM): "enableSleepData", (sTYP): sBOOL, title: "Enable sleep data collection", defaultValue: false)
       input ((sNM): "enableResponsiveAir", (sTYP): sBOOL, title: "Enable responsive air data", defaultValue: false)
->>>>>>> Stashed changes:sd.groovy
     }
   }
 }
@@ -511,11 +471,6 @@ void setUnderbedLightState(String st, String timer = "Forever", String brightnes
   vsendToParent("setUnderbedLightState", [state: st,
     timer: UNDERBED_LIGHT_TIMES[timer],
     brightness: UNDERBED_LIGHT_BRIGHTNESS[brightness] ])
-}
-
-void setResponsiveAirState(String state) {
-  debug "setResponsiveAirState($state)"
-  sendToParent "setResponsiveAirState", Boolean.valueOf(state)
 }
 
 void setResponsiveAirState(String state) {
