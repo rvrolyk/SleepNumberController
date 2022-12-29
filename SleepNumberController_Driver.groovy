@@ -85,6 +85,9 @@ metadata {
     attribute "sleepDataRefreshTime", "date"
     attribute "sleepIQSummary", "string"
     attribute "sessionSummary", "string"
+    // Responsive Air state - optional based on preference since it requires another HTTP request
+    // and most users probably don't care about it.
+    attribute "responsiveAir", "enum", ["true", "false"]
 
     command "setRefreshInterval", [[name: "interval", type: "NUMBER", constraints: ["NUMBER"]]]
     command "arrived"
@@ -106,6 +109,7 @@ metadata {
     command "setUnderbedLightState", [[name: "state", type: "ENUM", constraints: UNDERBED_LIGHT_STATES],
         [name: "timer", type: "ENUM", constraints: UNDERBED_LIGHT_TIMES.collect{ it.key }],
         [name: "brightness", type: "ENUM", constraints: UNDERBED_LIGHT_BRIGHTNESS.collect{ it.key }]]
+    command "setResponsiveAirState", [[name: "state", type: "ENUM", constraints: ["true", "false"]]]
   }
 
   preferences {
@@ -116,6 +120,7 @@ metadata {
       input name: "footWarmerTimer", type: "enum", title: "Foot warmer duration for 'on'", options: HEAT_TIMES.collect{ it.key }, defaultValue: "30m"
       input name: "underbedLightTimer", type: "enum", title: "Underbed light timer for 'on'", options: UNDERBED_LIGHT_TIMES.collect{ it.key }, defaultValue: "15m"
       input name: "enableSleepData", type: "bool", title: "Enable sleep data collection", defaultValue: false
+      input name: "enableResponsiveAir", type: "bool", title: "Enable responsive air data", defaultValue: false
     }
   }
 }
@@ -401,6 +406,11 @@ void setUnderbedLightState(String state, String timer = "Forever", String bright
   sendToParent "setUnderbedLightState", [state: state,
     timer: UNDERBED_LIGHT_TIMES.get(timer),
     brightness: UNDERBED_LIGHT_BRIGHTNESS.get(brightness)]
+}
+
+void setResponsiveAirState(String state) {
+  debug "setResponsiveAirState($state)"
+  sendToParent "setResponsiveAirState", Boolean.valueOf(state)
 }
 
 void getSleepData() {

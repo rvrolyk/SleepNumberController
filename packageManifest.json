@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "3.1.7",
+  "version": "3.1.8",
   "minimumHEVersion": "2.2.2",
   "dateReleased": "2021-12-08",
-  "releaseNotes": "Made logging work even if not set.  Avoids NullPointerException.",
+  "releaseNotes": "Added ability to enable responsive sleep data collection.\nAdded ability to set responsive air setting (this doesn't require collection).\nAdded ability to use AWS for login.  This should be more robust than the current cookie based method as it uses an oauth token that will refresh as needed.",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",
   "payPalUrl": "https://www.paypal.com/paypalme/rvrolyk",

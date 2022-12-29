@@ -25,6 +25,7 @@
 import groovy.transform.Field
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Semaphore
+import org.json.JSONObject
 
 @Field static ConcurrentLinkedQueue requestQueue = new ConcurrentLinkedQueue()
 @Field static Semaphore mutex = new Semaphore(1)
@@ -35,7 +36,10 @@ import java.util.concurrent.Semaphore
 @Field final String NAMESPACE = "rvrolyk"
 @Field final String API_HOST = "prod-api.sleepiq.sleepnumber.com"
 @Field final String API_URL = "https://" + API_HOST
-@Field final String USER_AGENT = "SleepIQ/1593766370 CFNetwork/1185.2 Darwin/20.0.0"
+@Field final String LOGIN_HOST = "l06it26kuh.execute-api.us-east-1.amazonaws.com"
+@Field final String LOGIN_URL = "https://" + LOGIN_HOST
+@Field final String LOGIN_CLIENT_ID = "jpapgmsdvsh9rikn4ujkodala"
+@Field final String USER_AGENT = "SleepIQ/1669639706 CFNetwork/1399 Darwin/22.1.0"
 //'''\
 //Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36'''
 
@@ -79,6 +83,7 @@ def appButtonHandler(btn) {
       unsubscribe()
       updateLabel()
     } else {
+      login()
       initialize()
     }
   }
@@ -172,6 +177,7 @@ def homePage() {
       if (settings.login && settings.password) {
         href "diagnosticsPage", title: "Diagnostics", description: "Show diagnostic info"
       }
+      input "useAwsOAuth", "bool", title: "(Beta) Use AWS OAuth", required: false, submitOnChange: true, defaultValue: false
     }
   }
 }
@@ -184,6 +190,7 @@ def installed() {
 def updated() {
   unsubscribe()
   unschedule()
+  state.session = null // next run will refresh all tokens/cookies
   state.variableRefresh = ""
   initialize()
   if (enableDebugLogging) {
@@ -790,6 +797,12 @@ def diagnosticsPage(params) {
           paragraph "${response}"
         }
     }
+    section("Authentication") {
+      href "diagnosticsPage", title: "Clear session info", description: null, params: [clearSession: true]
+      if (params && params.clearSession) {
+        state.session = null
+      }
+    }
   }
 }
 
@@ -835,6 +848,7 @@ def processBedData(Map responseData) {
   def sleepNumberFavorites = [:]
   def outletData = [:]
   def underbedLightData = [:]
+  def responsiveAir = [:]
 
   List deviceTypes = getBedDeviceTypes()
 
@@ -991,6 +1005,16 @@ def processBedData(Map responseData) {
             sleepNumberFavorite: favorite
           ]
         }
+        // If the device has responsive air, fetch that status and add to the map
+        if (!bedFailures.get(bedId) && device.getSetting('enableResponsiveAir')) {
+          if (!responsiveAir.get(bedId)) {
+            responsiveAir[bedId] = getResponsiveAirStatus(bedId)
+          }
+          def side = bedSideStr.toLowerCase()
+          statusMap << [
+            responsiveAir: responsiveAir.get(bedId)?."${side}SideEnabled" ?: ""
+          ]
+        }
         if (bedFailures.get(bedId)) {
           // Only log update errors once per bed
           loggedError[bedId] = true
@@ -1034,6 +1058,33 @@ def getFoundationStatus(String bedId, String currentSide) {
 def getFootWarmingStatus(String bedId) {
   debug "Getting Foot Warming Status for ${bedId}"
   return httpRequest("/rest/bed/${bedId}/foundation/footwarming")
+}
+
+def getResponsiveAirStatus(String bedId) {
+  debug "Getting responsive air status for ${bedId}"
+  return httpRequest("/rest/bed/${bedId}/responsiveAir")
+}
+
+def setResponsiveAirState(Boolean state, String devId) {
+  def device = getBedDevices().find { devId == it.deviceNetworkId }
+  if (!device) {
+    log.error "Bed device with id ${devId} is not a valid child"
+    return
+  }
+  Map body = [:] 
+  String side = device.getState().side
+  debug "Setting responsive air state ${side} to ${state}"
+  if (side.toLowerCase().equals("right")) {
+    body << [
+      rightSideEnabled: state
+    ]
+  } else {
+    body << [
+      leftSideEnabled: state
+    ]
+  }
+  httpRequestQueue(5, path: "/rest/bed/${device.getState().bedId}/responsiveAir",
+      body: body, runAfter: "refreshChildDevices")
 }
 
 /**
@@ -1445,10 +1496,137 @@ Map getSleepData(Map ignored, String devId) {
   ])
 }
 
-void login() {
+void loginAws() {
+  debug "Logging in"
+  if (state.session?.refreshToken) {
+    state.session.accessToken = null
+    try {
+      JSONObject jsonBody = new JSONObject();
+      jsonBody.put("RefreshToken", state.session.refreshToken)
+      jsonBody.put("ClientID", LOGIN_CLIENT_ID)
+      Map params = [
+        uri: LOGIN_URL + "/Prod/v1/token",
+        requestContentType: "application/json",
+        contentType: "application/json",	
+        headers: [
+          "Host": LOGIN_HOST,
+          "User-Agent": USER_AGENT,
+        ],
+        body: jsonBody.toString(),
+        timeout: 20
+      ]
+      httpPut(params) { response -> 
+        if (response.success) {
+          debug "refresh Success: (${response.status}) ${response.data}"
+          state.session.accessToken = response.data.data.AccessToken
+          // Refresh the access token 1 minute before it expires
+          runIn((response.data.data.ExpiresIn - 60), loginAws)
+        } else {
+          // If there's a failure here then purge all session data to force clean slate
+          state.session = null
+          maybeLogError "login Failure refreshing Token: (${response.status}) ${response.data}"
+          state.status = "Login Error"
+        }
+      }
+    } catch (Exception e) {
+      // If there's a failure here then purge all session data to force clean slate
+      state.session = null
+      maybeLogError "login Error: ${e}"
+      state.status = "Login Error"
+    }
+  } else {
+    state.session = null
+    try {
+      JSONObject jsonBody = new JSONObject()
+      jsonBody.put("Email", settings.login)
+      jsonBody.put("Password", settings.password)
+      jsonBody.put("ClientID", LOGIN_CLIENT_ID)
+      Map params = [
+        uri: LOGIN_URL + "/Prod/v1/token",
+        headers: [
+          "Host": LOGIN_HOST,
+          "User-Agent": USER_AGENT,
+        ],
+        body: jsonBody.toString(),
+        timeout: 20
+      ]
+      httpPostJson(params) { response ->
+        if (response.success) {
+          debug "login Success: (${response.status}) ${response.data}"
+          state.session = [:]
+          state.session.accessToken = response.data.data.AccessToken
+          state.session.refreshToken = response.data.data.RefreshToken
+          // Refresh the access token 1 minute before it expires
+          runIn((response.data.data.ExpiresIn - 60), loginAws)
+          // Get cookies since this is all new state
+          loginCookie()
+        } else {
+          maybeLogError "login Failure getting Token: (${response.status}) ${response.data}"
+          state.status = "Login Error"
+        }
+      }
+    } catch (Exception e) {
+      maybeLogError "login Error: ${e}"
+      state.status = "Login Error"
+    }
+  }
+}
+
+void loginCookie() {
+  state.session.cookies = null
+  try {
+    debug "Getting cookie"
+    Map params = [
+      uri: API_URL + "/rest/account",
+      headers: [
+        "Host": API_HOST,
+        "User-Agent": USER_AGENT,
+        "Authorization": state.session.accessToken,
+      ],
+      timeout: 20
+    ]
+    httpGet(params) { response -> 
+      if (response.success) {
+        def expiration = null
+        response.getHeaders("Set-Cookie").each {
+          cookieInfo = it.value.split(";")
+          state.session.cookies = state.session.cookies + cookieInfo[0] + ";"
+          // find the expires value if it exists
+          if (!expiration) {
+            for (cookie in cookieInfo) {
+              if (cookie.contains("Expires=")) {
+                expiration = cookie.split("=")[1]
+              }
+            }
+          }
+        }
+        def refreshDate = null
+        if (expiration == null) {
+          maybeLogError "No expiration for any cookie found in response: " + response.getHeaders("Set-Cookie")
+          refreshDate = new Date() + 1
+        } else {
+          refreshDate = toDateTime(java.time.LocalDateTime.parse(expiration,
+            java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).minusDays(1L).toString() + "Z")
+        }
+        runOnce(refreshDate, loginCookie)
+      } else {
+        maybeLogError "login Failure getting Cookie: (${response.status}) ${response.data}"
+        state.status = "Login Error"
+      }
+    }
+  } catch (Exception e) {
+    maybeLogError "loginCookie Error: ${e}"
+    state.status = "Login Error"
+  }
+}
+
+void loginOld() {
   debug "Logging in"
   state.session = null
   try {
+    JSONObject jsonBody = new JSONObject()
+    jsonBody.put("login", settings.login)
+    jsonBody.put("password", settings.password)
     Map params = [
       uri: API_URL + "/rest/login",
       requestContentType: "application/json",
@@ -1458,7 +1636,7 @@ void login() {
         "User-Agent": USER_AGENT,
         "DNT": "1",
       ],
-      body: "{'login':'${settings.login}', 'password':'${settings.password}'}=",
+      body: jsonBody.toString(),
       timeout: 20
     ]
     httpPut(params) { response ->
@@ -1478,6 +1656,14 @@ void login() {
   } catch (Exception e) {
     maybeLogError "login Error: ${e}"
     state.status = "Login Error"
+  }
+}
+
+void login() {
+  if (settings.useAwsOAuth) {
+    loginAws()
+  } else {
+    loginOld()
   }
 }
 
@@ -1551,17 +1737,23 @@ void handleRequestQueue(boolean releaseLock = false) {
 
 def httpRequest(String path, Closure method = this.&get, Map body = null, Map query = null, boolean alreadyTriedRequest = false) {
   def result = [:]
-  if (!state.session || !state.session.key) {
+  def loginState = settings.useAwsOAuth ? !state.session || !state.session.accessToken : !state.session || !state.session.key
+  if (loginState) {
     if (alreadyTriedRequest) {
       maybeLogError "Already attempted login but still no session key, giving up"
       return result
     } else {
       login()
+      if (settings.useAwsOAuth) {
+        loginAws()
+      } else {
+        login()
+      }
       return httpRequest(path, method, body, query, true)
     }
   }
   def payload = body ? new groovy.json.JsonBuilder(body).toString() : null
-  Map queryString = [_k: state.session.key]
+  Map queryString = settings.useAwsOAuth ? new HashMap() : [_k: state.session.key]
   if (query) {
     queryString = queryString + query
   }
@@ -1582,6 +1774,9 @@ def httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
     body: payload,
     timeout: 20
   ]
+  if (settings.useAwsOAuth) {
+    statusParams.headers["Authorization"] = state.session.accessToken
+  }
   if (payload) {
     debug "Sending request for ${path} with query ${queryString}: ${payload}"
   } else {
@@ -1601,7 +1796,11 @@ def httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
     if (e.toString().contains("Unauthorized") && !alreadyTriedRequest) {
       // The session is invalid so retry login before giving up.
       info "Unauthorized, retrying login"
-      login()
+      if (settings.useAwsOAuth) {
+        loginAws()
+      } else {
+        login()
+      }
       return httpRequest(path, method, body, query, true)
     } else {
       // There was some other error so retry if that hasn't already been done
