@@ -1624,7 +1624,7 @@ void loginOld() {
   debug "Logging in"
   state.session = null
   try {
-    JSONObject jsonBody = new JSONObject();
+    JSONObject jsonBody = new JSONObject()
     jsonBody.put("login", settings.login)
     jsonBody.put("password", settings.password)
     Map params = [
