@@ -325,11 +325,12 @@ List<Map> getBedDeviceData() {
   return output
 }
 
-/*
+/**
  * Returns devices types for a supplied bedId as a unique set of values.
- * Given there is no need to map specific sides to a device type, keeping this simple for now, but associating
- * at least to the supplied bedID. The only consumer of this function already iterates by bed.
-*/
+ * Given there is no need to map specific sides to a device type, keeping this simple for
+ * now, but associating at least to the supplied bedID. The only consumer of this function
+ * already iterates by bed.
+ */
 Set<String> getBedDeviceTypes(String bedId) {
   List data = getBedDeviceData()
   Set typeList = data.collect { if ((String)it.bedId == bedId) { return it.type } }
@@ -874,7 +875,7 @@ def processBedData(Map responseData) {
       underbedLightData[bedId] = [:]
     }
 
-    Set deviceTypes = getBedDeviceTypes(bedId)
+    Set<String> deviceTypes = getBedDeviceTypes(bedId)
     for (def bed : (List)responseData.beds) {
       // Make sure the various bed state info is set up so we can use it later.
       if (!state?.bedInfo || !state?.bedInfo[bed.bedId] || !state?.bedInfo[bed.bedId]?.components) {
