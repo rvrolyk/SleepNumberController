@@ -457,6 +457,7 @@ def findBedPage() {
       responseData.beds.each { bed ->
         def sidesSeen = []
         section("Bed: ${bed.bedId}") {
+          paragraph "<br>Note: <i>Sides are labeled as if you area laying in bed.</i>"
           if (devices.size() > 0) {
             for (def dev : devices) {
               if (dev.getState().bedId != bed.bedId) {
@@ -621,6 +622,7 @@ Side: ${params.side}
         msg += "</ol>"
         paragraph msg
         newDeviceName = ""
+        paragraph "<b>Click create below to continue</b>"
         href "createBedPage", title: "Create Devices", description: null,
         params: [
           presence: params.present,
