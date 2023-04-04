@@ -25,16 +25,21 @@
 import groovy.transform.Field
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Semaphore
+import org.json.JSONObject
 
 @Field static ConcurrentLinkedQueue requestQueue = new ConcurrentLinkedQueue()
 @Field static Semaphore mutex = new Semaphore(1)
 @Field static Long lastLockTime = 0
+@Field static Long lastErrorLogTime = 0
 
 @Field final String DRIVER_NAME = "Sleep Number Bed"
 @Field final String NAMESPACE = "rvrolyk"
 @Field final String API_HOST = "prod-api.sleepiq.sleepnumber.com"
 @Field final String API_URL = "https://" + API_HOST
-@Field final String USER_AGENT = "SleepIQ/1593766370 CFNetwork/1185.2 Darwin/20.0.0"
+@Field final String LOGIN_HOST = "l06it26kuh.execute-api.us-east-1.amazonaws.com"
+@Field final String LOGIN_URL = "https://" + LOGIN_HOST
+@Field final String LOGIN_CLIENT_ID = "jpapgmsdvsh9rikn4ujkodala"
+@Field final String USER_AGENT = "SleepIQ/1669639706 CFNetwork/1399 Darwin/22.1.0"
 //'''\
 //Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36'''
 
@@ -45,6 +50,7 @@ import java.util.concurrent.Semaphore
 @Field final ArrayList VALID_PRESETS = [1, 2, 3, 4, 5, 6]
 @Field final ArrayList VALID_LIGHT_TIMES = [15, 30, 45, 60, 120, 180]
 @Field final ArrayList VALID_LIGHT_BRIGHTNESS = [1, 30, 100]
+@Field final Map<String, String> LOG_LEVELS = ["0": "Off", "1": "Debug", "2": "Info", "3": "Warn"]
 
 definition(
   name: "Sleep Number Controller",
@@ -77,6 +83,7 @@ def appButtonHandler(btn) {
       unsubscribe()
       updateLabel()
     } else {
+      login()
       initialize()
     }
   }
@@ -104,16 +111,20 @@ def homePage() {
       input "variableRefresh", "bool", title: "Use variable refresh interval? (recommended)", defaultValue: defaultVariableRefresh,
          submitOnChange: true
       if (defaultVariableRefresh || settings.variableRefresh) {
-        input name: "dayInterval", type: "number", title: "Daytime Refresh Interval (minutes)",
+        input name: "dayInterval", type: "number", title: "Daytime Refresh Interval (minutes; 0-59)",
             description: "How often to refresh bed state during the day", defaultValue: 30
-        input name: "dayStart", type: "time", title: "Day start time",
-            description: "Time when day will start if both sides are out of bed for more than 5 minutes", submitOnChange: true
-          input name: "nightInterval", type: "number", title: "Nighttime Refresh Interval (minutes)",
+        input name: "nightInterval", type: "number", title: "Nighttime Refresh Interval (minutes; 0-59)",
               description: "How often to refresh bed state during the night", defaultValue: 1
-        input name: "nightStart", type: "time", title: "Night start time",
-            description: "Time when night will start", submitOnChange: true
+        input "variableRefreshModes", "bool", title: "Use modes to control variable refresh interval", defaultValue: false, submitOnChange: true
+        if (settings.variableRefreshModes) {
+          input name: "nightMode", type: "mode", title: "Modes for night (anything else will be day)", multiple: true, submitOnChange: true
+        } else {
+          input name: "dayStart", type: "time", title: "Day start time",
+              description: "Time when day will start if both sides are out of bed for more than 5 minutes", submitOnChange: true
+          input name: "nightStart", type: "time", title: "Night start time", description: "Time when night will start", submitOnChange: true
+        }
       } else {
-        input name: "refreshInterval", type: "number", title: "Refresh Interval (minutes)",
+        input name: "refreshInterval", type: "number", title: "Refresh Interval (minutes; 0-59)",
             description: "How often to refresh bed state", defaultValue: 1
       }
     }
@@ -159,10 +170,14 @@ def homePage() {
       }
       label title: "Assign an app name", required: false, defaultValue: defaultName
       input name: "modes", type: "mode", title: "Set for specific mode(s)", required: false, multiple: true, submitOnChange: true
-      input "logEnable", "bool", title: "Enable debug logging?", defaultValue: false, required: true, submitOnChange: true
+      input name: "switchToDisable", type: "capability.switch", title: "Switch to disable refreshes", required: false, submitOnChange: true
+      input "enableDebugLogging", "bool", title: "Enable debug logging for 30m?", defaultValue: false, required: true, submitOnChange: true
+      input "logLevel", "enum", title: "Choose the logging level", defaultValue: "2", submitOnChange: true, options: LOG_LEVELS
+      input "limitErrorLogsMin", "number", title: "How often to allow error logs (minutes), 0 for all the time. <br><font size=-1>(Only applies when log level is not off)</font> ", defaultValue: 0, submitOnChange: true 
       if (settings.login && settings.password) {
         href "diagnosticsPage", title: "Diagnostics", description: "Show diagnostic info"
       }
+      input "useAwsOAuth", "bool", title: "(Beta) Use AWS OAuth", required: false, submitOnChange: true, defaultValue: false
     }
   }
 }
@@ -175,8 +190,20 @@ def installed() {
 def updated() {
   unsubscribe()
   unschedule()
+  state.session = null // next run will refresh all tokens/cookies
   state.variableRefresh = ""
   initialize()
+  if (enableDebugLogging) {
+    runIn(1800, logsOff)
+  }
+}
+
+void logsOff() {
+  if (enableDebugLogging) {
+    // Log this information regardless of user setting.
+    log.info "debug logging disabled..."
+    app.updateSetting "enableDebugLogging", [value: "false", type: "bool"]
+  }
 }
 
 def initialize() {
@@ -185,6 +212,9 @@ def initialize() {
   }
   if (settings.variableRefresh && (settings.dayInterval <= 0 || settings.nightInterval <= 0)) {
     log.error "Invalid refresh intervals ${settings.dayInterval} or ${settings.nightInterval}"
+  }
+  if (settings.variableRefreshModes) {
+    subscribe(location, "mode", configureVariableRefreshInterval)
   }
   setRefreshInterval(0 /* force picking from settings */, "" /* ignored */)
   initializeBedInfo()
@@ -217,9 +247,9 @@ void updateLabel() {
 
 void initializeBedInfo() {
   debug "Setting up bed info"
-  def info = getBeds()
+  def bedInfo = getBeds()
   state.bedInfo = [:]
-  info.beds.each() { Map bed ->
+  bedInfo.beds.each() { Map bed ->
     debug "Bed id ${bed.bedId}"
     if (!state.bedInfo.containsKey(bed.bedId)) {
       state.bedInfo[bed.bedId] = [:]
@@ -238,7 +268,7 @@ void initializeBedInfo() {
     state.bedInfo[bed.bedId].components = components
   }
   if (!state.bedInfo) {
-    log.warn "No bed state set up"
+    warn "No bed state set up"
   }
 }
 
@@ -295,12 +325,20 @@ List<Map> getBedDeviceData() {
   return output
 }
 
-List<String> getBedDeviceTypes() {
+/**
+ * Returns devices types for a supplied bedId as a unique set of values.
+ * Given there is no need to map specific sides to a device type, keeping this simple for
+ * now, but associating at least to the supplied bedID. The only consumer of this function
+ * already iterates by bed.
+ */
+Set<String> getBedDeviceTypes(String bedId) {
   List data = getBedDeviceData()
-  // TODO: Consider splitting this by side or even by bed.
-  // SKipping for now as most are probably using the same device types
-  // per side and probably only have one bed.
-  return data.collect { it.type }
+  Set typeList = data.collect { if ((String)it.bedId == bedId) { return it.type } }
+
+  // cull NULL entries
+  typeList = typeList.findAll()
+
+  return typeList
 }
 
 // Use with #schedule as apparently it's not good to mix #runIn method call
@@ -317,6 +355,12 @@ void scheduledRefreshChildDevices() {
 void refreshChildDevices() {
   // Only refresh if mode is a selected one
   if (settings.modes && !settings.modes.contains(location.mode)) {
+    debug "Skipping refresh, not the right mode"
+    return
+  }
+  // If there's a switch defined and it's on, don't bother refreshing at all
+  if (settings.switchToDisable && settings.switchToDisable.currentValue("switch") == "on") {
+    debug "Skipping refresh, switch to disable is on"
     return
   }
   getBedData()
@@ -358,47 +402,74 @@ void setRefreshInterval(BigDecimal val, String ignoredDevId) {
  * during the day but at night can poll quicker in order to detect things like presence
  * faster.  Daytime will be used if the time is between day and night _and_ no presence
  * is detected.
+ * If user opted to use modes, this just checks the mode and sets the appropriate polling
+ * based on that.
  */
+void configureVariableRefreshInterval(evt) {
+  configureVariableRefreshInterval()
+}
 void configureVariableRefreshInterval() {
-  // Gather presence state of all child devices
-  List presentChildren = getBedDevices().findAll {
-    (!it.getState().type || it.getState()?.type == "presence") && it.isPresent()
-  }
-  Date now = new Date()
-  def random = new Random()
-  Integer randomInt = random.nextInt(40) + 4
-  if (timeOfDayIsBetween(toDateTime(settings.dayStart), toDateTime(settings.nightStart), now)
-      && presentChildren.size() == 0) {
-    // Only log and schedule if we haven't already done so.
-    if (state.variableRefresh != "day") {
-      log.info "Setting interval to day; daytime and no beds present. Refreshing every ${settings.dayInterval} minutes."
-      schedule("${randomInt} /${settings.dayInterval} * * * ?", "scheduledRefreshChildDevices")
-      state.variableRefresh = "day"
+  boolean night = false
+
+  if (settings.variableRefreshModes) {
+    if (settings.nightMode.contains(location.mode)) {
+      night = true
+    } else {
+      night = false
     }
-  } else if (state.variableRefresh != "night") {
-    log.info "Setting interval to night. Refreshing every ${settings.nightInterval} minutes."
-    schedule("${randomInt} /${settings.nightInterval} * * * ?", "scheduledRefreshChildDevices")
-    state.variableRefresh = "night"
+  } else {
+    // Gather presence state of all child devices
+    List presentChildren = getBedDevices().findAll {
+      (!it.getState().type || it.getState()?.type == "presence") && it.isPresent()
+    }
+    Date now = new Date()
+    if (timeOfDayIsBetween(toDateTime(settings.dayStart), toDateTime(settings.nightStart), now)) {
+      if (presentChildren.size() > 0) return // if someone is still in bed, don't change anything
+      night = false
+    } else {
+      night = true
+    }
+  }
+
+  Random random = new Random()
+  Integer randomInt = random.nextInt(40) + 4
+
+  if (night) {
+    // Don't bother setting the schedule if we are already set to night.
+    if (state.variableRefresh != "night") {
+      info "Setting interval to night. Refreshing every ${settings.nightInterval} minutes."
+      schedule("${randomInt} /${settings.nightInterval} * * * ?", "scheduledRefreshChildDevices")
+      state.variableRefresh = "night"
+    }
+  } else if (state.variableRefresh != "day") {
+    info "Setting interval to day. Refreshing every ${settings.dayInterval} minutes."
+    schedule("${randomInt} /${settings.dayInterval} * * * ?", "scheduledRefreshChildDevices")
+    state.variableRefresh = "day"
   }
 }
 
 def findBedPage() {
   def responseData = getBedData()
   List devices = getBedDevices()
-  def sidesSeen = []
   def childDevices = []
   dynamicPage(name: "findBedPage") {
-    if (responseData.beds.size() > 0) {
+    if (responseData && responseData.beds.size() > 0) {
       responseData.beds.each { bed ->
+        def sidesSeen = []
         section("Bed: ${bed.bedId}") {
+          paragraph "<br>Note: <i>Sides are labeled as if you area laying in bed.</i>"
           if (devices.size() > 0) {
             for (def dev : devices) {
+              if (dev.getState().bedId != bed.bedId) {
+                debug "bedId's don't match, skipping"
+                continue
+              }
               if (!dev.getState().type || dev.getState()?.type == "presence") {
                 if (!dev.getState().type) {
                   childDevices << dev.getState().side
                 }
                 sidesSeen << dev.getState().side
-                href "selectBedPage", title: dev.label, description: "Click to modify",
+                href "selectBedPage", name: "Bed: ${bed.bedId}", title: dev.label, description: "Click to modify",
                     params: [bedId: bed.bedId, side: dev.getState().side, label: dev.label]
               }
             }
@@ -406,22 +477,22 @@ def findBedPage() {
               input "createNewChildDevices", "bool", title: "Create new child device types", defaultValue: false, submitOnChange: true
               if (settings.createNewChildDevices) {
                 if (!childDevices.contains("Left")) {
-                  href "selectBedPage", title: "Left Side", description: "Click to create",
+                  href "selectBedPage", name: "Bed: ${bed.bedId}", title: "Left Side", description: "Click to create",
                       params: [bedId: bed.bedId, side: "Left", label: ""]
                 }
                 if (!childDevices.contains("Right")) {
-                  href "selectBedPage", title: "Right Side", description: "Click to create",
+                  href "selectBedPage", name: "Bed: ${bed.bedId}", title: "Right Side", description: "Click to create",
                       params: [bedId: bed.bedId, side: "Right", label: ""]
                 }
               }
             }
           }
           if (!sidesSeen.contains("Left")) {
-            href "selectBedPage", title: "Left Side", description: "Click to create",
+            href "selectBedPage", name: "Bed: ${bed.bedId}", title: "Left Side", description: "Click to create",
                 params: [bedId: bed.bedId, side: "Left", label: ""]
           }
           if (!sidesSeen.contains("Right")) {
-            href "selectBedPage", title: "Right Side", description: "Click to create",
+            href "selectBedPage", name: "Bed: ${bed.bedId}", title: "Right Side", description: "Click to create",
                 params: [bedId: bed.bedId, side: "Right", label: ""]
           }
         }
@@ -462,7 +533,8 @@ Side: ${params.side}
 """ 
     }
     section {
-      input "newDeviceName", "text", title: "Device Name", defaultValue: settings.newDeviceName ?: params.label,
+      def name = settings.newDeviceName?.trim() ? settings.newDeviceName : params.label?.trim() ? params.label : newDeviceName
+      input "newDeviceName", "text", title: "Device Name", defaultValue: name,
           description: "What prefix do you want for the devices?", submitOnChange: true,
           required: true
       input "useChildDevices", "bool", title: "Use child devices? (recommended)", defaultValue: true,
@@ -508,54 +580,60 @@ Side: ${params.side}
         }
       }
     }
-    section {
-      String msg = "Will create the following devices"
-      def containerName = ""
-      def types = []
-      if (settings.useChildDevices) {
-        settings.useContainer = false
-        msg += " with each side as a primary device and each type as a child device of the side"
-      } else if (settings.useContainer) {
-        containerName = "${newDeviceName} Container"
-        msg += " in virtual container '${containerName}'"
+    if (!newDeviceName?.trim()) {
+      debug "no device name entered, skipping create/modify section"
+    } else {
+      section {
+        String msg = "Will create the following devices"
+        def containerName = ""
+        def types = []
+        if (settings.useChildDevices) {
+          settings.useContainer = false
+          msg += " with each side as a primary device and each type as a child device of the side"
+        } else if (settings.useContainer) {
+          containerName = "${newDeviceName} Container"
+          msg += " in virtual container '${containerName}'"
+        }
+        msg += ":<ol>"
+        if (settings.createPresence) {
+          msg += "<li>${createDeviceLabel(newDeviceName, 'presence')}</li>"
+          types.add("presence")
+        }
+        if (settings.createHeadControl) {
+          msg += "<li>${createDeviceLabel(newDeviceName, 'head')}</li>"
+          types.add("head")
+        }
+        if (settings.createFootControl) {
+          msg += "<li>${createDeviceLabel(newDeviceName, 'foot')}</li>"
+          types.add("foot")
+        }
+        if (settings.createFootWarmer) {
+          msg += "<li>${createDeviceLabel(newDeviceName, 'foot warmer')}</li>"
+          types.add("foot warmer")
+        }
+        if (settings.createUnderbedLighting && settings.useChildDevices) {
+          msg += "<li>${createDeviceLabel(newDeviceName, 'underbed light')}</li>"
+          types.add("underbed light")
+        }
+        if (settings.createOutlet && settings.useChildDevices) {
+          msg += "<li>${createDeviceLabel(newDeviceName, 'outlet')}</li>"
+          types.add("outlet")
+        }
+        msg += "</ol>"
+        paragraph msg
+        newDeviceName = ""
+        paragraph "<b>Click create below to continue</b>"
+        href "createBedPage", title: "Create Devices", description: null,
+        params: [
+          presence: params.present,
+          bedId: params.bedId,
+          side: params.side,
+          useChildDevices: settings.useChildDevices,
+          useContainer: settings.useContainer,
+          containerName: containerName,
+          types: types
+        ]
       }
-      msg += ":<ol>"
-      if (settings.createPresence) {
-        msg += "<li>${createDeviceLabel(newDeviceName, 'presence')}</li>"
-        types.add("presence")
-      }
-      if (settings.createHeadControl) {
-        msg += "<li>${createDeviceLabel(newDeviceName, 'head')}</li>"
-        types.add("head")
-      }
-      if (settings.createFootControl) {
-        msg += "<li>${createDeviceLabel(newDeviceName, 'foot')}</li>"
-        types.add("foot")
-      }
-      if (settings.createFootWarmer) {
-        msg += "<li>${createDeviceLabel(newDeviceName, 'foot warmer')}</li>"
-        types.add("foot warmer")
-      }
-      if (settings.createUnderbedLighting && settings.useChildDevices) {
-        msg += "<li>${createDeviceLabel(newDeviceName, 'underbed light')}</li>"
-        types.add("underbed light")
-      }
-      if (settings.createOutlet && settings.useChildDevices) {
-        msg += "<li>${createDeviceLabel(newDeviceName, 'outlet')}</li>"
-        types.add("outlet")
-      }
-      msg += "</ol>"
-      paragraph msg
-      href "createBedPage", title: "Create Devices", description: null,
-      params: [
-        presence: params.present,
-        bedId: params.bedId,
-        side: params.side,
-        useChildDevices: settings.useChildDevices,
-        useContainer: settings.useContainer,
-        containerName: containerName,
-        types: types
-      ]
     }
   }
 }
@@ -595,7 +673,7 @@ def createBedPage(params) {
     def label = createDeviceLabel(settings.newDeviceName, "presence")
     def parent = existingDevices.find{ it.deviceNetworkId == deviceId }
     if (parent) {
-      log.info "Parent device ${deviceId} already exists"
+      info "Parent device ${deviceId} already exists"
     } else {
       debug "Creating parent device ${deviceId}"
       parent = addChildDevice(NAMESPACE, DRIVER_NAME, deviceId, null, [label: label])
@@ -630,7 +708,7 @@ def createBedPage(params) {
     params.types.each { type ->
       def deviceId = "sleepnumber.${params.bedId}.${params.side}.${type.replaceAll(' ', '_')}"
       if (existingDevices.find{ it.data.vcId == deviceId }) {
-        log.info "Not creating device ${deviceId}, it already exists"
+        info "Not creating device ${deviceId}, it already exists"
       } else {
         def label = createDeviceLabel(settings.newDeviceName, type)
         def device = null
@@ -663,19 +741,19 @@ def createBedPage(params) {
       }
       header += ":"
       paragraph(header)
-      def info = "<ol>"
+      def displayInfo = "<ol>"
       devices.each { device ->
-        info += "<li>"
-        info += "${device.label}"
+        displayInfo += "<li>"
+        displayInfo += "${device.label}"
         if (!params.useChildDevices) {
-          info += "<br>Bed ID: ${device.getState().bedId}"
-          info += "<br>Side: ${device.getState().side}"
-          info += "<br>Type: ${device.getState()?.type}"
+          displayInfo += "<br>Bed ID: ${device.getState().bedId}"
+          displayInfo += "<br>Side: ${device.getState().side}"
+          displayInfo += "<br>Type: ${device.getState()?.type}"
         }
-        info += "</li>"
+        displayInfo += "</li>"
       }
-      info += "</ol>"
-      paragraph info
+      displayInfo += "</ol>"
+      paragraph displayInfo
     }
     section {
       href "findBedPage", title: "Back to Bed List", description: null
@@ -684,9 +762,9 @@ def createBedPage(params) {
 }
 
 def diagnosticsPage(params) {
-  def info = getBeds()
+  def bedInfo = getBeds()
   dynamicPage(name: "diagnosticsPage") {
-    info.beds.each { Map bed ->
+    bedInfo.beds.each { Map bed ->
       section("Bed: ${bed.bedId}") {
         def bedOutput = "<ul>"
         bedOutput += "<li>Size: ${bed.size}"
@@ -719,7 +797,7 @@ def diagnosticsPage(params) {
             try {
               body = parseJson(params.requestBody)
             } catch (groovy.json.JsonException e) {
-              log.error "${params.requestBody} : ${e}"
+              maybeLogError "${params.requestBody} : ${e}"
             }
           }
           Map query
@@ -727,7 +805,7 @@ def diagnosticsPage(params) {
             try {
               query = parseJson(params.requestQuery)
             } catch (groovy.json.JsonException e) {
-              log.error "${params.requestQuery} : ${e}"
+              maybeLogError "${params.requestQuery} : ${e}"
             }
           }
           def response = httpRequest((String)params.requestPath,
@@ -737,6 +815,12 @@ def diagnosticsPage(params) {
                                      true)
           paragraph "${response}"
         }
+    }
+    section("Authentication") {
+      href "diagnosticsPage", title: "Clear session info", description: null, params: [clearSession: true]
+      if (params && params.clearSession) {
+        state.session = null
+      }
     }
   }
 }
@@ -783,8 +867,7 @@ def processBedData(Map responseData) {
   def sleepNumberFavorites = [:]
   def outletData = [:]
   def underbedLightData = [:]
-
-  List deviceTypes = getBedDeviceTypes()
+  def responsiveAir = [:]
 
   for (def device : getBedDevices()) {
     String bedId = device.getState().bedId.toString()
@@ -794,10 +877,11 @@ def processBedData(Map responseData) {
       underbedLightData[bedId] = [:]
     }
 
+    Set<String> deviceTypes = getBedDeviceTypes(bedId)
     for (def bed : (List)responseData.beds) {
       // Make sure the various bed state info is set up so we can use it later.
       if (!state?.bedInfo || !state?.bedInfo[bed.bedId] || !state?.bedInfo[bed.bedId]?.components) {
-        log.warn "state.bedInfo somehow lost, re-caching it"
+        warn "state.bedInfo somehow lost, re-caching it"
         initializeBedInfo()
       }
       if (bedId == bed.bedId) {
@@ -939,6 +1023,16 @@ def processBedData(Map responseData) {
             sleepNumberFavorite: favorite
           ]
         }
+        // If the device has responsive air, fetch that status and add to the map
+        if (!bedFailures.get(bedId) && device.getSetting('enableResponsiveAir')) {
+          if (!responsiveAir.get(bedId)) {
+            responsiveAir[bedId] = getResponsiveAirStatus(bedId)
+          }
+          def side = bedSideStr.toLowerCase()
+          statusMap << [
+            responsiveAir: responsiveAir.get(bedId)?."${side}SideEnabled" ?: ""
+          ]
+        }
         if (bedFailures.get(bedId)) {
           // Only log update errors once per bed
           loggedError[bedId] = true
@@ -982,6 +1076,33 @@ def getFoundationStatus(String bedId, String currentSide) {
 def getFootWarmingStatus(String bedId) {
   debug "Getting Foot Warming Status for ${bedId}"
   return httpRequest("/rest/bed/${bedId}/foundation/footwarming")
+}
+
+def getResponsiveAirStatus(String bedId) {
+  debug "Getting responsive air status for ${bedId}"
+  return httpRequest("/rest/bed/${bedId}/responsiveAir")
+}
+
+def setResponsiveAirState(Boolean state, String devId) {
+  def device = getBedDevices().find { devId == it.deviceNetworkId }
+  if (!device) {
+    log.error "Bed device with id ${devId} is not a valid child"
+    return
+  }
+  Map body = [:] 
+  String side = device.getState().side
+  debug "Setting responsive air state ${side} to ${state}"
+  if (side.toLowerCase().equals("right")) {
+    body << [
+      rightSideEnabled: state
+    ]
+  } else {
+    body << [
+      leftSideEnabled: state
+    ]
+  }
+  httpRequestQueue(5, path: "/rest/bed/${device.getState().bedId}/responsiveAir",
+      body: body, runAfter: "refreshChildDevices")
 }
 
 /**
@@ -1356,7 +1477,7 @@ Map getSleepData(Map ignored, String devId) {
   def device = getBedDevices().find { devId == it.deviceNetworkId }
   if (!device) {
     log.error "Bed device with id ${devId} is not a valid child"
-      return
+    return
   }
   def bedId = device.getState().bedId
   def ids = [:]
@@ -1375,7 +1496,7 @@ Map getSleepData(Map ignored, String devId) {
           side = "Right"
           break
         default:
-          log.warn "Unknown sleeper info: ${sleeper}"
+          warn "Unknown sleeper info: ${sleeper}"
       }
       if (side) {
         ids[side] = sleeper.sleeperId
@@ -1393,10 +1514,137 @@ Map getSleepData(Map ignored, String devId) {
   ])
 }
 
-void login() {
+void loginAws() {
+  debug "Logging in"
+  if (state.session?.refreshToken) {
+    state.session.accessToken = null
+    try {
+      JSONObject jsonBody = new JSONObject();
+      jsonBody.put("RefreshToken", state.session.refreshToken)
+      jsonBody.put("ClientID", LOGIN_CLIENT_ID)
+      Map params = [
+        uri: LOGIN_URL + "/Prod/v1/token",
+        requestContentType: "application/json",
+        contentType: "application/json",	
+        headers: [
+          "Host": LOGIN_HOST,
+          "User-Agent": USER_AGENT,
+        ],
+        body: jsonBody.toString(),
+        timeout: 20
+      ]
+      httpPut(params) { response -> 
+        if (response.success) {
+          debug "refresh Success: (${response.status}) ${response.data}"
+          state.session.accessToken = response.data.data.AccessToken
+          // Refresh the access token 1 minute before it expires
+          runIn((response.data.data.ExpiresIn - 60), loginAws)
+        } else {
+          // If there's a failure here then purge all session data to force clean slate
+          state.session = null
+          maybeLogError "login Failure refreshing Token: (${response.status}) ${response.data}"
+          state.status = "Login Error"
+        }
+      }
+    } catch (Exception e) {
+      // If there's a failure here then purge all session data to force clean slate
+      state.session = null
+      maybeLogError "login Error: ${e}"
+      state.status = "Login Error"
+    }
+  } else {
+    state.session = null
+    try {
+      JSONObject jsonBody = new JSONObject()
+      jsonBody.put("Email", settings.login)
+      jsonBody.put("Password", settings.password)
+      jsonBody.put("ClientID", LOGIN_CLIENT_ID)
+      Map params = [
+        uri: LOGIN_URL + "/Prod/v1/token",
+        headers: [
+          "Host": LOGIN_HOST,
+          "User-Agent": USER_AGENT,
+        ],
+        body: jsonBody.toString(),
+        timeout: 20
+      ]
+      httpPostJson(params) { response ->
+        if (response.success) {
+          debug "login Success: (${response.status}) ${response.data}"
+          state.session = [:]
+          state.session.accessToken = response.data.data.AccessToken
+          state.session.refreshToken = response.data.data.RefreshToken
+          // Refresh the access token 1 minute before it expires
+          runIn((response.data.data.ExpiresIn - 60), loginAws)
+          // Get cookies since this is all new state
+          loginCookie()
+        } else {
+          maybeLogError "login Failure getting Token: (${response.status}) ${response.data}"
+          state.status = "Login Error"
+        }
+      }
+    } catch (Exception e) {
+      maybeLogError "login Error: ${e}"
+      state.status = "Login Error"
+    }
+  }
+}
+
+void loginCookie() {
+  state.session.cookies = null
+  try {
+    debug "Getting cookie"
+    Map params = [
+      uri: API_URL + "/rest/account",
+      headers: [
+        "Host": API_HOST,
+        "User-Agent": USER_AGENT,
+        "Authorization": state.session.accessToken,
+      ],
+      timeout: 20
+    ]
+    httpGet(params) { response -> 
+      if (response.success) {
+        def expiration = null
+        response.getHeaders("Set-Cookie").each {
+          cookieInfo = it.value.split(";")
+          state.session.cookies = state.session.cookies + cookieInfo[0] + ";"
+          // find the expires value if it exists
+          if (!expiration) {
+            for (cookie in cookieInfo) {
+              if (cookie.contains("Expires=")) {
+                expiration = cookie.split("=")[1]
+              }
+            }
+          }
+        }
+        def refreshDate = null
+        if (expiration == null) {
+          maybeLogError "No expiration for any cookie found in response: " + response.getHeaders("Set-Cookie")
+          refreshDate = new Date() + 1
+        } else {
+          refreshDate = toDateTime(java.time.LocalDateTime.parse(expiration,
+            java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).minusDays(1L).toString() + "Z")
+        }
+        runOnce(refreshDate, loginCookie)
+      } else {
+        maybeLogError "login Failure getting Cookie: (${response.status}) ${response.data}"
+        state.status = "Login Error"
+      }
+    }
+  } catch (Exception e) {
+    maybeLogError "loginCookie Error: ${e}"
+    state.status = "Login Error"
+  }
+}
+
+void loginOld() {
   debug "Logging in"
   state.session = null
   try {
+    JSONObject jsonBody = new JSONObject()
+    jsonBody.put("login", settings.login)
+    jsonBody.put("password", settings.password)
     Map params = [
       uri: API_URL + "/rest/login",
       requestContentType: "application/json",
@@ -1406,7 +1654,7 @@ void login() {
         "User-Agent": USER_AGENT,
         "DNT": "1",
       ],
-      body: "{'login':'${settings.login}', 'password':'${settings.password}'}=",
+      body: jsonBody.toString(),
       timeout: 20
     ]
     httpPut(params) { response ->
@@ -1419,13 +1667,21 @@ void login() {
           state.session.cookies = state.session.cookies + it.value.split(";")[0] + ";"
         }
       } else {
-        log.error "login Failure: (${response.status}) ${response.data}"
+        maybeLogError "login Failure: (${response.status}) ${response.data}"
         state.status = "Login Error"
       }
     }
   } catch (Exception e) {
-    log.error "login Error: ${e}"
+    maybeLogError "login Error: ${e}"
     state.status = "Login Error"
+  }
+}
+
+void login() {
+  if (settings.useAwsOAuth) {
+    loginAws()
+  } else {
+    loginOld()
   }
 }
 
@@ -1465,14 +1721,13 @@ void handleRequestQueue(boolean releaseLock = false) {
       // 2. There's an unintended failure which has lead to a failed lock release.  We detect
       //    this by checking the last time the lock was held and releasing the mutex if it's
       //    been too long.
+      // RACE HERE. if lock time hasnt been updsted in this thread yet it will incorrectly move forward
       if ((now() - lastLockTime) > 120000 /* 2 minutes */) {
         // Due to potential race setting and reading the lock time,
-        // wait 2s and check again before breaking it.  This should be rare so waiting
-        // an additional 2s should be fine.
-        log.info "HTTP queue lock potentially held for more than 2 minutes, confirming before releasing"
+        // wait 2s and check again before breaking it
         pauseExecution(2000)
         if ((now() - lastLockTime) > 120000 /* 2 minutes */) {
-          log.warn "HTTP queue lock was held for more than 2 minutes, forcing release"
+          warn "HTTP queue lock was held for more than 2 minutes, forcing release"
           mutex.release()
           // In this case we should re-run.
           handleRequestQueue()
@@ -1493,24 +1748,30 @@ void handleRequestQueue(boolean releaseLock = false) {
       runIn(request.duration, request.runAfter)
     }
   } catch(e) {
-    log.error "Failed to run HTTP queue: ${e}"
+    maybeLogError "Failed to run HTTP queue: ${e}"
     mutex.release()
   }
 }
 
 def httpRequest(String path, Closure method = this.&get, Map body = null, Map query = null, boolean alreadyTriedRequest = false) {
   def result = [:]
-  if (!state.session || !state.session.key) {
+  def loginState = settings.useAwsOAuth ? !state.session || !state.session.accessToken : !state.session || !state.session.key
+  if (loginState) {
     if (alreadyTriedRequest) {
-      log.error "Already attempted login but still no session key, giving up"
+      maybeLogError "Already attempted login but still no session key, giving up"
       return result
     } else {
       login()
+      if (settings.useAwsOAuth) {
+        loginAws()
+      } else {
+        login()
+      }
       return httpRequest(path, method, body, query, true)
     }
   }
   def payload = body ? new groovy.json.JsonBuilder(body).toString() : null
-  Map queryString = [_k: state.session.key]
+  Map queryString = settings.useAwsOAuth ? new HashMap() : [_k: state.session.key]
   if (query) {
     queryString = queryString + query
   }
@@ -1531,6 +1792,9 @@ def httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
     body: payload,
     timeout: 20
   ]
+  if (settings.useAwsOAuth) {
+    statusParams.headers["Authorization"] = state.session.accessToken
+  }
   if (payload) {
     debug "Sending request for ${path} with query ${queryString}: ${payload}"
   } else {
@@ -1541,7 +1805,7 @@ def httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
       if (response.success) {
         result = response.data
       } else {
-        log.error "Failed request for ${path} ${queryString} with payload ${payload}:(${response.status}) ${response.data}"
+        maybeLogError "Failed request for ${path} ${queryString} with payload ${payload}:(${response.status}) ${response.data}"
         state.status = "API Error"
       }
     }
@@ -1549,15 +1813,19 @@ def httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
   } catch (Exception e) {
     if (e.toString().contains("Unauthorized") && !alreadyTriedRequest) {
       // The session is invalid so retry login before giving up.
-      log.info "Unauthorized, retrying login"
-      login()
+      info "Unauthorized, retrying login"
+      if (settings.useAwsOAuth) {
+        loginAws()
+      } else {
+        login()
+      }
       return httpRequest(path, method, body, query, true)
     } else {
       // There was some other error so retry if that hasn't already been done
       // otherwise give up.  Not Found errors won't improve with retry to don't
       // bother.
       if (!alreadyTriedRequest && !e.toString().contains("Not Found")) {
-        log.error "Retrying failed request ${statusParams}\n${e}"
+        maybeLogError "Retrying failed request ${statusParams}\n${e}"
         return httpRequest(path, method, body, query, true)
       } else {
         if (e.toString().contains("Not Found")) {
@@ -1568,7 +1836,7 @@ def httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
           debug "Error making request ${statusParams}\n${e}"
           return result
         }
-        log.error "Error making request ${statusParams}\n${e}"
+        maybeLogError "Error making request ${statusParams}\n${e}"
         state.status = "API Error"
         return result
       }
@@ -1576,9 +1844,37 @@ def httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
   }
 }
 
+/**
+ * Only logs an error message if one wasn't logged within the last
+ * N minutes where N is configurable.
+ */
+void maybeLogError(String msg) {
+  if (logLevel != null && logLevel.toInteger() == 0) {
+    return
+  }
+  if (!settings.limitErrorLogsMin /* off */
+      || (now() - lastErrorLogTime) > (settings.limitErrorLogsMin * 60 * 1000)) {
+    log.error msg
+    lastErrorLogTime = now()
+  }
+}
+
 void debug(String msg) {
-  if (logEnable) {
+  if (enableDebugLogging || (logLevel != null && logLevel.toInteger() == 1)) {
     log.debug msg
+  }
+}
+
+void info(String msg) {
+  if (enableDebugLogging || logLevel == null
+      || (logLevel.toInteger() >= 1 && logLevel.toInteger() < 3)) {
+    log.info msg
+  }
+}
+
+void warn(String msg) {
+  if (enableDebugLogging || logLevel == null || logLevel.toInteger() > 0) {
+     log.warn msg
   }
 }
 
