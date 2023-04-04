@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "3.0.0",
+  "version": "3.2.1",
   "minimumHEVersion": "2.2.2",
-  "dateReleased": "2020-12-04",
-  "releaseNotes": "Introduces new parent/child device structure using component devices with device support for underbed lighting and outlets\nAdds pause ability to app",
+  "dateReleased": "2023-04-04",
+  "releaseNotes": "Work on Climate360 support",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",
   "payPalUrl": "https://www.paypal.com/paypalme/rvrolyk",
