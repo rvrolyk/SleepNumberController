@@ -24,8 +24,12 @@
  */
 
 import com.hubitat.app.ChildDeviceWrapper
+import groovy.json.JsonException
 import groovy.transform.CompileStatic
 import groovy.transform.Field
+
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Semaphore
 import org.json.JSONObject
@@ -223,7 +227,7 @@ def initialize() {
   if ((Boolean)settings.variableRefreshModes) {
     subscribe(location, "mode", configureVariableRefreshInterval)
   }
-  setRefreshInterval(0 /* force picking from settings */, "" /* ignored */)
+  setRefreshInterval(new BigDecimal(0) /* force picking from settings */, "" /* ignored */)
   initializeBedInfo()
   refreshChildDevices()
   updateLabel()
@@ -254,15 +258,15 @@ void updateLabel() {
 }
 
 /*------------------ Bed state helpers  ------------------*/
-String getBedDeviceId(ChildDeviceWrapper bed) {
+static String getBedDeviceId(ChildDeviceWrapper bed) {
   return (String)((Map) bed.getState()).bedId
 }
 
-String getBedDeviceSide(ChildDeviceWrapper bed) {
+static String getBedDeviceSide(ChildDeviceWrapper bed) {
   return (String)((Map) bed.getState()).side
 }
 
-String getBedDeviceType(ChildDeviceWrapper bed) {
+static String getBedDeviceType(ChildDeviceWrapper bed) {
   return (String)((Map) bed.getState()).type
 }
 
@@ -535,7 +539,7 @@ void addBedSelectLink(String side, String bedId, String label = "", String modif
           params: [bedId: bedId, side: side, label: label]
 }
 
-String presenceText(presence) {
+static String presenceText(presence) {
   return presence ? "Present" : "Not Present"
 }
 
@@ -668,7 +672,7 @@ Side: ${params.side}
   }
 }
 
-String createDeviceLabel(String name, String type) {
+static String createDeviceLabel(String name, String type) {
   switch (type) {
     case "presence":
       return "${name}"
@@ -827,7 +831,7 @@ Map diagnosticsPage(params) {
           if (params.requestBody) {
             try {
               body = (Map) parseJson(params.requestBody)
-            } catch (groovy.json.JsonException e) {
+            } catch (JsonException e) {
               maybeLogError("%s : %s", params.requestBody, e)
             }
           }
@@ -835,7 +839,7 @@ Map diagnosticsPage(params) {
           if (params.requestQuery) {
             try {
               query = (Map) parseJson(params.requestQuery)
-            } catch (groovy.json.JsonException e) {
+            } catch (JsonException e) {
               maybeLogError("%s : %s", params.requestQuery, e)
             }
           }
@@ -910,7 +914,7 @@ void processBedData(Map responseData) {
     }
 
     Set<String> deviceTypes = getBedDeviceTypes(bedId)
-    for (Map bed : (List) responseData.beds) {
+    for (Map bed : (List<Map>) responseData.beds) {
       // Make sure the various bed state info is set up so we can use it later.
       if (!state?.bedInfo || !state?.bedInfo[bed.bedId] || !state?.bedInfo[bed.bedId]?.components) {
         warn "state.bedInfo somehow lost, re-caching it"
@@ -994,7 +998,7 @@ void processBedData(Map responseData) {
           }
         }
 
-        Map<String, Object> bedSide = bedSideStr == "Right" ? bed.rightSide : bed.leftSide
+        Map<String, Object> bedSide = bedSideStr == "Right" ? (Map<String, Object>) bed.rightSide : (Map<String, Object>) bed.leftSide
         device.setPresence(bedSide.isInBed)
         Map<String, String> statusMap = [
           sleepNumber: bedSide.sleepNumber,
@@ -1559,7 +1563,7 @@ void loginAws() {
   if (state.session?.refreshToken) {
     state.session.accessToken = null
     try {
-      JSONObject jsonBody = new JSONObject();
+      JSONObject jsonBody = new JSONObject()
       jsonBody.put("RefreshToken", state.session.refreshToken)
       jsonBody.put("ClientID", LOGIN_CLIENT_ID)
       Map params = [
@@ -1663,8 +1667,8 @@ void loginCookie() {
           maybeLogError("No expiration for any cookie found in response: %s", response.getHeaders("Set-Cookie"))
           refreshDate = new Date() + 1
         } else {
-          refreshDate = toDateTime(java.time.LocalDateTime.parse(expiration,
-            java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME).minusDays(1L).toString() + "Z")
+          refreshDate = toDateTime(LocalDateTime.parse(expiration,
+                  DateTimeFormatter.RFC_1123_DATE_TIME).minusDays(1L).toString() + "Z")
         }
         runOnce(refreshDate, loginCookie)
       } else {
@@ -1777,7 +1781,7 @@ void handleRequestQueue(boolean releaseLock = false) {
       return
     }
     lastLockTime = now()
-    Map request = requestQueue.poll()
+    Map request = (Map) requestQueue.poll()
     httpRequest(request.path, this.&put, request.body, request.query)
 
     // Try to process more requests and release the lock since this request
@@ -1811,7 +1815,7 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
       return httpRequest(path, method, body, query, true)
     }
   }
-  String payload = body ? new groovy.json.JsonBuilder(body).toString() : null
+  String payload = body ? new JsonBuilder(body).toString() : null
   Map queryString = settings.useAwsOAuth ? new HashMap() : [_k: state.session.key]
   if (query) {
     queryString = queryString + query
@@ -1980,14 +1984,14 @@ Long now() {
 @Field static final String RED = "red"
 
 @CompileStatic
-private String logPrefix(String msg, String color = null) {
+private static String logPrefix(String msg, String color = null) {
   StringBuilder sb = new StringBuilder("<span ")
           .append("style='color:").append(GRAY).append(";'>")
           .append("[v").append(appVersion).append("] ")
           .append("</span>")
           .append("<span style='color:").append(color).append(";'>")
           .append(msg)
-          .append("</span>");
+          .append("</span>")
   return sb.toString()
 }
 

@@ -229,7 +229,7 @@ void setLevel(Number val) {
         }
         debug "setLevel(${val}): warmer level to ${level}"
         setFootWarmingState(level)
-        break;
+        break
     }
   } else {
     debug "setLevel(${val}): sleepNumber"
@@ -754,7 +754,7 @@ void componentOn(com.hubitat.app.DeviceWrapper device) {
       setOutletState("On")
       break
     case "underbedlight":
-      setUnderbedLightState("On", underbedLightTimer)
+      setUnderbedLightState("On", settings.underbedLightTimer)
       break
     case "head":
       // For now, just share the same preset as the parent.
@@ -770,9 +770,6 @@ void componentOn(com.hubitat.app.DeviceWrapper device) {
       break
     case "footwarmer":
       setFootWarmingState(footWarmerLevel, footWarmerTimer)
-      break
-    case "outlet":
-      setOutletState("On")
       break
     default:
       logWarn "Unknown child device type ${type}, not turning on"
@@ -800,9 +797,6 @@ void componentOff(com.hubitat.app.DeviceWrapper device) {
       break
     case "footwarmer":
       setFootWarmingState("Off")
-      break
-    case "outlet":
-      setOutletState("Off")
       break
     default:
       log.warn "Unknown child device type ${type}, not turning off"
@@ -838,7 +832,7 @@ void componentSetLevel(com.hubitat.app.DeviceWrapper device, Number level, Numbe
           logError "Invalid level for underbed light.  Only 1, 2 or 3 is valid"
           return
       }
-      def presetDuration = underbedLightTimer
+      def presetDuration = settings.underbedLightTimer
       if (duration != null && UNDERBED_LIGHT_TIMES.values().contains(duration)) {
         debug "Using provided duration time of ${duration}"
         presetDuration = duration
@@ -883,7 +877,7 @@ void componentSetLevel(com.hubitat.app.DeviceWrapper device, Number level, Numbe
 }
 
 
-boolean childValueChanged(com.hubitat.app.DeviceWrapper device, String name, Object newValue) {
+Boolean static childValueChanged(com.hubitat.app.DeviceWrapper device, String name, Object newValue) {
   String currentValue = device.currentValue(name)
   if (name == "level") {
     return currentValue != null ? currentValue.toInteger() != newValue : true
@@ -948,14 +942,14 @@ void componentStopLevelChange(com.hubitat.app.DeviceWrapper device) {
 @Field static final String RED = "red"
 
 @CompileStatic
-private String logPrefix(String msg, String color = null) {
+private static String logPrefix(String msg, String color = null) {
   StringBuilder sb = new StringBuilder("<span ")
           .append("style='color:").append(GRAY).append(";'>")
           .append("[v").append(appVersion).append("] ")
           .append("</span>")
           .append("<span style='color:").append(color).append(";'>")
           .append(msg)
-          .append("</span>");
+          .append("</span>")
   return sb.toString()
 }
 
