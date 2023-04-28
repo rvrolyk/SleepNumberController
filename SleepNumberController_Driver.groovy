@@ -23,25 +23,28 @@
  *    https://github.com/natecj/SmartThings/blob/master/smartapps/natecj/sleepiq-manager.src/sleepiq-manager.groovy
  *    https://github.com/ClassicTim1/SleepNumberManager/blob/master/FlexBase/SmartApp.groovy
  */
+
+import groovy.transform.CompileStatic
 import groovy.transform.Field
+import java.util.GregorianCalendar
 
-@Field final ArrayList TYPES = ["presence", "head", "foot", "foot warmer"]
+@Field static final ArrayList<String> TYPES = ["presence", "head", "foot", "foot warmer"]
 
-@Field final ArrayList SIDES = ["Right", "Left"]
-@Field final Map HEAT_TEMPS = [Off: 0, Low: 31, Medium: 57, High: 72]
-@Field final Map HEAT_TIMES = ["30m": 30, "1h": 60, "2h": 120, "3h": 180, "4h": 240, "5h": 300, "6h": 360]
-@Field final Map ACTUATOR_TYPES = [head: "H", foot: "F"]
-@Field final Map PRESET_TIMES = ["Off": 0, "15m": 15, "30m": 30, "45m": 45, "1h": 60, "2h": 120, "3h": 180]
-@Field final Map PRESET_NAMES = [Favorite: 1, Flat: 4, ZeroG: 5, Snore: 6, WatchTV: 3, Read: 2]
-@Field final ArrayList UNDERBED_LIGHT_STATES = ["Auto", "On", "Off"]
-@Field final Map UNDERBED_LIGHT_BRIGHTNESS = [Low: 1, Medium: 30, High: 100]
-@Field final Map UNDERBED_LIGHT_TIMES = ["Forever": 0, "15m": 15, "30m": 30, "45m": 45, "1h": 60, "2h": 120, "3h": 180]
-@Field final ArrayList OUTLET_STATES = ["On", "Off"]
-@Field final String DNI_SEPARATOR = "-"
+@Field static final ArrayList<String> SIDES = ["Right", "Left"]
+@Field static final Map<String, Integer> HEAT_TEMPS = [Off: 0, Low: 31, Medium: 57, High: 72]
+@Field static final Map<String, Integer> HEAT_TIMES = ["30m": 30, "1h": 60, "2h": 120, "3h": 180, "4h": 240, "5h": 300, "6h": 360]
+@Field static final Map<String, String> ACTUATOR_TYPES = [head: "H", foot: "F"]
+@Field static final Map<String, Integer> PRESET_TIMES = ["Off": 0, "15m": 15, "30m": 30, "45m": 45, "1h": 60, "2h": 120, "3h": 180]
+@Field static final Map<String, Integer> PRESET_NAMES = [Favorite: 1, Flat: 4, ZeroG: 5, Snore: 6, WatchTV: 3, Read: 2]
+@Field static final ArrayList<String> UNDERBED_LIGHT_STATES = ["Auto", "On", "Off"]
+@Field static final Map<String, Integer> UNDERBED_LIGHT_BRIGHTNESS = [Low: 1, Medium: 30, High: 100]
+@Field static final Map<String, Integer> UNDERBED_LIGHT_TIMES = ["Forever": 0, "15m": 15, "30m": 30, "45m": 45, "1h": 60, "2h": 120, "3h": 180]
+@Field static final ArrayList<String> OUTLET_STATES = ["On", "Off"]
+@Field static final String DNI_SEPARATOR = "-"
 
 metadata {
-  definition(name: "Sleep Number Bed",
-             namespace: "rvrolyk",
+  definition(name: DRIVER_NAME,
+             namespace: NAMESPACE,
              author: "Russ Vrolyk",
              importUrl: "https://raw.githubusercontent.com/rvrolyk/SleepNumberController/master/SleepNumberController_Driver.groovy"
   ) {
@@ -114,7 +117,7 @@ metadata {
 
   preferences {
     section("Settings:") {
-      input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
+      input name: "logEnable", type: "bool", title: "Enable logDebuglogging", defaultValue: false
       input name: "presetLevel", type: "enum", title: "Bed preset level for 'on'", options: PRESET_NAMES.collect{ it.key }, defaultValue: "Favorite"
       input name: "footWarmerLevel", type: "enum", title: "Foot warmer level for 'on'", options: HEAT_TEMPS.collect{ it.key }, defaultValue: "Medium"
       input name: "footWarmerTimer", type: "enum", title: "Foot warmer duration for 'on'", options: HEAT_TIMES.collect{ it.key }, defaultValue: "30m"
@@ -131,16 +134,16 @@ void installed() {
 }
 
 void logsOff() {
-  log.warn "debug logging disabled..."
+  logInfo "logDebuglogging disabled..."
   device.updateSetting "logEnable", [value: "false", type: "bool"]
 }
 
 void updated() {
   debug "updated()"
-  if (logEnable) {
+  if ((Boolean) settings.logEnable) {
     runIn(1800, logsOff)
   }
-  if (enableSleepData) {
+  if ((Boolean) settings.enableSleepData) {
     getSleepData()
   }
   // Poll right after updated / installed
@@ -149,7 +152,7 @@ void updated() {
 
 void uninstalled() {
   // Delete all the children when this is uninstalled.
-  childDevices.each { deleteChildDevice(it.deviceNetworkId) }
+  childDevices.each { deleteChildDevice((String) it.deviceNetworkId) }
 }
 
 void parse(String description) {
@@ -165,11 +168,11 @@ void poll() {
 // Required by Switch capability
 void on() {
   sendEvent name: "switch", value: "on"
-  if (state?.type == "foot warmer") {
+  if ((String) state.type == "foot warmer") {
     debug "on(): foot warmer"
     setFootWarmingState(footWarmerLevel, footWarmerTimer)
   } else {
-    debug "on(): set preset ${presetLevel}"
+    debug "on(): set preset ${settings.presetLevel}"
     setBedPreset(presetLevel)
   }
 }
@@ -177,7 +180,7 @@ void on() {
 // Required by Switch capability
 void off() {
   sendEvent name: "switch", value: "off"
-  if (state?.type == "foot warmer") {
+  if ((String) state.type == "foot warmer") {
     debug "off(): foot warmer"
     setFootWarmingState("Off")
   } else {
@@ -193,8 +196,8 @@ void setLevel(Number val, Number duration) {
 }
 
 void setLevel(Number val) {
-  if (state?.type) {
-    switch (state.type) {
+  if ((String) state.type) {
+    switch ((String) state.type) {
       case "presence":
         debug "setLevel(${val}): sleepNumber"
         setSleepNumber(val)
@@ -208,7 +211,7 @@ void setLevel(Number val) {
         setBedPosition(val)
         break
       case "foot warmer":
-        def level = 0
+        String level = null
         switch (val) {
           case 1:
             level = "Low"
@@ -221,7 +224,7 @@ void setLevel(Number val) {
             break
         }
         if (!level) {
-          log.error "Invalid level for warmer state.  Only 1, 2 or 3 is valid"
+          logError "Invalid level for warmer state.  Only 1, 2 or 3 is valid"
           return
         }
         debug "setLevel(${val}): warmer level to ${level}"
@@ -236,7 +239,7 @@ void setLevel(Number val) {
 }
 
 // Required by PresenceSensor capability
-boolean isPresent() {
+Boolean isPresent() {
   return device.currentValue("presence") == "present"
 }
 
@@ -253,7 +256,7 @@ void departed() {
   if (isPresent() && isPresenceOrParent()) {
     log.info "${device.displayName} departed"
     sendEvent name: "presence", value: "not present"
-    if (enableSleepData) {
+    if ((Boolean) settings.enableSleepData) {
       getSleepData()
     }
   }
@@ -276,7 +279,7 @@ void setBedId(String val) {
 void setSide(String val) {
   debug "setSide(${val})"
   if (!SIDES.contains(val)) {
-    log.error "Invalid side ${val}, possible values are ${SIDES}"
+    logError "Invalid side ${val}, possible values are ${SIDES}"
   }
   state.side = val
 }
@@ -291,28 +294,28 @@ void setSleepNumber(Number val) {
   if (val > 0 && val <= 100) {
     sendToParent "setSleepNumber", val
   } else {
-    log.error "Invalid number, must be between 1 and 100"
+    logError "Invalid number, must be between 1 and 100"
   }
 }
 
 void setBedPosition(Number val, String actuator = null) {
   debug "setBedPosition(${val})"
-  def type = actuator ?: ACTUATOR_TYPES.get(state.type)
+  String type = actuator ?: ACTUATOR_TYPES.get(state.type)
   if (!type) {
-    log.error "Cannot determine actuator"
+    logError "Cannot determine actuator"
     return
   }
   if (val >= 0 && val <= 100) {
     sendToParent "setFoundationAdjustment", [actuator: type, position: val]
   } else {
-    log.error "Invalid position, must be between 0 and 100"
+    logError "Invalid position, must be between 0 and 100"
   }
 }
 
 void setFootWarmingState(String temp = "OFF", String timer = "30m") {
   debug "setWarmerState(${temp}, ${timer})"
   if (!HEAT_TIMES.get(timer)) {
-    log.error "Invalid warming time ${timer}"
+    logError "Invalid warming time ${timer}"
     return
   }
   setFootWarmingState(temp, HEAT_TIMES.get(timer))
@@ -321,15 +324,15 @@ void setFootWarmingState(String temp = "OFF", String timer = "30m") {
 void setFootWarmingState(String temp = "OFF", Number duration) {
   debug "setWarmerState(${temp}, ${duration})"
   if (HEAT_TEMPS.get(temp) == null) {
-    log.error "Invalid warming temp ${temp}"
+    logError "Invalid warming temp ${temp}"
     return
   }
   if (duration == null) {
-    log.error "Invalid warming time ${duration}"
+    logError "Invalid warming time ${duration}"
     return
   }
   if (!HEAT_TIMES.values().contains(duration.toInteger())) {
-    log.error "Invalid warming time ${duration}"
+    logError "Invalid warming time ${duration}"
     return
   }
   sendToParent "setFootWarmingState", [temp: HEAT_TEMPS.get(temp), timer: duration.toInteger()]
@@ -338,7 +341,7 @@ void setFootWarmingState(String temp = "OFF", Number duration) {
 void setBedPreset(String preset) {
   debug "setBedPreset(${preset})"
   if (preset == null || PRESET_NAMES.get(preset) == null) {
-    log.error "Invalid preset ${preset}"
+    logError "Invalid preset ${preset}"
     return
   }
   sendToParent "setFoundationPreset", PRESET_NAMES.get(preset)
@@ -347,11 +350,11 @@ void setBedPreset(String preset) {
 void setBedPresetTimer(String preset, String timer) {
   debug "setBedPresetTimer(${preset}, ${timer})"
   if (preset == null || PRESET_NAMES.get(preset) == null) {
-    log.error "Invalid preset ${preset}"
+    logError "Invalid preset ${preset}"
     return
   }
   if (timer == null || PRESET_TIMES.get(timer) == null) {
-    log.error "Invalid preset timer ${timer}"
+    logError "Invalid preset timer ${timer}"
     return
   }
   sendToParent "setFoundationTimer", [preset: PRESET_NAMES.get(preset), timer: PRESET_TIMES.get(timer)]
@@ -380,10 +383,12 @@ void setSleepNumberFavorite() {
   sendToParent "setSleepNumberFavorite"
 }
 
+// TODO: Add updateSleepNumberFavorite?
+
 void setOutletState(String state) {
   debug "setOutletState(${state})"
   if (state == null || !OUTLET_STATES.contains(state)) {
-    log.error "Invalid state ${state}"
+    logError "Invalid state ${state}"
     return
   }
   sendToParent "setOutletState", state
@@ -392,15 +397,15 @@ void setOutletState(String state) {
 void setUnderbedLightState(String state, String timer = "Forever", String brightness = "High") {
   debug "setUnderbedLightState(${state}, ${timer}, ${brightness})"
   if (state == null || !UNDERBED_LIGHT_STATES.contains(state)) {
-    log.error "Invalid state ${state}"
+    logError "Invalid state ${state}"
     return
   }
   if (timer != null && UNDERBED_LIGHT_TIMES.get(timer) == null) {
-    log.error "Invalid timer ${timer}"
+    logError "Invalid timer ${timer}"
     return
   }
   if (brightness && !UNDERBED_LIGHT_BRIGHTNESS.get(brightness)) {
-    log.error "Invalid brightness ${brightness}"
+    logError "Invalid brightness ${brightness}"
     return
   }
   sendToParent "setUnderbedLightState", [state: state,
@@ -415,14 +420,14 @@ void setResponsiveAirState(String state) {
 
 void getSleepData() {
   if (!isPresenceOrParent()) {
-    log.error "Sleep data only available on presence (main) device, this is ${state.type}"
+    logError "Sleep data only available on presence (main) device, this is ${state.type}"
     return
   }
   Map data = sendToParent "getSleepData"
   debug "sleep data ${data}"
 
   if (!data || data.sleepSessionCount == 0) {
-    log.info "No sleep sessions found, skipping update"
+    logInfo "No sleep sessions found, skipping update"
     return
   }
 
@@ -481,19 +486,19 @@ void getSleepData() {
   sendEvent name: "sessionSummary", value: summaryTile
 }
 
-String convertSecondsToTimeString(int secondsToConvert) {
+static String convertSecondsToTimeString(int secondsToConvert) {
   new GregorianCalendar(0, 0, 0, 0, 0, secondsToConvert, 0).time.format("HH:mm:ss")
 }
 
 // Method used by parent app to set bed state
 void setStatus(Map params) {
   debug "setStatus(${params})"
-  if (state?.type) {
+  if ((String) state.type) {
     setStatusOld(params)
     return
   }
   // No type means we are using parent/child devices.
-  def validAttributes = device.supportedAttributes.collect{ it.name }
+  List<String> validAttributes = device.supportedAttributes.collect{ (String) it.name }
   params.each { param ->
     if (param.key in validAttributes) {
       def attributeValue = device."current${param.key.capitalize()}"
@@ -503,7 +508,7 @@ void setStatus(Map params) {
       if (param.key == "footWarmingTemp") {
         value = HEAT_TEMPS.find{ it.value == value }
         if (value == null) {
-          log.error "Invalid foot warming temp ${param.value}"
+          logError "Invalid foot warming temp ${param.value}"
         } else {
           value = value.key
         }
@@ -594,7 +599,7 @@ void setStatus(Map params) {
       // Send an event with the key name to catalog it and set the attribute.
       sendEvent name: param.key, value: value
     } else {
-      log.error "Invalid attribute ${param.key}"
+      logError "Invalid attribute ${param.key}"
     }
   }
 }
@@ -602,7 +607,7 @@ void setStatus(Map params) {
 // Used to set individual device states.
 void setStatusOld(Map params) {
   debug "setStatusOld(${params})"
-  def validAttributes = device.supportedAttributes.collect{ it.name }
+  List<String> validAttributes = device.supportedAttributes.collect{ (String) it.name }
   params.each{param ->
     if (param.key in validAttributes) {
       def attributeValue = device."current${param.key.capitalize()}"
@@ -611,7 +616,7 @@ void setStatusOld(Map params) {
       if (param.key == "footWarmingTemp") {
         value = HEAT_TEMPS.find{ it.value == value }
         if (value == null) {
-          log.error "Invalid foot warming temp ${param.value}"
+          logError "Invalid foot warming temp ${param.value}"
         } else {
           value = value.key
         }
@@ -658,7 +663,7 @@ void setStatusOld(Map params) {
         sendEvent name: param.key, value: value
       }
     } else {
-      log.error "Invalid attribute ${param.key}"
+      logError "Invalid attribute ${param.key}"
     }
   }
 }
@@ -667,15 +672,15 @@ Map sendToParent(String method, Object data = null) {
   debug "sending to parent ${method}, ${data}"
   if (device.parentDeviceId) {
     // Send via virtual container method
-    return parent.childComm(method, data, device.deviceNetworkId)
+    return (Map) parent.childComm(method, data, device.deviceNetworkId)
   } else {
-    return parent."${method}"(data, device.deviceNetworkId)
+    return (Map) parent."${method}"(data, device.deviceNetworkId)
   }
 }
 
 void debug(String msg) {
   if (logEnable) {
-    log.debug msg
+    logDebug msg
   }
 }
 
@@ -686,7 +691,7 @@ void debug(String msg) {
 void setType(String val) {
   debug "setType(${val})"
   if (!TYPES.contains(val)) {
-    log.error "Invalid type ${val}, possible values are ${TYPES}"
+    logError "Invalid type ${val}, possible values are ${TYPES}"
   }
   def msg = "${val.capitalize()} - "
   switch (val) {
@@ -707,8 +712,8 @@ void setType(String val) {
   state.type = val
 }
 
-boolean isPresenceOrParent() {
-  return !state?.type || state?.type == "presence"
+Boolean isPresenceOrParent() {
+  return !(String) state.type || (String) state.type == "presence"
 }
 
 //-----------------------------------------------------------------------------
@@ -718,7 +723,7 @@ boolean isPresenceOrParent() {
 com.hubitat.app.DeviceWrapper createChildDevice(String childNetworkId, String componentDriver, String label) {
   // Make sure the child doesn't already exist.
   def child = getChildDevice(childNetworkId)
-  if (getChildDevice(childNetworkId)) {
+  if (child) {
     log.warn "Child device with id ${childNetworkId} already exists"
     return child
   } else {
@@ -742,7 +747,7 @@ String getChildType(String childNetworkId) {
 }
 
 void componentOn(com.hubitat.app.DeviceWrapper device) {
-  def type = getChildType(device.deviceNetworkId)
+  String type = getChildType(device.deviceNetworkId)
   debug "componentOn $type"
   switch (type) {
     case "outlet":
@@ -754,13 +759,13 @@ void componentOn(com.hubitat.app.DeviceWrapper device) {
     case "head":
       // For now, just share the same preset as the parent.
       // TODO: Add "head" preset pref if it turns out people use this.
-      log.info("Head turned on.")
+      logInfo("Head turned on.")
       on()
       break
     case "foot":
       // For now, just share the same preset as the parent.
       // TODO: Add "foot" preset pref if it turns out people use this.
-      log.info("Foot turned on.")
+      logInfo("Foot turned on.")
       on()
       break
     case "footwarmer":
@@ -770,13 +775,13 @@ void componentOn(com.hubitat.app.DeviceWrapper device) {
       setOutletState("On")
       break
     default:
-      log.warn "Unknown child device type ${type}, not turning on"
+      logWarn "Unknown child device type ${type}, not turning on"
       break
   }
 }
 
 void componentOff(com.hubitat.app.DeviceWrapper device) {
-  def type = getChildType(device.deviceNetworkId)
+  String type = getChildType(device.deviceNetworkId)
   debug "componentOff $type"
   switch (type) {
     case "outlet": 
@@ -810,7 +815,7 @@ void componentSetLevel(com.hubitat.app.DeviceWrapper device, Number level) {
 }
 
 void componentSetLevel(com.hubitat.app.DeviceWrapper device, Number level, Number duration) {
-  def type = getChildType(device.deviceNetworkId)
+  String type = getChildType(device.deviceNetworkId)
   debug "componentSetLevel $type $level $duration"
   switch (type) {
     case "outlet": 
@@ -818,7 +823,7 @@ void componentSetLevel(com.hubitat.app.DeviceWrapper device, Number level, Numbe
       break
     case "underbedlight":
       // Only 3 levels are supported.
-      def val = 0
+      String val
       switch (level) {
         case 1:
           val = "Low"
@@ -830,7 +835,7 @@ void componentSetLevel(com.hubitat.app.DeviceWrapper device, Number level, Numbe
           val = "High"
           break
         default:
-          log.error "Invalid level for underbed light.  Only 1, 2 or 3 is valid"
+          logError "Invalid level for underbed light.  Only 1, 2 or 3 is valid"
           return
       }
       def presetDuration = underbedLightTimer
@@ -848,7 +853,7 @@ void componentSetLevel(com.hubitat.app.DeviceWrapper device, Number level, Numbe
       setBedPosition(level, ACTUATOR_TYPES.get("foot"))
       break
     case "footwarmer":
-      def val = 0
+      String val
       switch (level) {
         case 1:
           val = "Low"
@@ -860,7 +865,7 @@ void componentSetLevel(com.hubitat.app.DeviceWrapper device, Number level, Numbe
           val = "High"
           break
         default:
-          log.error "Invalid level for warmer state.  Only 1, 2 or 3 is valid"
+          logError "Invalid level for warmer state.  Only 1, 2 or 3 is valid"
           return
       }
       Number presetDuration = HEAT_TIMES.get(footWarmerTimer)
@@ -872,7 +877,7 @@ void componentSetLevel(com.hubitat.app.DeviceWrapper device, Number level, Numbe
       setFootWarmingState(val, presetDuration)
       break
     default:
-      log.warn "Unknown child device type ${type}, not setting level"
+      logWarn "Unknown child device type ${type}, not setting level"
       break
   }
 }
@@ -918,13 +923,71 @@ void childDimmerLevel(String childType, Number level) {
 }
 
 void componentStartLevelChange(com.hubitat.app.DeviceWrapper device, String direction) {
-  log.info "startLevelChange not supported"
+  logInfo "startLevelChange not supported"
 }
 
 void componentStopLevelChange(com.hubitat.app.DeviceWrapper device) {
-  log.info "stopLevelChange not supported"
+  logInfo "stopLevelChange not supported"
 }
 
 
+/*------------------ Shared constants ------------------*/
+
+
+@Field static final String appVersion = "3.2.3"  // public version
+@Field static final String NAMESPACE = "rvrolyk"
+@Field static final String DRIVER_NAME = "Sleep Number Bed"
+
+
+/*------------------ Logging helpers ------------------*/
+
+@Field static final String PURPLE = "purple"
+@Field static final String BLUE = "#0299b1"
+@Field static final String GRAY = "gray"
+@Field static final String ORANGE = "orange"
+@Field static final String RED = "red"
+
+@CompileStatic
+private String logPrefix(String msg, String color = null) {
+  StringBuilder sb = new StringBuilder("<span ")
+          .append("style='color:").append(GRAY).append(";'>")
+          .append("[v").append(appVersion).append("] ")
+          .append("</span>")
+          .append("<span style='color:").append(color).append(";'>")
+          .append(msg)
+          .append("</span>");
+  return sb.toString()
+}
+
+private void logTrace(String msg) {
+  log.trace logPrefix(msg, GRAY)
+}
+
+private void logDebug(String msg) {
+  log.debug logPrefix(msg, PURPLE)
+}
+
+private void logInfo(String msg) {
+  log.info logPrefix(msg, BLUE)
+}
+
+private void logWarn(String msg) {
+  log.warn logPrefix(msg, ORANGE)
+}
+
+private void logError(String msg, Exception ex = null) {
+  log.error logPrefix(msg, RED)
+  String a = null
+  try {
+    if (ex) {
+      a = getExceptionMessageWithLine(ex)
+    }
+  } catch (ignored) {}
+  if (a) {
+    log.error logPrefix(a, RED)
+  }
+}
+
 // vim: tabstop=2 shiftwidth=2 expandtab
+
 
