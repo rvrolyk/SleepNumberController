@@ -24,6 +24,7 @@
  */
 
 import com.hubitat.app.ChildDeviceWrapper
+import groovy.json.JsonBuilder
 import groovy.json.JsonException
 import groovy.transform.CompileStatic
 import groovy.transform.Field

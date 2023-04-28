@@ -877,7 +877,7 @@ void componentSetLevel(com.hubitat.app.DeviceWrapper device, Number level, Numbe
 }
 
 
-Boolean static childValueChanged(com.hubitat.app.DeviceWrapper device, String name, Object newValue) {
+static Boolean childValueChanged(com.hubitat.app.DeviceWrapper device, String name, Object newValue) {
   String currentValue = device.currentValue(name)
   if (name == "level") {
     return currentValue != null ? currentValue.toInteger() != newValue : true
