@@ -24,6 +24,8 @@
  *    https://github.com/ClassicTim1/SleepNumberManager/blob/master/FlexBase/SmartApp.groovy
  */
 
+
+import com.hubitat.app.DeviceWrapper
 import groovy.transform.CompileStatic
 import groovy.transform.Field
 import java.util.GregorianCalendar
@@ -117,7 +119,7 @@ metadata {
 
   preferences {
     section("Settings:") {
-      input name: "logEnable", type: "bool", title: "Enable logDebuglogging", defaultValue: false
+      input name: "logEnable", type: "bool", title: "Enable Debug logging", defaultValue: false
       input name: "presetLevel", type: "enum", title: "Bed preset level for 'on'", options: PRESET_NAMES.collect{ it.key }, defaultValue: "Favorite"
       input name: "footWarmerLevel", type: "enum", title: "Foot warmer level for 'on'", options: HEAT_TEMPS.collect{ it.key }, defaultValue: "Medium"
       input name: "footWarmerTimer", type: "enum", title: "Foot warmer duration for 'on'", options: HEAT_TIMES.collect{ it.key }, defaultValue: "30m"
@@ -134,7 +136,7 @@ void installed() {
 }
 
 void logsOff() {
-  logInfo "logDebuglogging disabled..."
+  logInfo "Debug logging disabled..."
   device.updateSetting "logEnable", [value: "false", type: "bool"]
 }
 
@@ -246,7 +248,7 @@ Boolean isPresent() {
 void arrived() {
   debug "arrived()"
   if (!isPresent() && isPresenceOrParent()) {
-    log.info "${device.displayName} arrived"
+    logInfo "${device.displayName} arrived"
     sendEvent name: "presence", value: "present"
   }
 }
@@ -254,7 +256,7 @@ void arrived() {
 void departed() {
   debug "departed()"
   if (isPresent() && isPresenceOrParent()) {
-    log.info "${device.displayName} departed"
+    logInfo "${device.displayName} departed"
     sendEvent name: "presence", value: "not present"
     if ((Boolean) settings.enableSleepData) {
       getSleepData()
@@ -518,7 +520,7 @@ void setStatus(Map params) {
         }
         value = brightnessValuesToNames.get(value)
         if (value == null) {
-          log.warn "Invalid underbedLightBrightness ${param.value}, using Low"
+          logWarn "Invalid underbedLightBrightness ${param.value}, using Low"
           value = "Low"
         }
       }
@@ -720,15 +722,15 @@ Boolean isPresenceOrParent() {
 // Methods specific to child device support
 //-----------------------------------------------------------------------------
 
-com.hubitat.app.DeviceWrapper createChildDevice(String childNetworkId, String componentDriver, String label) {
+DeviceWrapper createChildDevice(String childNetworkId, String componentDriver, String label) {
   // Make sure the child doesn't already exist.
   def child = getChildDevice(childNetworkId)
   if (child) {
-    log.warn "Child device with id ${childNetworkId} already exists"
+    logWarn "Child device with id ${childNetworkId} already exists"
     return child
   } else {
     child = addChildDevice("hubitat", componentDriver, childNetworkId, [label: label, isComponent: false])
-    log.info("Created ${label} child device")
+    logInfo("Created ${label} child device")
     return child
   }
 }
@@ -737,7 +739,7 @@ String getChildNetworkId(String name) {
   return device.deviceNetworkId + DNI_SEPARATOR + name
 }
 
-void componentRefresh(com.hubitat.app.DeviceWrapper device) {
+void componentRefresh(DeviceWrapper device) {
   poll()
 }
 
@@ -746,7 +748,7 @@ String getChildType(String childNetworkId) {
   return childNetworkId.substring(device.deviceNetworkId.length() + 1)
 }
 
-void componentOn(com.hubitat.app.DeviceWrapper device) {
+void componentOn(DeviceWrapper device) {
   String type = getChildType(device.deviceNetworkId)
   debug "componentOn $type"
   switch (type) {
@@ -777,7 +779,7 @@ void componentOn(com.hubitat.app.DeviceWrapper device) {
   }
 }
 
-void componentOff(com.hubitat.app.DeviceWrapper device) {
+void componentOff(DeviceWrapper device) {
   String type = getChildType(device.deviceNetworkId)
   debug "componentOff $type"
   switch (type) {
@@ -788,32 +790,32 @@ void componentOff(com.hubitat.app.DeviceWrapper device) {
       setUnderbedLightState("Off")
       break
     case "head":
-      log.info("Head turned off, setting bed flat")
+      logInfo("Head turned off, setting bed flat")
       off()
       break
     case "foot":
-      log.info("Foot turned off, setting bed flat")
+      logInfo("Foot turned off, setting bed flat")
       off()
       break
     case "footwarmer":
       setFootWarmingState("Off")
       break
     default:
-      log.warn "Unknown child device type ${type}, not turning off"
+      logWarn "Unknown child device type ${type}, not turning off"
       break
   }
 }
 
-void componentSetLevel(com.hubitat.app.DeviceWrapper device, Number level) {
+void componentSetLevel(DeviceWrapper device, Number level) {
   componentSetLevel(device, level, null)
 }
 
-void componentSetLevel(com.hubitat.app.DeviceWrapper device, Number level, Number duration) {
+void componentSetLevel(DeviceWrapper device, Number level, Number duration) {
   String type = getChildType(device.deviceNetworkId)
   debug "componentSetLevel $type $level $duration"
   switch (type) {
     case "outlet": 
-      log.info "Child type outlet does not support level"
+      logInfo "Child type outlet does not support level"
       break
     case "underbedlight":
       // Only 3 levels are supported.
@@ -877,7 +879,7 @@ void componentSetLevel(com.hubitat.app.DeviceWrapper device, Number level, Numbe
 }
 
 
-static Boolean childValueChanged(com.hubitat.app.DeviceWrapper device, String name, Object newValue) {
+static Boolean childValueChanged(DeviceWrapper device, String name, Object newValue) {
   String currentValue = device.currentValue(name)
   if (name == "level") {
     return currentValue != null ? currentValue.toInteger() != newValue : true
@@ -916,11 +918,11 @@ void childDimmerLevel(String childType, Number level) {
   child.parse([[name: "level", value: level, descriptionText: "${child.displayName} level was set to ${level}"]])
 }
 
-void componentStartLevelChange(com.hubitat.app.DeviceWrapper device, String direction) {
+void componentStartLevelChange(DeviceWrapper device, String direction) {
   logInfo "startLevelChange not supported"
 }
 
-void componentStopLevelChange(com.hubitat.app.DeviceWrapper device) {
+void componentStopLevelChange(DeviceWrapper device) {
   logInfo "stopLevelChange not supported"
 }
 
