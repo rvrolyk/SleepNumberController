@@ -1,9 +1,9 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "3.2.2",
+  "version": "3.2.3",
   "minimumHEVersion": "2.2.2",
-  "releaseNotes": "refactor for some optimizations",
+  "releaseNotes": "add `connection` state to device",
   "dateReleased": "2023-04-28",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",

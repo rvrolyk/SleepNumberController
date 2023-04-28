@@ -24,7 +24,6 @@
  *    https://github.com/ClassicTim1/SleepNumberManager/blob/master/FlexBase/SmartApp.groovy
  */
 
-
 import com.hubitat.app.DeviceWrapper
 import groovy.transform.CompileStatic
 import groovy.transform.Field
@@ -56,6 +55,8 @@ metadata {
     capability "PresenceSensor"
     capability "Polling"
 
+    // indicator for overall connectivity to Sleep Number API
+    attribute "connection", "enum", ["online", "offline"]
     attribute "headPosition", "number"
     attribute "footPosition", "number"
     attribute "footWarmingTemp", "enum", HEAT_TEMPS.collect{ it.key }
@@ -670,6 +671,14 @@ void setStatusOld(Map params) {
   }
 }
 
+void setConnectionState(Boolean connected) {
+  if (connected) {
+    sendEvent name: "connection", value: "online"
+  } else {
+    sendEvent name: "connection", value: "offline"
+  }
+}
+
 Map sendToParent(String method, Object data = null) {
   debug "sending to parent ${method}, ${data}"
   if (device.parentDeviceId) {
@@ -930,7 +939,7 @@ void componentStopLevelChange(DeviceWrapper device) {
 /*------------------ Shared constants ------------------*/
 
 
-@Field static final String appVersion = "3.2.2"  // public version
+@Field static final String appVersion = "3.2.3"  // public version
 @Field static final String NAMESPACE = "rvrolyk"
 @Field static final String DRIVER_NAME = "Sleep Number Bed"
 
