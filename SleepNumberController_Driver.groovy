@@ -509,7 +509,7 @@ void setStatus(Map params) {
       // Translate some of the values into something more meaningful for comparison
       // but leave the other values alone
       if (param.key == "footWarmingTemp") {
-        value = HEAT_TEMPS.find{ it.value == value }
+        value = HEAT_TEMPS.find{ it.value == Integer.valueOf(value) }
         if (value == null) {
           logError "Invalid foot warming temp ${param.value}"
         } else {
@@ -519,7 +519,7 @@ void setStatus(Map params) {
         Map<Integer, String> brightnessValuesToNames = UNDERBED_LIGHT_BRIGHTNESS.collectEntries{
             e -> [(e.value): e.key]
         }
-        value = brightnessValuesToNames.get((Integer) value)
+        value = brightnessValuesToNames.get(Integer.valueOf(value))
         if (value == null) {
           logWarn "Invalid underbedLightBrightness ${param.value}, using Low"
           value = "Low"
@@ -617,7 +617,7 @@ void setStatusOld(Map params) {
       def value = param.value
       // Translate heat temp to something more meaningful but leave the other values alone
       if (param.key == "footWarmingTemp") {
-        value = HEAT_TEMPS.find{ it.value == value }
+        value = HEAT_TEMPS.find{ it.value == Integer.valueOf(value) }
         if (value == null) {
           logError "Invalid foot warming temp ${param.value}"
         } else {

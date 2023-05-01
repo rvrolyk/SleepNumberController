@@ -861,6 +861,12 @@ Map diagnosticsPage(params) {
         state.session = null
       }
     }
+    section("Misc") {
+      href "diagnosticsPage", title: "Clear bed state info", description: null, params: [clearBedState: true]
+      if (params && (Boolean) params.clearBedState) {
+        state.bedInfo = null
+      }
+    }
   }
 }
 
@@ -969,7 +975,7 @@ void processBedData(Map responseData) {
             if (!underbedLightData.get(bedId)) {
               bedFailures[bedId] = true
             } else {
-              def brightnessData = getUnderbedLightBrightness(bedId)
+              Map brightnessData = getUnderbedLightBrightness(bedId)
               if (!brightnessData) {
                 bedFailures[bedId] = true
               } else {
