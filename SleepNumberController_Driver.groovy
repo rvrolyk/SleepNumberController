@@ -939,7 +939,7 @@ void componentStopLevelChange(DeviceWrapper device) {
 /*------------------ Shared constants ------------------*/
 
 
-@Field static final String appVersion = "3.2.4"  // public version
+@Field static final String appVersion = "3.2.5"  // public version
 @Field static final String NAMESPACE = "rvrolyk"
 @Field static final String DRIVER_NAME = "Sleep Number Bed"
 
