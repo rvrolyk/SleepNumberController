@@ -443,10 +443,10 @@ void configureVariableRefreshInterval(evt) {
 }
 
 void configureVariableRefreshInterval() {
-  Boolean night = false
+  Boolean night
 
   if ((Boolean) settings.variableRefreshModes) {
-    if ((List) settings.nightMode.contains(location.mode)) {
+    if (((List) settings.nightMode).contains(location.mode)) {
       night = true
     } else {
       night = false
@@ -1270,7 +1270,7 @@ void setFoundationPreset(Integer preset, String devId) {
   Map body = [
     speed: 0,
     preset : preset,
-    side: getBedDeviceSide(device).side[0],
+    side: getBedDeviceSide(device)[0],
   ]
   // It takes ~35 seconds for a FlexFit3 head to go from 0-100 (or back) and about 18 seconds for the foot.
   // Rather than attempt to derive the preset relative to the current state so we can compute
@@ -1974,7 +1974,7 @@ Long now() {
 /*------------------ Shared constants ------------------*/
 
 
-@Field static final String appVersion = "3.2.3"  // public version
+@Field static final String appVersion = "3.2.4"  // public version
 @Field static final String NAMESPACE = "rvrolyk"
 @Field static final String DRIVER_NAME = "Sleep Number Bed"
 

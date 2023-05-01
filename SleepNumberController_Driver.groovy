@@ -516,10 +516,10 @@ void setStatus(Map params) {
           value = value.key
         }
       } else if (param.key == "underbedLightBrightness") {
-        def brightnessValuesToNames = UNDERBED_LIGHT_BRIGHTNESS.collectEntries{
+        Map<Integer, String> brightnessValuesToNames = UNDERBED_LIGHT_BRIGHTNESS.collectEntries{
             e -> [(e.value): e.key]
         }
-        value = brightnessValuesToNames.get(value)
+        value = brightnessValuesToNames.get((Integer) value)
         if (value == null) {
           logWarn "Invalid underbedLightBrightness ${param.value}, using Low"
           value = "Low"
@@ -939,7 +939,7 @@ void componentStopLevelChange(DeviceWrapper device) {
 /*------------------ Shared constants ------------------*/
 
 
-@Field static final String appVersion = "3.2.3"  // public version
+@Field static final String appVersion = "3.2.4"  // public version
 @Field static final String NAMESPACE = "rvrolyk"
 @Field static final String DRIVER_NAME = "Sleep Number Bed"
 

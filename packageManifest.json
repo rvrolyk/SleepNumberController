@@ -1,9 +1,9 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "3.2.3",
+  "version": "3.2.4",
   "minimumHEVersion": "2.2.2",
-  "releaseNotes": "add `connection` state to device",
+  "releaseNotes": "fix foundation preset bug, try to fix underbed light bug",
   "dateReleased": "2023-04-28",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",
