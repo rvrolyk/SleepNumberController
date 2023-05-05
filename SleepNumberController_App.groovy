@@ -1386,11 +1386,12 @@ void setOutletState(String outletState, String devId) {
  * @param bedId: the bed id
  * @param outletId: 1-4
  * @param state: on or off
- * @param timer: a valid minute duration (for outlets 3 and 4 only)
- * Timer is the only optional parameter.
+ * @param timer: optional indicating a valid minute duration (for outlets 3 and 4 only)
+ * @param refresh: boolean indicating whether or not to skip refreshing state, refreshes by default
  */
 @CompileStatic
-void setOutletState(String bedId, Integer outletId, String outletState, Integer timer = null) {
+void setOutletState(String bedId, Integer outletId, String outletState, Integer timer = null,
+                    Boolean refresh = true) {
   if (!bedId || !outletId || !outletState) {
     error "Not all required arguments present"
     return
@@ -1414,8 +1415,12 @@ void setOutletState(String bedId, Integer outletId, String outletState, Integer 
     setting: outletState == "on" ? 1 : 0,
     outletId: outletId
   ]
-  httpRequestQueue(5, path: "/rest/bed/${bedId}/foundation/outlet",
-      body: body, runAfter: "refreshChildDevices") 
+  String path = "/rest/bed/${bedId}/foundation/outlet"
+  if (refresh) {
+    httpRequestQueue(5, path: path, body: body, runAfter: "refreshChildDevices")
+  } else {
+    httpRequest(path, this.&put, body)
+  }
 }
 
 @CompileStatic
@@ -1514,9 +1519,6 @@ void setUnderbedLightState(Map params, String devId) {
       leftBrightness = null
     }
   }
-  setOutletState(getBedDeviceId(device), outletNum,
-      params.state == "auto" ? "off" : params.state, params.timer)
-
   // If brightness was given then set it.
   if (params.brightness) {
     body = [
@@ -1525,6 +1527,9 @@ void setUnderbedLightState(Map params, String devId) {
     ]
     httpRequest("/rest/bed/${getBedDeviceId(device)}/foundation/system", this.&put, body)
   }
+  setOutletState(getBedDeviceId(device), outletNum,
+          params.state == "auto" ? "off" : params.state, params.timer, false)
+
   runIn(10, "refreshChildDevices") 
 }
 
