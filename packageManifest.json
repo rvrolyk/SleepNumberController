@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "3.2.6",
+  "version": "3.2.7",
   "minimumHEVersion": "2.2.2",
-  "releaseNotes": "switch underbed light call ordering",
-  "dateReleased": "2023-05-05",
+  "releaseNotes": "only send connection event on change",
+  "dateReleased": "2023-07-10",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",
   "payPalUrl": "https://www.paypal.com/paypalme/rvrolyk",

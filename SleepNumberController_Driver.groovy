@@ -672,9 +672,11 @@ void setStatusOld(Map params) {
 }
 
 void setConnectionState(Boolean connected) {
-  if (connected) {
+  // Only send the event if the value changed
+  Boolean current = device.currentValue("connection") == "online"
+  if (connected && !current) {
     sendEvent name: "connection", value: "online"
-  } else {
+  } else if (!connected && current) {
     sendEvent name: "connection", value: "offline"
   }
 }
