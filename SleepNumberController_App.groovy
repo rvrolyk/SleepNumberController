@@ -191,7 +191,7 @@ Map homePage() {
           paragraph "Current beds"
           currentDevices.each { Map device ->
             String output; output = sBLK
-            if (device.isChild) {
+            if ((Boolean)device.isChild) {
               output += "            "
             } else {
               output += device.bedId
@@ -282,6 +282,7 @@ def initialize() {
   if ((Boolean) settings.variableRefreshModes) {
     subscribe(location, "mode", configureVariableRefreshInterval)
   }
+  subscribe(location, "systemStart", startHandler)
 
   remTsVal("lastBedDataUpdDt")
   remTsVal("lastFamilyDataUpdDt")
@@ -295,6 +296,15 @@ def initialize() {
   initializeBedInfo()
   refreshChildDevices()
   updateLabel()
+}
+
+void startHandler(evt){
+  debug "startHandler called"
+  wrunIn(40, "startAction")
+}
+
+void startAction(){
+  scheduledRefreshChildDevices()
 }
 
 void updateLabel() {
@@ -381,7 +391,7 @@ void initializeBedInfo() {
 /**
  * Gets all bed child devices even if they're in a virtual container.
  * Will not return the virtual container(s) or children of a parent
- * device.
+ * device
  */
 List<ChildDeviceWrapper> getBedDevices() {
   List<ChildDeviceWrapper> children = []
@@ -679,6 +689,7 @@ Side: ${params.side}
     Long tbedId = Math.abs(Long.valueOf((String) params.bedId))
     String varName = "${tbedId}.${params.side}".toString()
     String newName; newName = settings[varName]
+    Boolean ucd; ucd = false
     section {
       String label = (String) params.label
       String name; name = newName
@@ -688,15 +699,16 @@ Side: ${params.side}
           (sDESC): "What prefix do you want for the devices?", submitOnChange: true,
           required: true
       newName = settings[varName]
-      input "useChildDevices", sBOOL, (sTIT): "Use child devices? (recommended)", defaultValue: true,
+      input "useChildDevices", sBOOL, (sTIT): "Use child devices? (only recommended if  you have underbed lights or bed outlets)", defaultValue: true,
          submitOnChange: true
-      if (!(Boolean) settings.useChildDevices) {
+      ucd = (Boolean) settings.useChildDevices
+      if (!ucd) {
         input "useContainer", sBOOL, (sTIT): "Use virtual container?", defaultValue: false,
            submitOnChange: true
       }
       String side = ((String) params.side).toLowerCase()
       paragraph "A presence type device exposes on/off as switching to a preset level (on) and flat (off).  Dimming will change the Sleep Number."
-      if ((Boolean) settings.useChildDevices) {
+      if (ucd) {
         paragraph "This is the parent device when child devices are used"
         app.updateSetting "createPresence", [(sVL): "true", (sTYP): sBOOL]
         settings.createPresence = true
@@ -719,34 +731,31 @@ Side: ${params.side}
            (sTIT): "Create device to control the foot warmer of the ${side} side?",
            defaultValue: true, submitOnChange: true
       }
-      if ((Boolean) settings.useChildDevices) {
-        determineUnderbedLightSetup(bdId)
+      determineUnderbedLightSetup(bdId)
+      determineOutletSetup(bdId)
+      if (ucd) {
         if (((List) ((Map)state.bedInfo[bdId]).underbedoutlets).size() > iZ) {
           paragraph "Underbed lighting creates a dimmer allowing the light to be turned on or off at different levels with timer based on parent device preference."
           input "createUnderbedLighting", sBOOL,
                   (sTIT): "Create device to control the underbed lighting of the ${side} side?",
                   defaultValue: false, submitOnChange: true
         }
-        determineOutletSetup(bdId)
         if (((List) ((Map)state.bedInfo[bdId]).outlets).size() > iZ) {
           paragraph "Outlet creates a switch allowing foundation outlet for this side to be turned on or off."
           input "createOutlet", sBOOL,
            (sTIT): "Create device to control the outlet of the ${side} side?",
              defaultValue: false, submitOnChange: true
         }
-      } else {
-        app.removeSetting('createUnderbedLighting')
-        app.removeSetting('createOutlet')
       }
     }
-    if (!(Boolean)settings.createUnderbedLighting) app.removeSetting('createUnderbedLighting')
-    if (!(Boolean)settings.createOutlet) app.removeSetting('createOutlet')
+    if (!ucd || !(Boolean)settings.createUnderbedLighting) app.removeSetting('createUnderbedLighting')
+    if (!ucd || !(Boolean)settings.createOutlet) app.removeSetting('createOutlet')
 
     section {
       StringBuilder msg; msg = new StringBuilder("Will create the following devices")
       String containerName; containerName = sBLK
       List<String> types = []
-      if ((Boolean) settings.useChildDevices) {
+      if (ucd) {
         app.updateSetting "useContainer", [(sVL): "false", (sTYP): sBOOL]
         settings.useContainer = false
         msg.append(" with each side as a primary device and each type as a child device of the side")
@@ -771,11 +780,11 @@ Side: ${params.side}
         msg.append("<li>").append(createDeviceLabel(newName, sFOOTWMR)).append("</li>")
         types.add(sFOOTWMR)
       }
-      if ((Boolean) settings.createUnderbedLighting && (Boolean) settings.useChildDevices) {
+      if ((Boolean) settings.createUnderbedLighting && ucd) {
         msg.append("<li>").append(createDeviceLabel(newName, sUNDERBEDLIGHT)).append("</li>")
         types.add(sUNDERBEDLIGHT)
       }
-      if ((Boolean) settings.createOutlet && (Boolean) settings.useChildDevices) {
+      if ((Boolean) settings.createOutlet && ucd) {
         msg.append("<li>").append(createDeviceLabel(newName, sOUTLET)).append("</li>")
         types.add(sOUTLET)
       }
@@ -787,7 +796,7 @@ Side: ${params.side}
         presence: params.present,
         bedId: bdId,
         side: params.side,
-        useChildDevices: (Boolean)settings.useChildDevices,
+        useChildDevices: ucd,
         useContainer: (Boolean)settings.useContainer,
         containerName: containerName,
         types: types
@@ -1137,6 +1146,7 @@ void processBedData(Map responseData) {
             bedFailures[bedId] = true
           }
         }
+
         // If there's underbed lighting or outlets then poll for that data as well.  Don't poll
         // otherwise since it's just another network request and may be unwanted.
         // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
@@ -1175,11 +1185,11 @@ void processBedData(Map responseData) {
           }
         }
 
-        //determineOutletSetup(bedId)
-        //bedInfo = (Map)gtSt('bedInfo')
-        //bedInfoBed =  bedInfo ? (Map)bedInfo[bedId1] : null
         // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
         if (!bedFailures[bedId] && deviceTypes.contains(sOUTLET)) {
+          determineOutletSetup(bedId)
+          //bedInfo = (Map)gtSt('bedInfo')
+          //bedInfoBed =  bedInfo ? (Map)bedInfo[bedId1] : null
           if (!outletData[bedId][i1]) {
             outletData[bedId][i1] = getOutletState(bedId, i1)
             if (!outletData[bedId][i1]) {
@@ -1194,11 +1204,11 @@ void processBedData(Map responseData) {
         }
 
         Map<String, Object> bedSide = bedSideStr == sRIGHT ? (Map<String, Object>) bed.rightSide : (Map<String, Object>) bed.leftSide
-        device.setPresence((Boolean)bedSide.isInBed)
-        Map<String, String> statusMap; statusMap = [
+        Map<String, Object> statusMap; statusMap = [
+          presence: (Boolean)bedSide.isInBed,
           sleepNumber: (String)bedSide.sleepNumber,
-          privacyMode: privacyStatus[bedId],
-        ]
+          privacyMode: privacyStatus[bedId]
+        ] as Map<String, Object>
         if (underbedLightData[bedId]) {
           Integer outletNumber = bedSideStr == sLEFT ? i3 : i4
           Map outletDataBedOut = outletData[bedId][outletNumber]
@@ -1257,6 +1267,7 @@ void processBedData(Map responseData) {
             sleepNumberFavorite: favorite
           ]
         }
+        //determineResponsiveAirSetup(bedId)
         // If the device has responsive air, fetch that status and add to the map
         if (!bedFailures.get(bedId) && device.getSetting('enableResponsiveAir')) {
           if (!responsiveAir.get(bedId)) {
@@ -1461,6 +1472,7 @@ void setResponsiveAirState(Boolean st, String devId) {
   if (!device) {
     return
   }
+  //determineResponsiveAirSetup(bedId)
   Map body = [:]
   String side = getBedDeviceSide(device)
   debug("Setting responsive air state %s to %s", side, st)
@@ -1473,14 +1485,14 @@ void setResponsiveAirState(Boolean st, String devId) {
             leftSideEnabled: st
     ]
   }
-  httpRequestQueue(5, path: "/rest/bed/${getBedDeviceId(device)}/responsiveAir",
+  httpRequestQueue(0, path: "/rest/bed/${getBedDeviceId(device)}/responsiveAir",
           body: body, runAfter: "refreshChildDevices")
 }
 
 
 /**
  * Params must be a Map containing keys actuator and position.
- * The side is derived from the specified device.
+ * The side is derived from the specified device
  */
 void setFoundationAdjustment(Map params, String devId) {
   ChildDeviceWrapper device = findBedDevice(devId)
@@ -1516,7 +1528,7 @@ void setFoundationAdjustment(Map params, String devId) {
 
 /**
  * Params must be a Map containing keys temp and timer.
- * The side is derived from the specified device.
+ * The side is derived from the specified device
  */
 void setFootWarmingState(Map params, String devId) {
   ChildDeviceWrapper device = findBedDevice(devId)
@@ -1542,14 +1554,13 @@ void setFootWarmingState(Map params, String devId) {
           ("footWarmingTemp${sid}".toString()): ptemp,
           ("footWarmingTimer${sid}".toString()): ptimer
   ]
-  // Shouldn't take too long for the bed to reflect the new state, wait 5s just to be safe
-  httpRequestQueue(5, path: "/rest/bed/${getBedDeviceId(device)}/foundation/footwarming",
+  httpRequestQueue(0, path: "/rest/bed/${getBedDeviceId(device)}/foundation/footwarming",
       body: body, runAfter: "refreshChildDevices")
 }
 
 /**
  * Params must be a map containing keys preset and timer.
- * The side is derived from the specified device.
+ * The side is derived from the specified device
  */
 void setFoundationTimer(Map params, String devId) {
   ChildDeviceWrapper device = findBedDevice(devId)
@@ -1576,13 +1587,12 @@ void setFoundationTimer(Map params, String devId) {
     positionPreset: ppreset,
     positionTimer: ptimer
   ]
-  httpRequest("/rest/bed/${getBedDeviceId(device)}/foundation/adjustment", this.&put, body)
-  // Shouldn't take too long for the bed to reflect the new state, wait 5s just to be safe
-  wrunIn(5L, "refreshChildDevices")
+  httpRequestQueue(5, path: "/rest/bed/${getBedDeviceId(device)}/foundation/adjustment",
+          body: body, runAfter: "refreshChildDevices")
 }
 
 /**
- * The side is derived from the specified device.
+ * The side is derived from the specified device
  */
 void setFoundationPreset(Integer preset, String devId) {
   ChildDeviceWrapper device = findBedDevice(devId)
@@ -1616,13 +1626,13 @@ void stopFoundationMovement(Map ignored, String devId) {
     footMotion: i1,
     side: getBedDeviceSide(device)[iZ]
   ]
-  httpRequest("/rest/bed/${getBedDeviceId(device)}/foundation/motion", this.&put, body)
   remTsVal("lastFamilyDataUpdDt")
-  wrunIn(5L, "refreshChildDevices")
+  httpRequestQueue(5, path: "/rest/bed/${getBedDeviceId(device)}/foundation/motion",
+          body: body, runAfter: "refreshChildDevices")
 }
 
 /**
- * The side is derived from the specified device.
+ * The side is derived from the specified device
  */
 void setSleepNumber(Integer number, String devId) {
   ChildDeviceWrapper device = findBedDevice(devId)
@@ -1655,7 +1665,7 @@ String getPrivacyMode(String bedId, Boolean lazy=false) {
     return (String)privacyMapFLD[bedId].pauseMode
   }
   debug("Getting Privacy Mode for %s", bedId)
-  Map res= httpRequest("/rest/bed/${bedId}/pauseMode", this.&get)
+  Map res= httpRequest("/rest/bed/${bedId}/pauseMode")
   if(devdbg()) debug("Response data from SleepNumber: %s", res)
   if(res){
     privacyMapFLD[bedId]=res
@@ -1670,13 +1680,12 @@ void setPrivacyMode(Boolean mode, String devId) {
     return
   }
   String pauseMode = mode ? sON : sOFF
-  // Cloud request so no need to queue.
-  Map res = httpRequest("/rest/bed/${getBedDeviceId(device)}/pauseMode", this.&put, null, [mode: pauseMode])
-  if(devdbg()) debug("Response data from SleepNumber: %s", res)
+  // Cloud request
   remTsVal("lastPrivacyDataUpdDt")
   remTsVal("lastFamilyDataUpdDt")
   remTsVal("lastSleeperDataUpdDt")
-  wrunIn(2L, "refreshChildDevices")
+  httpRequestQueue(2, path: "/rest/bed/${getBedDeviceId(device)}/pauseMode",
+          query: [mode: pauseMode], runAfter: "refreshChildDevices")
 }
 
 @Field volatile static Map<String, Map> sleepNumMapFLD      = [:]
@@ -1690,7 +1699,7 @@ Map getSleepNumberFavorite(String bedId, Boolean lazy=false) {
     return sleepNumMapFLD[bedId]
   }
   debug "Getting Sleep Number Favorites"
-  Map res= httpRequest("/rest/bed/${bedId}/sleepNumberFavorite", this.&get)
+  Map res= httpRequest("/rest/bed/${bedId}/sleepNumberFavorite")
   if(devdbg()) debug("Response data from SleepNumber: %s", res)
   if(res){
     sleepNumMapFLD[bedId]=res
@@ -1913,9 +1922,9 @@ void setOutletState(String bedId, Integer outletId, String ioutletState, Integer
   String val = "lastOutletUpdDt" + "${outletId}"
   remTsVal(val)
     if (refresh) {
-      httpRequestQueue(5, path: path, body: body, runAfter: "refreshChildDevices")
+      httpRequestQueue(2, path: path, body: body, runAfter: "refreshChildDevices")
     } else {
-      httpRequest(path, this.&put, body)
+      httpRequestQueue(0, path: path, body: body)
     }
 }
 
@@ -1991,13 +2000,12 @@ void determineUnderbedLightSetup(String bedId) {
 /**
  * Sets the underbed lighting per given params.
  * If only timer is given, state is assumed to be `on`.
- * If the foundation has outlet 3 and 4 then the bed side
- * will be used to determine which to enable.
+ * If the foundation has outlet 3 and 4, the bed side will be used to enable.
  * The params map must include:
- * state: on, off, auto
+ *    state: on, off, auto
  * And may include:
- * timer: valid minute duration
- * brightness: low, medium, high
+ *    timer: valid minute duration
+ *    brightness: low, medium, high
  */
 void setUnderbedLightState(Map params, String devId) {
   ChildDeviceWrapper device = findBedDevice(devId)
@@ -2033,7 +2041,7 @@ void setUnderbedLightState(Map params, String devId) {
     enableAuto: ps == "auto"
   ]
   String id = getBedDeviceId(device)
-  httpRequest("/rest/bed/${id}/foundation/underbedLight", this.&put, body)
+  httpRequestQueue(2, path: "/rest/bed/${id}/foundation/underbedLight", body: body)
 
   determineUnderbedLightSetup(id)
   Integer rightBrightness, leftBrightness
@@ -2059,7 +2067,7 @@ void setUnderbedLightState(Map params, String devId) {
       rightUnderbedLightPWM: rightBrightness,
       leftUnderbedLightPWM: leftBrightness
     ]
-    httpRequest("/rest/bed/${id}/foundation/system", this.&put, body)
+    httpRequestQueue(2, path: "/rest/bed/${id}/foundation/system", body: body)
   }
   setOutletState(id, outletNum,
           ps == "auto" ? sOFF : ps, pt, false)
@@ -2556,14 +2564,17 @@ void ahttpRequestHandler(resp,Map callbackData){
     httpRequest((String)request.path, this.&put, (Map)request.body, (Map)request.query, false, false, request)
   }
 
-  Long rd= ((Integer)request.duration).toLong()
+  Long rd; rd= ((Integer)request.duration).toLong()
   // Let this operation complete then process more requests and release the lock
-  wrunInMillis(Math.round(rd * 1000.0D), "handleRequestQueue", [data: true])
+  // throttle requests to 1 per second
+  if(rd > 0L) wrunInMillis(Math.round(rd * 1000.0D), "handleRequestQueue", [data: true])
+  else wrunInMillis(Math.round(1000.0D), "handleRequestQueue", [data: true])
 
   // If there was something to run after this then set that up as well.
   String ra = (String)request.runAfter
   if (ra) {
     remTsVal("lastFamilyDataUpdDt")
+    if(rd < 1L) rd = 4L
     wrunIn(rd, ra)// [overwrite:false])
   }
   debug "finishing async request $rCode; delay to next operation $rd seconds" + ra ? " with runafter" : sBLK
