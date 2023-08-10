@@ -551,7 +551,7 @@ static String convertSecondsToTimeString(Integer secondsToConvert) {
 }
 
 // Method used by parent app to set bed state
-void setStatus(Map params) {
+void setStatus(Map<String,Object> params) {
   debug "setStatus(${params})"
   if ((String) state.type) {
     setStatusOld(params)
@@ -559,10 +559,9 @@ void setStatus(Map params) {
   }
   // No type means we are using parent/child devices.
   List<String> validAttributes = device.supportedAttributes.collect{ (String) it.name }
-  params.each { param ->
+  for (Map.Entry<String,Object>param in params) {
     String pk=param.key
     if (pk in validAttributes) {
-      def attributeValue = device."current${pk.capitalize()}"
       def value; value = param.value
       // Translate some of the values into something more meaningful for comparison
       // but leave the other values alone
@@ -571,6 +570,7 @@ void setStatus(Map params) {
         value = aa ? aa.key : sNL
         if (value == sNL) {
           logError "Invalid foot warming temp ${param.value}"
+          continue
         }
       } else if (pk == sUNDERBEDLBRIGHT) {
         Map.Entry<String,Integer> aa= UNDERBED_LIGHT_BRIGHTNESS.find { it.value == value as Integer}
@@ -581,9 +581,17 @@ void setStatus(Map params) {
         }
       }
 
-      debug "Setting ${pk} to ${value}, it was ${attributeValue}"
+      def attributeValue = device."current${pk.capitalize()}"
+      if (attributeValue.toString() != value.toString()) {
+        debug "Setting ${pk} to ${value}, it was ${attributeValue}"
+      }
       // Figure out what child device to send to based on the key.
+      Boolean dfltdone; dfltdone = false
       switch (pk) {
+        case sPRESENCE:
+          setPresence((Boolean)value)
+          dfltdone = true
+          break
         case sSLEEPNUM:
           // This is for this device so just send the event.
           sendEvent ((sNM): sLEVEL, (sVL): value)
@@ -654,8 +662,10 @@ void setStatus(Map params) {
           // switch and level events.
           break
       }
-      // Send an event with the key name to catalog it and set the attribute.
-      sendEvent ((sNM): pk, (sVL): value)
+      if(!dfltdone) {
+        // Send an event with the key name to catalog it and set the attribute.
+        sendEvent ((sNM): pk, (sVL): value)
+      }
     } else {
       logError "Invalid status attribute ${pk}"
     }
@@ -666,43 +676,60 @@ void setStatus(Map params) {
 void setStatusOld(Map<String,Object> params) {
   debug "setStatusOld(${params})"
   List<String> validAttributes = device.supportedAttributes.collect{ (String)it.name }
-  params.each{param ->
+  for (Map.Entry<String,Object>param in params) {
     String pk=param.key
     if (pk in validAttributes) {
-      def attributeValue = device."current${pk.capitalize()}"
       def value; value = param.value
+
       // Translate heat temp to something more meaningful but leave the other values alone
       if (pk == sFOOTWRMTEMP) {
         Map.Entry<String,Integer> aa = HEAT_TEMPS.find{ it.value == Integer.valueOf("${value}") }
         value = aa ? aa.key : sNL
         if (value == sNL) {
           logError "Invalid foot warming temp ${param.value}"
+          continue
         }
       }
+
+      def attributeValue = device."current${pk.capitalize()}"
       if (attributeValue.toString() != value.toString()) {
         debug "Setting ${pk} to ${value}, it was ${attributeValue}"
-        // If this is a head or foot device, we need to sync level with the relevant
-        // position, if it's presence, then we sync level with the sleep number value.
-        String stype = (String)state.type
-        if ((stype == sHEAD && pk == sHEADPOSITION)
-            || (stype == sFOOT && pk == sFOOTPOSITION)
-            || (stype == sPRESENCE && pk == sSLEEPNUM)) {
-          sendEvent ((sNM): sLEVEL, (sVL): value)
-        }
-        if (stype != sFOOTWMR && pk == sPOSITIONPRESET) {
-          if (value == sFLAT) {
-            sendEvent ((sNM): sSWITCH, (sVL): sOFF)
-          } else if (value == (String)settings.presetLevel) {
-            // On if the level is the desired preset.
-            // Note this means it's off even when raised if it doesn't match a preset which
-            // may not make sense given there is a level.  But since it can be "turned on"
-            // when not at preset level, the behavior (if not the indicator) seems logical.
-            sendEvent ((sNM): sSWITCH, (sVL): sON)
+      }
+      // If this is a head or foot device, we need to sync level with the relevant
+      // position, if it's presence, then we sync level with the sleep number value.
+      String stype = (String)state.type
+      Boolean dfltdone; dfltdone = false
+      switch (pk){
+        case sPRESENCE:
+          setPresence((Boolean)value)
+          dfltdone = true
+          break
+        case sSLEEPNUM:
+          if(stype == sPRESENCE) sendEvent ((sNM): sLEVEL, (sVL): value)
+          break
+        case sHEADPOSITION:
+          if(stype == sHEAD) sendEvent ((sNM): sLEVEL, (sVL): value)
+          break
+        case sFOOTPOSITION:
+          if(stype == sFOOT) sendEvent ((sNM): sLEVEL, (sVL): value)
+          break
+        case sPOSITIONPRESET:
+          if (stype != sFOOTWMR) {
+            if (value == sFLAT) {
+              sendEvent ((sNM): sSWITCH, (sVL): sOFF)
+            } else if (value == (String)settings.presetLevel) {
+              // On if the level is the desired preset.
+              // Note this means it's off even when raised if it doesn't match a preset which
+              // may not make sense given there is a level.  But since it can be "turned on"
+              // when not at preset level, the behavior (if not the indicator) seems logical.
+              sendEvent ((sNM): sSWITCH, (sVL): sON)
+            }
           }
-        }
-        if (stype == sFOOTWMR && pk == sFOOTWRMTEMP) {
-          Integer level; level = iZ
-          switch (value) {
+          break
+        case sFOOTWRMTEMP:
+          if (stype == sFOOTWMR) {
+            Integer level; level = iZ
+            switch (value) {
               case sSTOFF:
                 level = iZ
                 break
@@ -715,10 +742,14 @@ void setStatusOld(Map<String,Object> params) {
               case sHIGH:
                 level = 3
                 break
+            }
+            sendEvent ((sNM): sSWITCH, (sVL): level > iZ ? sON : sOFF)
+            if(level > iZ) sendEvent ((sNM): sLEVEL, (sVL): level)
           }
-          sendEvent ((sNM): sLEVEL, (sVL): level)
-          sendEvent ((sNM): sSWITCH, (sVL): level > iZ ? sON : sOFF)
-        }
+          break
+      }
+      if(!dfltdone) {
+        // Send an event with the key name to catalog it and set the attribute.
         sendEvent ((sNM): pk, (sVL): value)
       }
     } else {
