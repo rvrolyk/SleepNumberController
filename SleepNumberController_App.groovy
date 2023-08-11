@@ -70,6 +70,8 @@ import java.text.SimpleDateFormat
 @Field static final String sOUTLET='outlet'
 @Field static final String sUNDERBEDLIGHT='underbedlight'
 
+@Field static final String sCACHE=' CACHE'
+
 @Field static final Integer iZ=0
 @Field static final Integer i1=1
 @Field static final Integer i2=2
@@ -1043,7 +1045,7 @@ Map getBedData(Boolean async=false) {
   Integer lastUpd = getLastTsValSecs("lastFamilyDataUpdDt")
   if(familyMapFLD[myId] && ((!lazy && lastUpd < 180) || (lazy && lastUpd <= 550))) {
     debug "Getting CACHED family status ${ devdbg() ? familyMapFLD[myId] : sBLK}"
-    addHttpR('/rest/bed/familyStatus' + " CACHE")
+    addHttpR('/rest/bed/familyStatus' + sCACHE)
     processBedData(familyMapFLD[myId])
     return familyMapFLD[myId]
   }
@@ -1327,7 +1329,7 @@ Map getBeds(Boolean lazy=false) {
   String myId=gtAid()
   Integer lastUpd = getLastTsValSecs("lastBedDataUpdDt")
   if(sleepMapFLD[myId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
-    addHttpR('/rest/bed' + " CACHE")
+    addHttpR('/rest/bed' + sCACHE)
     debug "Getting CACHED information for all beds ${ devdbg() ? sleepMapFLD[myId] : sBLK}"
     return sleepMapFLD[myId]
   }
@@ -1660,7 +1662,7 @@ void setSleepNumber(Integer number, String devId) {
 String getPrivacyMode(String bedId, Boolean lazy=false) {
   Integer lastUpd = getLastTsValSecs("lastPrivacyDataUpdDt")
   if(privacyMapFLD[bedId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
-    addHttpR("/rest/bed/${bedId}/pauseMode" + " CACHE")
+    addHttpR("/rest/bed/${bedId}/pauseMode" + sCACHE)
     debug "Getting CACHED Privacy Mode for ${bedId} ${ devdbg() ? privacyMapFLD[bedId] : sBLK}"
     return (String)privacyMapFLD[bedId].pauseMode
   }
@@ -1694,7 +1696,7 @@ void setPrivacyMode(Boolean mode, String devId) {
 Map getSleepNumberFavorite(String bedId, Boolean lazy=false) {
   Integer lastUpd = getLastTsValSecs("lastSleepFavoriteUpdDt")
   if(sleepNumMapFLD[bedId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
-    addHttpR("/rest/bed/${bedId}/sleepNumberFavorite" + " CACHE")
+    addHttpR("/rest/bed/${bedId}/sleepNumberFavorite" + sCACHE)
     debug "Getting CACHED Sleep Number Favorites ${ devdbg() ? sleepNumMapFLD[bedId] : sBLK}"
     return sleepNumMapFLD[bedId]
   }
@@ -1854,7 +1856,7 @@ Map getOutletState(String bedId, Integer outlet) {
   String idx = bedId+'_'+outlet.toString()
   Integer lastUpd = getLastTsValSecs(val)
   if(outletMapFLD[idx] && lastUpd <= 180) {
-    addHttpR("/rest/bed/${bedId}/foundation/outlet " + outlet.toString() + " CACHE")
+    addHttpR("/rest/bed/${bedId}/foundation/outlet " + outlet.toString() + sCACHE)
     debug "Getting CACHED outlet ${ devdbg() ? outletMapFLD[idx] : sBLK}"
     return outletMapFLD[idx]
   }
@@ -1940,7 +1942,7 @@ Map getUnderbedLightState(String bedId) {
 Map getFoundationSystem(String bedId) {
   Integer lastUpd = getLastTsValSecs("lastFoundationSystemUpdDt")
   if(foundationSystemMapFLD[bedId] && lastUpd <= 14400) {
-    addHttpR("/rest/bed/${bedId}/foundation/system" + " CACHE")
+    addHttpR("/rest/bed/${bedId}/foundation/system" + sCACHE)
     debug "Getting CACHED Foundation System ${ devdbg() ? foundationSystemMapFLD[bedId] : sBLK}"
     return foundationSystemMapFLD[bedId]
   }
@@ -2107,13 +2109,14 @@ void determineOutletSetup(String bedId) {
 Map getSleepers(Boolean lazy=false) {
   Integer lastUpd = getLastTsValSecs("lastSleeperDataUpdDt")
   String myId=gtAid()
+  String path = '/rest/sleeper'
   if(sleepersMapFLD[myId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
-    addHttpR("/rest/sleeper" + " CACHE")
+    addHttpR(path + sCACHE)
     debug "Getting CACHED Sleepers ${ devdbg() ? sleepersMapFLD[myId] : sBLK}"
     return sleepersMapFLD[myId]
   }
   debug "Getting Sleepers"
-  Map res = httpRequest("/rest/sleeper", this.&get)
+  Map res = httpRequest(path, this.&get)
   if(devdbg()) debug("Response data from SleepNumber: %s", res)
   if(res){
     sleepersMapFLD[myId]=res
@@ -2494,7 +2497,10 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
   }
 
   Map statusParams = fillParams(path, body, query, useAwsO, sess, async)
-  addHttpR(path)
+  String addstr
+  addstr = query ? " ${query}" : sBLK
+  addstr += async ? " ${async}" : sBLK
+  addHttpR(path+addstr)
   try {
     if(async){
       wrunInMillis(24000L, "timeoutAreq", [data: qReq])
