@@ -191,7 +191,7 @@ Map homePage() {
       } else {
         if (currentDevices.size() > iZ) {
           paragraph "Current beds"
-          currentDevices.each { Map device ->
+          for (Map device in currentDevices) {
             String output; output = sBLK
             if ((Boolean)device.isChild) {
               output += "            "
@@ -255,6 +255,9 @@ def updated() {
   app.removeSetting('requestQuery')
   app.removeSetting("newDeviceName")
   state.remove('variableRefresh')
+  state.remove('selectBedP')
+  state.remove('createBedP')
+  state.remove('diagP')
   state.session = null // next run will refresh all tokens/cookies
   state.remove('pauseButtonName')
   initialize()
@@ -337,7 +340,7 @@ void updateLabel() {
     }
     label.append(">${nstatus}</span>")
     app.updateLabel(label.toString())
-    getBedDevices().each { b -> b.setConnectionState(connected) }
+    for (ChildDeviceWrapper b in getBedDevices()) { b.setConnectionState(connected) }
   }
 }
 
@@ -364,7 +367,7 @@ void initializeBedInfo() {
   Map bedInfo = getBeds()
   Map<String, Map> stateBedInfo = [:]
   if(bedInfo){
-    ((List<Map>)bedInfo.beds).each() { Map bed ->
+    for (Map bed in (List<Map>)bedInfo.beds) {
       String id = bed.bedId.toString()
       if(devdbg()) debug("Bed id %s", id)
       if (!stateBedInfo.containsKey(id)) {
@@ -398,7 +401,7 @@ void initializeBedInfo() {
 List<ChildDeviceWrapper> getBedDevices() {
   List<ChildDeviceWrapper> children = []
   // If any child is a virtual container, iterate that too
-  ((List<ChildDeviceWrapper>)getChildDevices()).each { child ->
+  for (ChildDeviceWrapper child in (List<ChildDeviceWrapper>)getChildDevices()) {
     if ((Boolean)child.hasAttribute("containerSize")) {
       children.addAll((List)child.childList())
     } else {
@@ -416,7 +419,7 @@ List<Map> getBedDeviceData() {
   // Start with all bed devices.
   List<ChildDeviceWrapper> devices = getBedDevices()
   List<Map> output = []
-  devices.each { device ->
+  for (ChildDeviceWrapper device in devices) {
     String side = getBedDeviceSide(device)
     String bedId = getBedDeviceId(device)
     String type = getBedDeviceType(device) ?: "Parent"
@@ -429,7 +432,7 @@ List<Map> getBedDeviceData() {
       bedId: bedId,
       isChild: false,
     ]
-    device.getChildDevices().each { child ->
+    for (ChildDeviceWrapper child in device.getChildDevices()) {
       output << [
         (sNM): (String)child.label,
         (sTYP): (String)device.getChildType(child.deviceNetworkId),
@@ -593,7 +596,7 @@ Map findBedPage() {
   List<Map> beds= responseData ? (List<Map>)responseData.beds : []
   dynamicPage(name: "findBedPage") {
     if (beds.size() > iZ) {
-      beds.each { Map bed ->
+      for (Map bed in beds) {
         String l=sLEFT
         String r=sRIGHT
         List sidesSeen = []
@@ -665,7 +668,9 @@ void checkBedInfo(){
  *     getBeds() (C)
  *     getOutletState(bedId, *) * 4 (C) (eventually if we initializedBedInfo)
  */
-Map selectBedPage(Map params) {
+Map selectBedPage(Map iparams) {
+  Map params; params = iparams
+  if(params) state.selectBedP = params else params = state.selectBedP
   checkBedInfo()
   dynamicPage((sNM): "selectBedPage") {
     String bdId=params?.bedId
@@ -826,7 +831,9 @@ static String createDeviceLabel(String name, String type) {
   }
 }
 
-Map createBedPage(Map params) {
+Map createBedPage(Map iparams) {
+  Map params; params = iparams
+  if(params) state.createBedP = params else params = state.createBedP
   ChildDeviceWrapper container; container = null
   if ((Boolean) params.useContainer) {
     container = createContainer((String) params.bedId, (String) params.containerName, (String) params.side)
@@ -857,7 +864,7 @@ Map createBedPage(Map params) {
     }
     // If we are using child devices then we create a presence device and
     // all others are children of it.
-    ((List<String>) params.types).each { String type ->
+    for (String type in (List<String>)params.types) {
       if (type != sPRESENCE) {
         String childId = deviceId + "-" + type.replaceAll(sSPACE, sBLK)
         String driverType; driverType = sNL
@@ -880,7 +887,7 @@ Map createBedPage(Map params) {
       }
     }
   } else {
-    ((List<String>) params.types).each { String type ->
+    for (String type in (List<String>)params.types) {
       String deviceId = "sleepnumber.${params.bedId}.${params.side}.${type.replaceAll(' ', '_')}".toString()
       if (existingDevices.find{ it.data.vcId == deviceId }) {
         info("Not creating device %s, it already exists", deviceId)
@@ -916,7 +923,7 @@ Map createBedPage(Map params) {
       header.append(":")
       paragraph(header.toString())
       StringBuilder displayInfo; displayInfo = new StringBuilder("<ol>")
-      devices.each { ChildDeviceWrapper device ->
+      for (ChildDeviceWrapper device in devices) {
         displayInfo.append("<li>")
         displayInfo.append((String)device.label)
         if (!(Boolean) params.useChildDevices) {
@@ -939,10 +946,12 @@ Map createBedPage(Map params) {
  * rest calls
  *    getBeds() (C)
  */
-Map diagnosticsPage(params) {
+Map diagnosticsPage(Map iparams) {
+  Map params; params = iparams
+  if(params) state.diagP = params else params = state.diagP
   Map bedInfo = getBeds(true)
   dynamicPage((sNM): "diagnosticsPage") {
-    ((List<Map>)bedInfo.beds).each { Map bed ->
+    for (Map bed in (List<Map>)bedInfo.beds) {
       section("Bed: ${bed.bedId}") {
         StringBuilder bedOutput; bedOutput = new StringBuilder("<ul>")
         bedOutput.append("<li>Size: ").append(bed.size)
@@ -2142,7 +2151,7 @@ Map getSleepData(Map ignored, String devId) {
   Map sleepers = getSleepers(true)
 
   debug("Getting sleeper ids for %s", bedId)
-  ((List<Map>)sleepers.sleepers).each() { sleeper ->
+  for (Map sleeper in (List<Map>)sleepers.sleepers) {
     if ((String)sleeper.bedId == bedId) {
       String side; side=sNL
       switch (sleeper.side) {
@@ -2786,7 +2795,7 @@ private void remTsVal(key) {
   if(key) {
     if(key instanceof List) {
       List<String> aa = (List<String>)key
-      aa.each { String k->
+      for (String k in aa) {
         if(data.containsKey(k)) { data.remove(k) }
         //if(k in svdTSValsFLD) { remServerItem(k) }
       }
