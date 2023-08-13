@@ -79,15 +79,15 @@ import java.text.SimpleDateFormat
 @Field static final Integer i4=4
 @Field static final Integer i20=20
 
-@Field static final String API_HOST = "prod-api.sleepiq.sleepnumber.com"
-static String getAPI_URL(){ "https://" + API_HOST }
-@Field static final String LOGIN_HOST = "l06it26kuh.execute-api.us-east-1.amazonaws.com"
-static String getLOGIN_URL(){ "https://" + LOGIN_HOST }
-@Field static final String LOGIN_CLIENT_ID = "jpapgmsdvsh9rikn4ujkodala"
-@Field static final String USER_AGENT = "SleepIQ/1669639706 CFNetwork/1399 Darwin/22.1.0"
-@Field static final String SN_APP_VERSION = "4.4.1"
+@Field static final String API_HOST = 'prod-api.sleepiq.sleepnumber.com'
+static String getAPI_URL(){ 'https://' + API_HOST }
+@Field static final String LOGIN_HOST = 'l06it26kuh.execute-api.us-east-1.amazonaws.com'
+static String getLOGIN_URL(){ 'https://' + LOGIN_HOST }
+@Field static final String LOGIN_CLIENT_ID = 'jpapgmsdvsh9rikn4ujkodala'
+@Field static final String USER_AGENT = 'SleepIQ/1669639706 CFNetwork/1399 Darwin/22.1.0'
+@Field static final String SN_APP_VERSION = '4.4.1'
 
-@Field static final ArrayList<String> VALID_ACTUATORS = ["H", "F"]
+@Field static final ArrayList<String> VALID_ACTUATORS = ['H', 'F']
 @Field static final ArrayList<Integer> VALID_SPEEDS = [0, 1, 2, 3]
 @Field static final ArrayList<Integer> VALID_WARMING_TIMES = [30, 60, 120, 180, 240, 300, 360]
 @Field static final ArrayList<Integer> VALID_WARMING_TEMPS = [0, 31, 57, 72]
@@ -95,41 +95,41 @@ static String getLOGIN_URL(){ "https://" + LOGIN_HOST }
 @Field static final ArrayList<Integer> VALID_PRESETS = [1, 2, 3, 4, 5, 6]
 @Field static final ArrayList<Integer> VALID_LIGHT_TIMES = [15, 30, 45, 60, 120, 180]
 @Field static final ArrayList<Integer> VALID_LIGHT_BRIGHTNESS = [1, 30, 100]
-@Field static final Map<String, String> LOG_LEVELS = ["0": "Off", "1": "Debug", "2": "Info", "3": "Warn"]
+@Field static final Map<String, String> LOG_LEVELS = ['0': 'Off', '1': 'Debug', '2': 'Info', '3': 'Warn']
 
-@Field static final String PAUSE = "Pause"
-@Field static final String RESUME = "Resume"
+@Field static final String PAUSE = 'Pause'
+@Field static final String RESUME = 'Resume'
 
 @CompileStatic
 static Boolean devdbg(){ return false }
 
 definition(
-  (sNM): "Sleep Number Controller",
+  (sNM): 'Sleep Number Controller',
   namespace: NAMESPACE,
-  author: "Russ Vrolyk",
-  (sDESC): "Control your Sleep Number Flexfit bed.",
-  category: "Integrations",
+  author: 'Russ Vrolyk',
+  (sDESC): 'Control your Sleep Number Flexfit bed.',
+  category: 'Integrations',
   iconUrl: sBLK,
   iconX2Url: sBLK,
-  importUrl: "https://raw.github.com/rvrolyk/SleepNumberController/master/SleepNumberController_App.groovy"
+  importUrl: 'https://raw.github.com/rvrolyk/SleepNumberController/master/SleepNumberController_App.groovy'
 )
 
 preferences {
-  page ((sNM): "homePage", install: true, uninstall: true)
-  page ((sNM): "findBedPage")
-  page ((sNM): "selectBedPage")
-  page ((sNM): "createBedPage")
-  page ((sNM): "diagnosticsPage")
+  page ((sNM): 'homePage', install: true, uninstall: true)
+  page ((sNM): 'findBedPage')
+  page ((sNM): 'selectBedPage')
+  page ((sNM): 'createBedPage')
+  page ((sNM): 'diagnosticsPage')
 }
 
 /**
  * Required handler for pause button.
  */
 def appButtonHandler(btn) {
-  if (btn == "pause") {
+  if (btn == 'pause') {
     state.paused = !(Boolean) state.paused
     if ((Boolean) state.paused) {
-      debug "Paused, unscheduling..."
+      debug 'Paused, unscheduling...'
       unschedule()
       unsubscribe()
       updateLabel()
@@ -143,39 +143,39 @@ def appButtonHandler(btn) {
 Map homePage() {
   List<Map> currentDevices = getBedDeviceData()
 
-  dynamicPage((sNM): "homePage") {
+  dynamicPage((sNM): 'homePage') {
     section(sBLK) {
-      input ((sNM): "pause", (sTYP): "button", (sTIT): (Boolean)state.paused ? RESUME : PAUSE)
+      input ((sNM): 'pause', (sTYP): 'button', (sTIT): (Boolean)state.paused ? RESUME : PAUSE)
     }
-    section("<b>Settings</b>") {
-      input ((sNM): "login", (sTYP): sTXT, (sTIT): "sleepnumber.com email",
-          (sDESC): "Email address you use with Sleep Number", submitOnChange: true)
-      input ((sNM): "password", (sTYP): "password", (sTIT): "sleepnumber.com password",
-          (sDESC): "Password you use with Sleep Number", submitOnChange: true)
+    section('<b>Settings</b>') {
+      input ((sNM): 'login', (sTYP): sTXT, (sTIT): 'sleepnumber.com email',
+          (sDESC): 'Email address you use with Sleep Number', submitOnChange: true)
+      input ((sNM): 'password', (sTYP): 'password', (sTIT): 'sleepnumber.com password',
+          (sDESC): 'Password you use with Sleep Number', submitOnChange: true)
       // User may opt for constant refresh or a variable one.
-      Boolean defaultVariableRefresh = settings.variableRefresh != null && !(Boolean)settings.variableRefresh ? false : (Integer)settings.refreshInterval == null
-      input ("variableRefresh", sBOOL, (sTIT): "Use variable refresh interval? (recommended)", defaultValue: defaultVariableRefresh,
+      Boolean defaultVariableRefresh = gtSetting('variableRefresh') != null && !gtSetB('variableRefresh') ? false : gtSetI('refreshInterval') == null
+      input ('variableRefresh', sBOOL, (sTIT): 'Use variable refresh interval? (recommended)', defaultValue: defaultVariableRefresh,
          submitOnChange: true)
-      if (defaultVariableRefresh || (Boolean)settings.variableRefresh) {
-        input ((sNM): "dayInterval", (sTYP): sNUM, (sTIT): "Daytime Refresh Interval (minutes; 1-59)",
-            (sDESC): "How often to refresh bed state during the day", defaultValue: 30)
-        input ((sNM): "nightInterval", (sTYP): sNUM, (sTIT): "Nighttime Refresh Interval (minutes; 1-59)",
-              (sDESC): "How often to refresh bed state during the night", defaultValue: i1)
-        input "variableRefreshModes", sBOOL, (sTIT): "Use modes to control variable refresh interval", defaultValue: false, submitOnChange: true
-        if ((Boolean)settings.variableRefreshModes) {
-          input ((sNM): "nightMode", (sTYP): "mode", (sTIT): "Modes for night (anything else will be day)", multiple: true, submitOnChange: true)
+      if (defaultVariableRefresh || gtSetB('variableRefresh')) {
+        input ((sNM): 'dayInterval', (sTYP): sNUM, (sTIT): 'Daytime Refresh Interval (minutes; 1-59)',
+            (sDESC): 'How often to refresh bed state during the day', defaultValue: 30)
+        input ((sNM): 'nightInterval', (sTYP): sNUM, (sTIT): 'Nighttime Refresh Interval (minutes; 1-59)',
+              (sDESC): 'How often to refresh bed state during the night', defaultValue: i1)
+        input 'variableRefreshModes', sBOOL, (sTIT): 'Use modes to control variable refresh interval', defaultValue: false, submitOnChange: true
+        if (gtSetB('variableRefreshModes')) {
+          input ((sNM): 'nightMode', (sTYP): 'mode', (sTIT): 'Modes for night (anything else will be day)', multiple: true, submitOnChange: true)
           app.removeSetting('dayStart')
           app.removeSetting('nightStart')
         } else {
-          input ((sNM): "dayStart", (sTYP): "time", (sTIT): "Day start time",
-              (sDESC): "Time when day will start if both sides are out of bed for more than 5 minutes", submitOnChange: true)
-          input ((sNM): "nightStart", (sTYP): "time", (sTIT): "Night start time", (sDESC): "Time when night will start", submitOnChange: true)
+          input ((sNM): 'dayStart', (sTYP): 'time', (sTIT): 'Day start time',
+              (sDESC): 'Time when day will start if both sides are out of bed for more than 5 minutes', submitOnChange: true)
+          input ((sNM): 'nightStart', (sTYP): 'time', (sTIT): 'Night start time', (sDESC): 'Time when night will start', submitOnChange: true)
           app.removeSetting('nightMode')
         }
         app.removeSetting('refreshInterval')
       } else {
-        input ((sNM): "refreshInterval", (sTYP): sNUM, (sTIT): "Refresh Interval (minutes; 1-59)",
-            (sDESC): "How often to refresh bed state", defaultValue: i1)
+        input ((sNM): 'refreshInterval', (sTYP): sNUM, (sTIT): 'Refresh Interval (minutes; 1-59)',
+            (sDESC): 'How often to refresh bed state', defaultValue: i1)
         app.removeSetting('dayInterval')
         app.removeSetting('nightInterval')
         app.removeSetting('dayStart')
@@ -185,56 +185,56 @@ Map homePage() {
       }
     }
 
-    section("<b>Bed Management</b>") {
-      if (!(String) settings.login || !(String) settings.password) {
-        paragraph "Add login and password to find beds"
+    section('<b>Bed Management</b>') {
+      if (!gtSetStr('login') || !gtSetStr('password')) {
+        paragraph 'Add login and password to find beds'
       } else {
         if (currentDevices.size() > iZ) {
-          paragraph "Current beds"
+          paragraph 'Current beds'
           for (Map device in currentDevices) {
             String output; output = sBLK
             if ((Boolean)device.isChild) {
-              output += "            "
+              output += '            '
             } else {
               output += device.bedId
             }
             output += " (<a href=\"/device/edit/${device.deviceId}\">dev:${device.deviceId}</a>) / ${device.name} / ${device.side} / ${device.type}"
             paragraph output
           }
-          paragraph "<br>Note: <i>To remove a device remove it from the Devices list</i>"
+          paragraph '<br>Note: <i>To remove a device remove it from the Devices list</i>'
         }
         // Only show bed search if user entered creds
-        if ((String) settings.login && (String) settings.password) {
-          href "findBedPage", (sTIT): "Create or Modify Bed", (sDESC): "Search for beds"
+        if (gtSetStr('login') && gtSetStr('password')) {
+          href 'findBedPage', (sTIT): 'Create or Modify Bed', (sDESC): 'Search for beds'
         }
       }
     }
 
     section((sTIT): sBLK) {
-      href url: "https://github.com/rvrolyk/SleepNumberController", style: "external", required: false, (sTIT): "Documentation", (sDESC): "Tap to open browser"
+      href url: 'https://github.com/rvrolyk/SleepNumberController', style: 'external', required: false, (sTIT): 'Documentation', (sDESC): 'Tap to open browser'
     }
  
     section((sTIT): sBLK) {
-      href url: "https://www.paypal.me/rvrolyk", style: "external", required: false, (sTIT): "Donations", (sDESC): "Tap to open browser for PayPal"
+      href url: 'https://www.paypal.me/rvrolyk', style: 'external', required: false, (sTIT): 'Donations', (sDESC): 'Tap to open browser for PayPal'
     }
        
-    section((sTIT): "<b>Advanced Settings</b>") {
-      String defaultName; defaultName = "Sleep Number Controller"
+    section((sTIT): '<b>Advanced Settings</b>') {
+      String defaultName; defaultName = 'Sleep Number Controller'
       if ((String)state.displayName) {
         defaultName = (String)state.displayName
       }
       app.updateLabel(defaultName)
 
-      label ((sTIT): "Assign an app name", required: false, defaultValue: defaultName)
-      input ((sNM): "modes", (sTYP): "mode", (sTIT): "Poll only in these mode(s)", required: false, multiple: true, submitOnChange: true)
-      input ((sNM): "switchToDisable", (sTYP): "capability.switch", (sTIT): "Switch to disable refreshes", required: false, submitOnChange: true)
-      input "enableDebugLogging", sBOOL, (sTIT): "Enable debug logging for 30m?", defaultValue: false, required: true, submitOnChange: true
-      input "logLevel", sENUM, (sTIT): "Choose the logging level", defaultValue: "2", submitOnChange: true, options: LOG_LEVELS
-      input "limitErrorLogsMin", sNUM, (sTIT): "How long between error log reports (minutes), 0 for no limit. <br><font size=-1>(Only applies when log level is not off)</font> ", defaultValue: 0, submitOnChange: true
-      if ((String)settings.login && (String)settings.password) {
-        href "diagnosticsPage", (sTIT): "Diagnostics", (sDESC): "Show diagnostic info"
+      label ((sTIT): 'Assign an app name', required: false, defaultValue: defaultName)
+      input ((sNM): 'modes', (sTYP): 'mode', (sTIT): 'Poll only in these mode(s)', required: false, multiple: true, submitOnChange: true)
+      input ((sNM): 'switchToDisable', (sTYP): 'capability.switch', (sTIT): 'Switch to disable refreshes', required: false, submitOnChange: true)
+      input 'enableDebugLogging', sBOOL, (sTIT): 'Enable debug logging for 30m?', defaultValue: false, required: true, submitOnChange: true
+      input 'logLevel', sENUM, (sTIT): 'Choose the logging level', defaultValue: '2', submitOnChange: true, options: LOG_LEVELS
+      input 'limitErrorLogsMin', sNUM, (sTIT): 'How long between error log reports (minutes), 0 for no limit. <br><font size=-1>(Only applies when log level is not off)</font> ', defaultValue: 0, submitOnChange: true
+      if (gtSetStr('login') && gtSetStr('password')) {
+        href 'diagnosticsPage', (sTIT): 'Diagnostics', (sDESC): 'Show diagnostic info'
       }
-      input "useAwsOAuth", sBOOL, (sTIT): "(Beta) Use AWS OAuth", required: false, submitOnChange: true, defaultValue: false
+      input 'useAwsOAuth', sBOOL, (sTIT): '(Beta) Use AWS OAuth', required: false, submitOnChange: true, defaultValue: false
     }
   }
 }
@@ -253,7 +253,7 @@ def updated() {
   app.removeSetting('requestPath')
   app.removeSetting('requestBody')
   app.removeSetting('requestQuery')
-  app.removeSetting("newDeviceName")
+  app.removeSetting('newDeviceName')
   state.remove('variableRefresh')
   state.remove('selectBedP')
   state.remove('createBedP')
@@ -261,40 +261,40 @@ def updated() {
   state.session = null // next run will refresh all tokens/cookies
   state.remove('pauseButtonName')
   initialize()
-  if ((Boolean) settings.enableDebugLogging) {
-    runIn(1800L, logsOff)
+  if (gtSetB('enableDebugLogging')) {
+    wrunIn(1800L, 'logsOff')
   }
 }
 
 void logsOff() {
-  if ((Boolean)settings.enableDebugLogging) {
+  if (gtSetB('enableDebugLogging')) {
     // Log this information regardless of user setting.
-    logInfo "debug logging disabled..."
-    app.updateSetting "enableDebugLogging", [(sVL): "false", (sTYP): sBOOL]
+    logInfo 'debug logging disabled...'
+    app.updateSetting 'enableDebugLogging', [(sVL): 'false', (sTYP): sBOOL]
   }
 }
 
 def initialize() {
-  Integer interval = (Integer)settings.refreshInterval
-  if (interval <= iZ && !(Boolean)settings.variableRefresh) {
+  Integer interval = gtSetI('refreshInterval')
+  if (interval <= iZ && !gtSetB('variableRefresh')) {
     logError "Invalid refresh interval ${interval}"
   }
-  Integer day = (Integer) settings.dayInterval
-  Integer night = (Integer) settings.nightInterval
-  if ((Boolean) settings.variableRefresh && (day <= iZ || night <= iZ)) {
+  Integer day = gtSetI('dayInterval')
+  Integer night = gtSetI('nightInterval')
+  if (gtSetB('variableRefresh') && (day <= iZ || night <= iZ)) {
     logError "Invalid refresh intervals ${day} or ${night}"
   }
-  if ((Boolean) settings.variableRefreshModes) {
-    subscribe(location, "mode", configureVariableRefreshInterval)
+  if (gtSetB('variableRefreshModes')) {
+    subscribe(location, 'mode', configureVariableRefreshInterval)
   }
-  subscribe(location, "systemStart", startHandler)
+  subscribe(location, 'systemStart', startHandler)
 
-  remTsVal("lastBedDataUpdDt")
-  remTsVal("lastFamilyDataUpdDt")
-  remTsVal("lastPrivacyDataUpdDt")
-  remTsVal("lastSleepFavoriteUpdDt")
-  remTsVal("lastSleeperDataUpdDt")
-  remTsVal("lastFoundationSystemUpdDt")
+  remTsVal('lastBedDataUpdDt')
+  remTsVal('lastFamilyDataUpdDt')
+  remTsVal('lastPrivacyDataUpdDt')
+  remTsVal('lastSleepFavoriteUpdDt')
+  remTsVal('lastSleeperDataUpdDt')
+  remTsVal('lastFoundationSystemUpdDt')
   outletMapFLD = [:]
 
   setRefreshInterval(new BigDecimal(iZ) /* force picking from settings */, "" /* ignored */)
@@ -304,8 +304,8 @@ def initialize() {
 }
 
 void startHandler(evt){
-  debug "startHandler called"
-  wrunIn(40, "startAction")
+  debug 'startHandler called'
+  wrunIn(40L, 'startAction')
 }
 
 void startAction(){
@@ -317,9 +317,9 @@ void updateLabel() {
   String appLabel; appLabel= (String) app.label
   Boolean connected; connected = false
   String dispN; dispN = (String) state.displayName
-  if(dispN.contains(" <span")){ dispN = dispN.split(" <span")[iZ] }
-  if(appLabel.contains(" <span")){ appLabel = appLabel.split(" <span")[iZ]  }
-  if (!appLabel){ appLabel = "Sleep Number Controller" }
+  if(dispN.contains(' <span')){ dispN = dispN.split(' <span')[iZ] }
+  if(appLabel.contains(' <span')){ appLabel = appLabel.split(' <span')[iZ]  }
+  if (!appLabel){ appLabel = 'Sleep Number Controller' }
   if (dispN != appLabel) { state.displayName = appLabel }
 
   String status; status = (String)state.status
@@ -328,15 +328,15 @@ void updateLabel() {
     String nstatus; nstatus=status
     StringBuilder label; label = new StringBuilder("${state.displayName} <span style=color:")
     if (paused) {
-      nstatus = "(Paused)"
-      label.append("red")
-    } else if (status == "Online") {
-      label.append("green")
+      nstatus = '(Paused)'
+      label.append('red')
+    } else if (status == 'Online') {
+      label.append('green')
       connected = true
-    } else if (status.contains("Login")) {
-      label.append("red")
+    } else if (status.contains('Login')) {
+      label.append('red')
     } else {
-      label.append("orange")
+      label.append('orange')
     }
     label.append(">${nstatus}</span>")
     app.updateLabel(label.toString())
@@ -362,24 +362,25 @@ static String getBedDeviceType(ChildDeviceWrapper bed) {
  *     getBeds() (C)
  *  @return   recreates state.bedInfo
  */
+@CompileStatic
 void initializeBedInfo() {
-  debug "Setting up bed info"
+  debug 'Setting up bed info'
   Map bedInfo = getBeds()
   Map<String, Map> stateBedInfo = [:]
   if(bedInfo){
     for (Map bed in (List<Map>)bedInfo.beds) {
       String id = bed.bedId.toString()
-      if(devdbg()) debug("Bed id %s", id)
+      if(devdbg()) debug('Bed id %s', id)
       if (!stateBedInfo.containsKey(id)) {
         stateBedInfo[id] = [:]
       }
       List<String> components = []
       for (Map component in (List<Map>)bed.components) {
-        if ((String) component.type == "Base"
-                && ((String) component.model).toLowerCase().contains("integrated")) {
+        if ((String) component.type == 'Base'
+                && ((String) component.model).toLowerCase().contains('integrated')) {
           // Integrated bases need to be treated separately as they don't appear to have
           // foundation status endpoints so don't lump this with a base type directly.
-          components << "Integrated Base"
+          components << 'Integrated Base'
         } else {
           components << (String)component.type
         }
@@ -388,9 +389,9 @@ void initializeBedInfo() {
     }
   }
   if (!stateBedInfo) {
-    warn "No bed state set up"
+    warn 'No bed state set up'
   }
-  state.bedInfo = stateBedInfo
+  assignSt('bedInfo',stateBedInfo)
 }
 
 /**
@@ -402,7 +403,7 @@ List<ChildDeviceWrapper> getBedDevices() {
   List<ChildDeviceWrapper> children = []
   // If any child is a virtual container, iterate that too
   for (ChildDeviceWrapper child in (List<ChildDeviceWrapper>)getChildDevices()) {
-    if ((Boolean)child.hasAttribute("containerSize")) {
+    if ((Boolean)child.hasAttribute('containerSize')) {
       children.addAll((List)child.childList())
     } else {
       children.add(child)
@@ -422,7 +423,7 @@ List<Map> getBedDeviceData() {
   for (ChildDeviceWrapper device in devices) {
     String side = getBedDeviceSide(device)
     String bedId = getBedDeviceId(device)
-    String type = getBedDeviceType(device) ?: "Parent"
+    String type = getBedDeviceType(device) ?: 'Parent'
 
     output << [
       (sNM): (String) device.label,
@@ -464,10 +465,10 @@ Set<String> getBedDeviceTypes(String bedId) {
 // Use with #schedule as apparently it's not good to mix #runIn method call
 // and #schedule method call to the same method.
 void scheduledRefreshChildDevices() {
-  remTsVal("lastFamilyDataUpdDt")
+  remTsVal('lastFamilyDataUpdDt')
   outletMapFLD = [:]
   refreshChildDevices()
-  if ((Boolean) settings.variableRefresh) {
+  if (gtSetB('variableRefresh')) {
     // If we're using variable refresh then try to reconfigure it since bed states
     // have been updated and we may be in daytime.
     configureVariableRefreshInterval()
@@ -476,23 +477,23 @@ void scheduledRefreshChildDevices() {
 
 void refreshChildDevices() {
   // Only refresh if mode is a selected one
-  List setModes = (List) settings.modes
+  List setModes = (List) gtSetting('modes')
   if (setModes && !setModes.contains(location.mode)) {
-    debug "Skipping refresh, not the right mode"
+    debug 'Skipping refresh, not the right mode'
     return
   }
   // If there's a switch defined and it's on, don't bother refreshing at all
-  def disableSwitch = settings.switchToDisable
+  def disableSwitch = gtSetting('switchToDisable')
   if (disableSwitch && (String) disableSwitch.currentValue(sSWITCH) == sON) {
-    debug "Skipping refresh, switch to disable is on"
+    debug 'Skipping refresh, switch to disable is on'
     return
   }
 
-  wrunIn(4L, "doRefresh")
+  wrunIn(4L, 'doRefresh')
 }
 
 void doRefresh(){
-  debug "Refresh child devices"
+  debug 'Refresh child devices'
   getBedData(true)
 }
 
@@ -500,9 +501,9 @@ void doRefresh(){
  * Called by driver when user triggers poll.
  */
 void refreshChildDevices(Map ignored, String ignoredDevId) {
-  Integer lastUpd = getLastTsValSecs("lastFamilyDataUpdDt")
+  Integer lastUpd = getLastTsValSecs('lastFamilyDataUpdDt')
   if(lastUpd > 40){
-    remTsVal("lastFamilyDataUpdDt")
+    remTsVal('lastFamilyDataUpdDt')
     outletMapFLD = [:]
   }
   refreshChildDevices()
@@ -516,18 +517,18 @@ void refreshChildDevices(Map ignored, String ignoredDevId) {
  * a particular time of day.
  */
 void setRefreshInterval(BigDecimal val, String ignoredDevId) {
-  debug ("setRefreshInterval(%s)", val)
+  debug ('setRefreshInterval(%s)', val)
   Random random = new Random()
   Integer randomSec = random.nextInt(40) + i4
   if (val && val.toInteger() > iZ) {
     Integer randomMin = random.nextInt(Math.min(60-val.toInteger(), val.toInteger()))
-    schedule("${randomSec} ${randomMin}/${val.toInteger()} * * * ?", "scheduledRefreshChildDevices")
+    schedule("${randomSec} ${randomMin}/${val.toInteger()} * * * ?", 'scheduledRefreshChildDevices')
   } else {
-    if (!(Boolean) settings.variableRefresh) {
-      Integer interval = (Integer) settings.refreshInterval ?: i1
+    if (!gtSetB('variableRefresh')) {
+      Integer interval = gtSetI('refreshInterval') ?: i1
       Integer randomMin = random.nextInt(Math.min(60-interval, interval))
-      debug ("Resetting interval to %s", interval)
-      schedule("${randomSec} ${randomMin}/${interval} * * * ?", "scheduledRefreshChildDevices")
+      debug ('Resetting interval to %s', interval)
+      schedule("${randomSec} ${randomMin}/${interval} * * * ?", 'scheduledRefreshChildDevices')
     } else {
       configureVariableRefreshInterval()
     }
@@ -549,8 +550,8 @@ void configureVariableRefreshInterval(evt) {
 void configureVariableRefreshInterval() {
   Boolean night
 
-  if ((Boolean) settings.variableRefreshModes) {
-    night = ((List) settings.nightMode).contains(location.mode)
+  if (gtSetB('variableRefreshModes')) {
+    night = ((List) gtSetting('nightMode')).contains(location.mode)
   } else {
     // Gather presence == present child devices
     List<ChildDeviceWrapper> presentChildren = getBedDevices().findAll { ChildDeviceWrapper it ->
@@ -558,7 +559,7 @@ void configureVariableRefreshInterval() {
       (!t || t == sPRESENCE) && (Boolean) it.isPresent()
     }
     Date now = new Date()
-    if (wtimeOfDayIsBetween(wtoDateTime((String)settings.dayStart), wtoDateTime((String)settings.nightStart), now)) {
+    if (wtimeOfDayIsBetween(wtoDateTime(gtSetStr('dayStart')), wtoDateTime(gtSetStr('nightStart')), now)) {
       if (presentChildren.size() > iZ) return // if someone is still in bed, don't change anything
       night = false
     } else {
@@ -568,24 +569,24 @@ void configureVariableRefreshInterval() {
 
   String s; s=sNL
   Integer ival; ival=null
-  String varRefresh = (String) state.variableRefresh
+  String varRefresh = (String) gtSt('variableRefresh')
   if (night) {
     // Don't bother setting the schedule if we are already set to night.
-    if (varRefresh != "night") {
-      ival = (Integer) settings.nightInterval
-      s="night"
+    if (varRefresh != 'night') {
+      ival = gtSetI('nightInterval')
+      s='night'
     }
-  } else if (varRefresh != "day") {
-    ival = (Integer) settings.dayInterval
-    s="day"
+  } else if (varRefresh != 'day') {
+    ival = gtSetI('dayInterval')
+    s='day'
   }
   if(s){
     Random random = new Random()
     Integer randomSec = random.nextInt(40) + i4
     Integer randomMin = random.nextInt(Math.min(60-ival, ival))
-    info ("Setting interval to %s. Refreshing every %s minutes.", s, ival)
-    schedule("${randomSec} ${randomMin}/${ival} * * * ?", "scheduledRefreshChildDevices")
-    state.variableRefresh = s
+    info ('Setting interval to %s. Refreshing every %s minutes.', s, ival)
+    schedule("${randomSec} ${randomMin}/${ival} * * * ?", 'scheduledRefreshChildDevices')
+    assignSt('variableRefresh',s)
   }
 }
 
@@ -594,7 +595,7 @@ Map findBedPage() {
   List<ChildDeviceWrapper> devices = getBedDevices()
   List childDevices = []
   List<Map> beds= responseData ? (List<Map>)responseData.beds : []
-  dynamicPage(name: "findBedPage") {
+  dynamicPage(name: 'findBedPage') {
     if (beds.size() > iZ) {
       for (Map bed in beds) {
         String l=sLEFT
@@ -602,24 +603,24 @@ Map findBedPage() {
         List sidesSeen = []
         String bdId=bed.bedId.toString()
         section("Bed: ${bdId}") {
-          paragraph "<br>Note: <i>Sides are labeled as if you are laying in bed.</i>"
+          paragraph '<br>Note: <i>Sides are labeled as if you are laying in bed.</i>'
           if (devices.size() > iZ) {
             for (ChildDeviceWrapper dev in devices) {
               if (getBedDeviceId(dev) != bdId) {
-                debug "bedId's don't match, skipping"
+                debug 'bedId's don't match, skipping'
                 continue
               }
               String dt= getBedDeviceType(dev)
               String ds= getBedDeviceSide(dev)
-              if (!dt || dt == "presence") {
+              if (!dt || dt == 'presence') {
                 childDevices << ds
                 sidesSeen << ds
-                addBedSelectLink(ds, bdId, (String)dev.label, "modify")
+                addBedSelectLink(ds, bdId, (String)dev.label, 'modify')
               }
             }
             if (childDevices.size() < i2) {
-              input "createNewChildDevices", sBOOL, (sTIT): "Create new child device types", defaultValue: false, submitOnChange: true
-              if (settings.createNewChildDevices) {
+              input 'createNewChildDevices', sBOOL, (sTIT): 'Create new child device types', defaultValue: false, submitOnChange: true
+              if (gtSetB('createNewChildDevices')) {
                 if (!childDevices.contains(l)) {
                   addBedSelectLink(l, bdId)
                 }
@@ -639,26 +640,26 @@ Map findBedPage() {
       }
     } else {
       section {
-        paragraph "No Beds Found"
+        paragraph 'No Beds Found'
       }
     }
   }
 }
 
-void addBedSelectLink(String side, String bedId, String label = sNL, String modifyCreate = "create") {
-  href "selectBedPage", (sNM): "Bed: ${bedId}", (sTIT): label ?: "${side} Side", (sDESC): "Click to ${modifyCreate}",
+void addBedSelectLink(String side, String bedId, String label = sNL, String modifyCreate = 'create') {
+  href 'selectBedPage', (sNM): "Bed: ${bedId}", (sTIT): label ?: "${side} Side", (sDESC): "Click to ${modifyCreate}",
           params: [bedId: bedId, side: side, label: label]
 }
 
 static String presenceText(presence) {
-  return presence ? "Present" : "Not Present"
+  return presence ? 'Present' : 'Not Present'
 }
 
 void checkBedInfo(){
-  Integer lastUpd = getLastTsValSecs("lastBedDataUpdDt")
+  Integer lastUpd = getLastTsValSecs('lastBedDataUpdDt')
   if(lastUpd > 600){
-    remTsVal("lastBedDataUpdDt")
-    remTsVal("lastFamilyDataUpdDt")
+    remTsVal('lastBedDataUpdDt')
+    remTsVal('lastFamilyDataUpdDt')
     initializeBedInfo()
   }
 }
@@ -672,11 +673,11 @@ Map selectBedPage(Map iparams) {
   Map params; params = iparams
   if(params) state.selectBedP = params else params = state.selectBedP
   checkBedInfo()
-  dynamicPage((sNM): "selectBedPage") {
+  dynamicPage((sNM): 'selectBedPage') {
     String bdId=params?.bedId
     if (!bdId) {
       section {
-        href "homePage", (sTIT): "Home", (sDESC): sNL
+        href 'homePage', (sTIT): 'Home', (sDESC): sNL
       }
       return
     }
@@ -695,46 +696,46 @@ Side: ${params.side}
     }
     Long tbedId = Math.abs(Long.valueOf((String) params.bedId))
     String varName = "${tbedId}.${params.side}".toString()
-    String newName; newName = settings[varName]
+    String newName; newName = gtSetStr(varName)
     Boolean ucd; ucd = false
     section {
       String label = (String) params.label
       String name; name = newName
       name = !(name=='null' || name == sNL) ? name : label
       name = !(name=='null' || name == sNL) ? name : (String) params.side
-      input varName, sTXT, (sTIT): "Device Name", defaultValue: name,
-          (sDESC): "What prefix do you want for the devices?", submitOnChange: true,
+      input varName, sTXT, (sTIT): 'Device Name', defaultValue: name,
+          (sDESC): 'What prefix do you want for the devices?', submitOnChange: true,
           required: true
-      newName = settings[varName]
-      input "useChildDevices", sBOOL, (sTIT): "Use child devices? (only recommended if  you have underbed lights or bed outlets)", defaultValue: true,
+      newName = gtSetStr(varName)
+      input 'useChildDevices', sBOOL, (sTIT): 'Use child devices? (only recommended if  you have underbed lights or bed outlets)', defaultValue: true,
          submitOnChange: true
-      ucd = (Boolean) settings.useChildDevices
+      ucd = gtSetB('useChildDevices')
       if (!ucd) {
-        input "useContainer", sBOOL, (sTIT): "Use virtual container?", defaultValue: false,
+        input 'useContainer', sBOOL, (sTIT): 'Use virtual container?', defaultValue: false,
            submitOnChange: true
       }
       String side = ((String) params.side).toLowerCase()
-      paragraph "A presence type device exposes on/off as switching to a preset level (on) and flat (off).  Dimming will change the Sleep Number."
+      paragraph 'A presence type device exposes on/off as switching to a preset level (on) and flat (off).  Dimming will change the Sleep Number.'
       if (ucd) {
-        paragraph "This is the parent device when child devices are used"
-        app.updateSetting "createPresence", [(sVL): "true", (sTYP): sBOOL]
+        paragraph 'This is the parent device when child devices are used'
+        app.updateSetting 'createPresence', [(sVL): 'true', (sTYP): sBOOL]
         settings.createPresence = true
       } else {
-        input "createPresence", sBOOL,
+        input 'createPresence', sBOOL,
             (sTIT): "Create presence device for ${side} side?",
             defaultValue: true, submitOnChange: true
       }
-      paragraph "A head type device exposes on/off as switching to a preset level (on) and  flat (off).  Dimming will change the head position (0 is flat, 100 is fully raised)."
-      input "createHeadControl", sBOOL,
+      paragraph 'A head type device exposes on/off as switching to a preset level (on) and  flat (off).  Dimming will change the head position (0 is flat, 100 is fully raised).'
+      input 'createHeadControl', sBOOL,
          (sTIT): "Create device to control the head of the ${side} side?",
          defaultValue: true, submitOnChange: true
-      paragraph "A foot type device exposes on/off as switching to a preset level (on) and  flat (off).  Dimming will change the foot position (0 is flat, 100 is fully raised)."
-      input "createFootControl", sBOOL,
+      paragraph 'A foot type device exposes on/off as switching to a preset level (on) and  flat (off).  Dimming will change the foot position (0 is flat, 100 is fully raised).'
+      input 'createFootControl', sBOOL,
          (sTIT): "Create device to control the foot of the ${side} side?",
          defaultValue: true, submitOnChange: true
-      if (((List<String>) ((Map) state.bedInfo[bdId]).components).contains("Warming")) {
-        paragraph "A foot type device exposes on/off as switching the foot warming on or off.  Dimming will change the heat levels (1: low, 2: medium, 3: high)."
-        input "createFootWarmer", sBOOL,
+      if (((List<String>) ((Map) state.bedInfo[bdId]).components).contains('Warming')) {
+        paragraph 'A foot type device exposes on/off as switching the foot warming on or off.  Dimming will change the heat levels (1: low, 2: medium, 3: high).'
+        input 'createFootWarmer', sBOOL,
            (sTIT): "Create device to control the foot warmer of the ${side} side?",
            defaultValue: true, submitOnChange: true
       }
@@ -742,69 +743,69 @@ Side: ${params.side}
       determineOutletSetup(bdId)
       if (ucd) {
         if (((List) ((Map)state.bedInfo[bdId]).underbedoutlets).size() > iZ) {
-          paragraph "Underbed lighting creates a dimmer allowing the light to be turned on or off at different levels with timer based on parent device preference."
-          input "createUnderbedLighting", sBOOL,
+          paragraph 'Underbed lighting creates a dimmer allowing the light to be turned on or off at different levels with timer based on parent device preference.'
+          input 'createUnderbedLighting', sBOOL,
                   (sTIT): "Create device to control the underbed lighting of the ${side} side?",
                   defaultValue: false, submitOnChange: true
         }
         if (((List) ((Map)state.bedInfo[bdId]).outlets).size() > iZ) {
-          paragraph "Outlet creates a switch allowing foundation outlet for this side to be turned on or off."
-          input "createOutlet", sBOOL,
+          paragraph 'Outlet creates a switch allowing foundation outlet for this side to be turned on or off.'
+          input 'createOutlet', sBOOL,
            (sTIT): "Create device to control the outlet of the ${side} side?",
              defaultValue: false, submitOnChange: true
         }
       }
     }
-    if (!ucd || !(Boolean)settings.createUnderbedLighting) app.removeSetting('createUnderbedLighting')
-    if (!ucd || !(Boolean)settings.createOutlet) app.removeSetting('createOutlet')
+    if (!ucd || !gtSetB('createUnderbedLighting')) app.removeSetting('createUnderbedLighting')
+    if (!ucd || !gtSetB('createOutlet')) app.removeSetting('createOutlet')
 
     section {
-      StringBuilder msg; msg = new StringBuilder("Will create the following devices")
+      StringBuilder msg; msg = new StringBuilder('Will create the following devices')
       String containerName; containerName = sBLK
       List<String> types = []
       if (ucd) {
-        app.updateSetting "useContainer", [(sVL): "false", (sTYP): sBOOL]
+        app.updateSetting 'useContainer', [(sVL): 'false', (sTYP): sBOOL]
         settings.useContainer = false
-        msg.append(" with each side as a primary device and each type as a child device of the side")
-      } else if ((Boolean) settings.useContainer) {
+        msg.append(' with each side as a primary device and each type as a child device of the side')
+      } else if (gtSetB('useContainer')) {
         containerName = "${newName} Container"
         msg.append(" in virtual container '").append(containerName).append("'")
       }
-      msg.append(":<ol>")
-      if ((Boolean) settings.createPresence) {
-        msg.append("<li>").append(createDeviceLabel(newName, sPRESENCE)).append("</li>")
+      msg.append(':<ol>')
+      if (gtSetB('createPresence')) {
+        msg.append('<li>').append(createDeviceLabel(newName, sPRESENCE)).append('</li>')
         types.add(sPRESENCE)
       }
-      if ((Boolean) settings.createHeadControl) {
-        msg.append("<li>").append(createDeviceLabel(newName, sHEAD)).append("</li>")
+      if (gtSetB('createHeadControl')) {
+        msg.append('<li>').append(createDeviceLabel(newName, sHEAD)).append('</li>')
         types.add(sHEAD)
       }
-      if ((Boolean) settings.createFootControl) {
-        msg.append("<li>").append(createDeviceLabel(newName, sFOOT)).append("</li>")
+      if (gtSetB('createFootControl')) {
+        msg.append('<li>').append(createDeviceLabel(newName, sFOOT)).append('</li>')
         types.add(sFOOT)
       }
-      if ((Boolean) settings.createFootWarmer) {
-        msg.append("<li>").append(createDeviceLabel(newName, sFOOTWMR)).append("</li>")
+      if (gtSetB('createFootWarmer')) {
+        msg.append('<li>').append(createDeviceLabel(newName, sFOOTWMR)).append('</li>')
         types.add(sFOOTWMR)
       }
-      if ((Boolean) settings.createUnderbedLighting && ucd) {
-        msg.append("<li>").append(createDeviceLabel(newName, sUNDERBEDLIGHT)).append("</li>")
+      if (gtSetB('createUnderbedLighting') && ucd) {
+        msg.append('<li>').append(createDeviceLabel(newName, sUNDERBEDLIGHT)).append('</li>')
         types.add(sUNDERBEDLIGHT)
       }
-      if ((Boolean) settings.createOutlet && ucd) {
-        msg.append("<li>").append(createDeviceLabel(newName, sOUTLET)).append("</li>")
+      if (gtSetB('createOutlet') && ucd) {
+        msg.append('<li>').append(createDeviceLabel(newName, sOUTLET)).append('</li>')
         types.add(sOUTLET)
       }
-      msg.append("</ol>")
+      msg.append('</ol>')
       paragraph msg.toString()
-      paragraph "<b>Click create below to continue</b>"
-      href "createBedPage", (sTIT): "Create Devices", (sDESC): sNL,
+      paragraph '<b>Click create below to continue</b>'
+      href 'createBedPage', (sTIT): 'Create Devices', (sDESC): sNL,
       params: [
         presence: params.present,
         bedId: bdId,
         side: params.side,
         useChildDevices: ucd,
-        useContainer: (Boolean)settings.useContainer,
+        useContainer: gtSetB('useContainer'),
         containerName: containerName,
         types: types
       ]
@@ -817,17 +818,17 @@ static String createDeviceLabel(String name, String type) {
     case sPRESENCE:
       return name
     case sHEAD:
-      return name + " Head"
+      return name + ' Head'
     case sFOOT:
-      return name + " Foot"
+      return name + ' Foot'
     case sFOOTWMR:
-      return name + " Foot Warmer"
+      return name + ' Foot Warmer'
     case sUNDERBEDLIGHT:
-      return name + " Underbed Light"
+      return name + ' Underbed Light'
     case sOUTLET:
-      return name + " Outlet"
+      return name + ' Outlet'
     default:
-      return name + " Unknown"
+      return name + ' Unknown'
   }
 }
 
@@ -844,7 +845,7 @@ Map createBedPage(Map iparams) {
 
   Long bedId = Math.abs(Long.valueOf((String) params.bedId))
   String varName = "${bedId}.${params.side}".toString()
-  String newName; newName = settings[varName]
+  String newName; newName = gtSetStr(varName)
 
   if ((Boolean) params.useChildDevices) {
     // Bed Ids seem to always be negative so convert to positive for the device
@@ -853,9 +854,9 @@ Map createBedPage(Map iparams) {
     String label = createDeviceLabel(newName, sPRESENCE)
     ChildDeviceWrapper parent; parent = existingDevices.find{ (String) it.deviceNetworkId == deviceId }
     if (parent) {
-      info("Parent device %s already exists", deviceId)
+      info('Parent device %s already exists', deviceId)
     } else {
-      debug("Creating parent device %s", deviceId)
+      debug('Creating parent device %s', deviceId)
       parent = addChildDevice(NAMESPACE, DRIVER_NAME, deviceId, null, [label: label])
       parent.setStatus(params.presence)
       parent.setBedId(params.bedId)
@@ -866,18 +867,18 @@ Map createBedPage(Map iparams) {
     // all others are children of it.
     for (String type in (List<String>)params.types) {
       if (type != sPRESENCE) {
-        String childId = deviceId + "-" + type.replaceAll(sSPACE, sBLK)
+        String childId = deviceId + '-' + type.replaceAll(sSPACE, sBLK)
         String driverType; driverType = sNL
         //noinspection GroovyFallthrough
         switch (type) {
           case sOUTLET:
-            driverType = "Switch"
+            driverType = 'Switch'
             break
           case sHEAD:
           case sFOOT:
           case sFOOTWMR:
           case sUNDERBEDLIGHT:
-            driverType = "Dimmer"
+            driverType = 'Dimmer'
         }
         ChildDeviceWrapper newDevice = parent.createChildDevice(childId, "Generic Component ${driverType}",
           createDeviceLabel(newName, type))
@@ -890,12 +891,12 @@ Map createBedPage(Map iparams) {
     for (String type in (List<String>)params.types) {
       String deviceId = "sleepnumber.${params.bedId}.${params.side}.${type.replaceAll(' ', '_')}".toString()
       if (existingDevices.find{ it.data.vcId == deviceId }) {
-        info("Not creating device %s, it already exists", deviceId)
+        info('Not creating device %s, it already exists', deviceId)
       } else {
         String label = createDeviceLabel(newName, type)
         ChildDeviceWrapper device
         if (container) {
-          debug("Creating new child device %s with label %s in container %s", deviceId, label, params.containerName)
+          debug('Creating new child device %s with label %s in container %s', deviceId, label, params.containerName)
           container.appCreateDevice(label, DRIVER_NAME, NAMESPACE, deviceId)
           // #appCreateDevice doesn't return the device so find it
           device = container.childList().find({it.data.vcId == deviceId})
@@ -912,32 +913,32 @@ Map createBedPage(Map iparams) {
   }
   // Reset the bed info since we added more.
   checkBedInfo()
-  dynamicPage((sNM): "selectDevicePage") {
+  dynamicPage((sNM): 'selectDevicePage') {
     section {
-      StringBuilder header; header = new StringBuilder("Created new devices")
+      StringBuilder header; header = new StringBuilder('Created new devices')
       if ((Boolean) params.useChildDevices) {
-        header.append(" using child devices")
+        header.append(' using child devices')
       } else if ((Boolean) params.useContainer) {
-        header.append(" in container ").append(params.containerName)
+        header.append(' in container ').append(params.containerName)
       }
-      header.append(":")
+      header.append(':')
       paragraph(header.toString())
-      StringBuilder displayInfo; displayInfo = new StringBuilder("<ol>")
+      StringBuilder displayInfo; displayInfo = new StringBuilder('<ol>')
       for (ChildDeviceWrapper device in devices) {
-        displayInfo.append("<li>")
+        displayInfo.append('<li>')
         displayInfo.append((String)device.label)
         if (!(Boolean) params.useChildDevices) {
-          displayInfo.append("<br>Bed ID: ").append(getBedDeviceId(device))
-          displayInfo.append("<br>Side: ").append(getBedDeviceSide(device))
-          displayInfo.append("<br>Type: ").append(getBedDeviceType(device))
+          displayInfo.append('<br>Bed ID: ').append(getBedDeviceId(device))
+          displayInfo.append('<br>Side: ').append(getBedDeviceSide(device))
+          displayInfo.append('<br>Type: ').append(getBedDeviceType(device))
         }
-        displayInfo.append("</li>")
+        displayInfo.append('</li>')
       }
-      displayInfo.append("</ol>")
+      displayInfo.append('</ol>')
       paragraph displayInfo.toString()
     }
     section {
-      href "findBedPage", (sTIT): "Back to Bed List", (sDESC): sNL
+      href 'findBedPage', (sTIT): 'Back to Bed List', (sDESC): sNL
     }
   }
 }
@@ -950,39 +951,39 @@ Map diagnosticsPage(Map iparams) {
   Map params; params = iparams
   if(params) state.diagP = params else params = state.diagP
   Map bedInfo = getBeds(true)
-  dynamicPage((sNM): "diagnosticsPage") {
+  dynamicPage((sNM): 'diagnosticsPage') {
     for (Map bed in (List<Map>)bedInfo.beds) {
       section("Bed: ${bed.bedId}") {
-        StringBuilder bedOutput; bedOutput = new StringBuilder("<ul>")
-        bedOutput.append("<li>Size: ").append(bed.size)
-        bedOutput.append("<li>Dual Sleep: ").append(bed.dualSleep)
-        bedOutput.append("<li>Components:")
+        StringBuilder bedOutput; bedOutput = new StringBuilder('<ul>')
+        bedOutput.append('<li>Size: ').append(bed.size)
+        bedOutput.append('<li>Dual Sleep: ').append(bed.dualSleep)
+        bedOutput.append('<li>Components:')
         for (Map component in (List<Map>)bed.components) {
-          bedOutput.append("<ul>")
-          bedOutput.append("<li>Type: ").append(component.type)
-          bedOutput.append("<li>Status: ").append(component.status)
-          bedOutput.append("<li>Model: ").append(component.model)
-          bedOutput.append("</ul>")
+          bedOutput.append('<ul>')
+          bedOutput.append('<li>Type: ').append(component.type)
+          bedOutput.append('<li>Status: ').append(component.status)
+          bedOutput.append('<li>Model: ').append(component.model)
+          bedOutput.append('</ul>')
         }
         paragraph bedOutput.toString()
       }
     }
-    //section("Dump of bedInfo") {
+    //section('Dump of bedInfo') {
      // paragraph getMapDescStr(bedInfo)
     //}
-    section("Dump of http request counts") {
+    section('Dump of http request counts') {
       paragraph getMapDescStr(httpCntsMapFLD)
     }
-    section("Send Requests") {
-      input("requestType", sENUM, (sTIT): "Request type", options: ["PUT", "GET"])
-      input("requestPath", sTXT, (sTIT): "Request path", (sDESC): "Full path including bed id if needed")
-      input("requestBody", sTXT, (sTIT): "Request Body in JSON")
-      input("requestQuery", sTXT, (sTIT): "Extra query key/value pairs in JSON")
-      href("diagnosticsPage", (sTIT): "Send request", (sDESC): sNL, params: [
-              requestType : (String) settings.requestType,
-              requestPath : (String) settings.requestPath,
-              requestBody : (String) settings.requestBody,
-              requestQuery: (String) settings.requestQuery
+    section('Send Requests') {
+      input('requestType', sENUM, (sTIT): 'Request type', options: ['PUT', 'GET'])
+      input('requestPath', sTXT, (sTIT): 'Request path', (sDESC): 'Full path including bed id if needed')
+      input('requestBody', sTXT, (sTIT): 'Request Body in JSON')
+      input('requestQuery', sTXT, (sTIT): 'Extra query key/value pairs in JSON')
+      href('diagnosticsPage', (sTIT): 'Send request', (sDESC): sNL, params: [
+              requestType : gtSetStr('requestType'),
+              requestPath : gtSetStr('requestPath'),
+              requestBody : gtSetStr('requestBody'),
+              requestQuery: gtSetStr('requestQuery')
       ])
       if (params && params.requestPath && params.requestType) {
         Map body; body = null
@@ -990,7 +991,7 @@ Map diagnosticsPage(Map iparams) {
           try {
             body = (Map) wparseJson((String) params.requestBody)
           } catch (e) {
-            maybeLogError("%s : %s", params.requestBody, e)
+            maybeLogError('%s : %s', params.requestBody, e)
           }
         }
         Map query; query = null
@@ -998,27 +999,27 @@ Map diagnosticsPage(Map iparams) {
           try {
             query = (Map) wparseJson((String) params.requestQuery)
           } catch (e) {
-            maybeLogError("%s : %s", params.requestQuery, e)
+            maybeLogError('%s : %s', params.requestQuery, e)
           }
         }
         Map response = httpRequest((String) params.requestPath,
-                (String) params.requestType == "PUT" ? this.&put : this.&get,
+                (String) params.requestType == 'PUT' ? this.&put : this.&get,
                 body,
                 query,
                 true)
         paragraph getMapDescStr(response)
       }
     }
-    section("Authentication") {
-      href "diagnosticsPage", title: "Clear session info", description: null, params: [clearSession: true]
+    section('Authentication') {
+      href 'diagnosticsPage', title: 'Clear session info', description: null, params: [clearSession: true]
       if (params && (Boolean) params.clearSession) {
         state.session = null
       }
     }
     /*
    if you done your way out this happens automatically and avoids missing data
-    section("Misc") {
-      href "diagnosticsPage", title: "Clear bed state info", description: null, params: [clearBedState: true]
+    section('Misc') {
+      href 'diagnosticsPage', title: 'Clear bed state info', description: null, params: [clearBedState: true]
       if (params && (Boolean) params.clearBedState) {
         state.bedInfo = null
       }
@@ -1032,14 +1033,14 @@ Map diagnosticsPage(Map iparams) {
  */
 ChildDeviceWrapper createContainer(String bedId, String containerName, String side) {
   ChildDeviceWrapper container
-  container = ((List<ChildDeviceWrapper>) getChildDevices()).find{ (String) it.typeName == "Virtual Container" &&  (String) it.label == containerName}
+  container = ((List<ChildDeviceWrapper>) getChildDevices()).find{ (String) it.typeName == 'Virtual Container' &&  (String) it.label == containerName}
   if(!container) {
-    debug("Creating container %s", containerName)
+    debug('Creating container %s', containerName)
     try {
-      container = addChildDevice("stephack", "Virtual Container", "${app.id}.${bedId}.${side}", null,
+      container = addChildDevice('stephack', 'Virtual Container', "${app.id}.${bedId}.${side}", null,
           [(sNM): containerName, label: containerName, completedSetup: true])
     } catch (e) {
-      logError("Container device creation failed with error = ", e)
+      logError('Container device creation failed with error = ', e)
       return null
     }
   }
@@ -1051,7 +1052,7 @@ Map getBedData(Boolean async=false) {
   Boolean lazy = async
 
   String myId=gtAid()
-  Integer lastUpd = getLastTsValSecs("lastFamilyDataUpdDt")
+  Integer lastUpd = getLastTsValSecs('lastFamilyDataUpdDt')
   if(familyMapFLD[myId] && ((!lazy && lastUpd < 180) || (lazy && lastUpd <= 550))) {
     debug "Getting CACHED family status ${ devdbg() ? familyMapFLD[myId] : sBLK}"
     addHttpR('/rest/bed/familyStatus' + sCACHE)
@@ -1060,7 +1061,7 @@ Map getBedData(Boolean async=false) {
   }
 
   if(!async){
-    Map responseData = getFamilyStatus(false)
+    Map responseData = getFamilyStatus()
     processBedData(responseData)
     return responseData
   }
@@ -1085,7 +1086,7 @@ Map getBedData(Boolean async=false) {
  */
 void processBedData(Map responseData) {
   if (!responseData || responseData.size() == iZ) {
-    debug "Empty response data"
+    debug 'Empty response data'
     return
   }
   //debug("Response data from SleepNumber: %s", responseData)
@@ -1119,7 +1120,7 @@ void processBedData(Map responseData) {
       Map bedInfoBed; bedInfoBed = bedInfo ? (Map)bedInfo[bedId1] : null
       // Make sure the various bed state info is set up so we can use it later.
       if (!bedInfoBed || !bedInfoBed.components) {
-        warn "state.bedInfo somehow lost, re-caching it"
+        warn 'state.bedInfo somehow lost, re-caching it'
         initializeBedInfo()
         bedInfo = (Map)gtSt('bedInfo')
         bedInfoBed =  bedInfo ? (Map)bedInfo[bedId1] : null
@@ -1147,8 +1148,8 @@ void processBedData(Map responseData) {
         // So far, the presence of "Warming" in the bed status indicates a foot warmer.
         if (!bedFailures[bedId]
             && !footwarmingStatus[bedId]
-            && ((List<String>)bedInfoBed?.components)?.contains("Warming")
-            && (deviceTypes.contains(sFOOTWMR) || deviceTypes.contains("footwarmer"))
+            && ((List<String>)bedInfoBed?.components)?.contains('Warming')
+            && (deviceTypes.contains(sFOOTWMR) || deviceTypes.contains('footwarmer'))
           ) {
           // Only try to update the warming state if the bed actually has it
           // and there's a device for it.
@@ -1223,10 +1224,10 @@ void processBedData(Map responseData) {
         if (underbedLightData[bedId]) {
           Integer outletNumber = bedSideStr == sLEFT ? i3 : i4
           Map outletDataBedOut = outletData[bedId][outletNumber]
-          String bstate = underbedLightData[bedId]?.enableAuto ? "Auto" :
+          String bstate = underbedLightData[bedId]?.enableAuto ? 'Auto' :
               outletDataBedOut?.setting == i1 ? sSTON : sSTOFF
-          String timer = bstate == "Auto" ? "Not set" :
-              outletDataBedOut?.timer ?: "Forever"
+          String timer = bstate == 'Auto' ? 'Not set' :
+              outletDataBedOut?.timer ?: 'Forever'
           def brightness = underbedLightData[bedId]?."fs${bedSideStr}UnderbedLightPWM"
           statusMap << [
             underbedLightState: bstate,
@@ -1294,17 +1295,17 @@ void processBedData(Map responseData) {
           loggedError[bedId] = true
         }
         device.setStatus(statusMap)
-        debug("update device $device side: $bedSideStr status %s", statusMap)
+        debug('update device %s side: %s status %s', device, bedSideStr, statusMap)
         break
       }
     }
   }
   if (bedFailures.size() && state.status == 'Online') {
-    state.status = "Bed / device mismatch"
+    state.status = 'Bed / device mismatch'
   }
   updateLabel()
   if(foundationStatus || footwarmingStatus) {
-    debug("Cached data: %s\n%s", foundationStatus, footwarmingStatus)
+    debug('Cached data: %s\n%s', foundationStatus, footwarmingStatus)
   }
 }
 
@@ -1314,7 +1315,7 @@ Integer convertHexToNumber(String value) {
   try {
     return Integer.parseInt(value, 16)
   } catch (Exception e) {
-    error("Failed to convert non-numeric value %s", e)
+    error('Failed to convert non-numeric value %s', e)
     return iZ
   }
 }
@@ -1322,7 +1323,7 @@ Integer convertHexToNumber(String value) {
 ChildDeviceWrapper findBedDevice(String deviceId) {
   ChildDeviceWrapper device = getBedDevices().find { ChildDeviceWrapper it -> deviceId == (String)it.deviceNetworkId }
   if (!device) {
-    error("Bed device with id %s is not a valid child", deviceId)
+    error('Bed device with id %s is not a valid child', deviceId)
     return null
   }
   return device
@@ -1336,18 +1337,18 @@ ChildDeviceWrapper findBedDevice(String deviceId) {
 @CompileStatic
 Map getBeds(Boolean lazy=false) {
   String myId=gtAid()
-  Integer lastUpd = getLastTsValSecs("lastBedDataUpdDt")
+  Integer lastUpd = getLastTsValSecs('lastBedDataUpdDt')
   if(sleepMapFLD[myId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
     addHttpR('/rest/bed' + sCACHE)
     debug "Getting CACHED information for all beds ${ devdbg() ? sleepMapFLD[myId] : sBLK}"
     return sleepMapFLD[myId]
   }
-  debug "Getting information for all beds"
-  Map res= httpRequest("/rest/bed")
-  if(devdbg()) debug("Response data from SleepNumber: %s", res)
+  debug 'Getting information for all beds'
+  Map res= httpRequest('/rest/bed')
+  if(devdbg()) debug('Response data from SleepNumber: %s', res)
   if(res){
     sleepMapFLD[myId]=res
-    updTsVal("lastBedDataUpdDt")
+    updTsVal('lastBedDataUpdDt')
   }
   return res
 }
@@ -1355,37 +1356,37 @@ Map getBeds(Boolean lazy=false) {
 @Field volatile static Map<String, Map> familyMapFLD      = [:]
 
 @CompileStatic
-Map getFamilyStatus(Boolean lazy=false) {
-  debug "Getting family status"
-  Map res= httpRequest("/rest/bed/familyStatus")
-  if(devdbg()) debug("Response data from SleepNumber: %s", res)
+Map getFamilyStatus() {
+  debug 'Getting family status'
+  Map res= httpRequest('/rest/bed/familyStatus')
+  if(devdbg()) debug('Response data from SleepNumber: %s', res)
   if(res){
     String myId=gtAid()
     familyMapFLD[myId]=res
-    updTsVal("lastFamilyDataUpdDt")
+    updTsVal('lastFamilyDataUpdDt')
   }
   return res
 }
 
 
 void getAsyncFamilyStatus(){
-  debug "Getting family status async"
+  debug 'Getting family status async'
 
   Map sess=(Map)state.session
-  Boolean useAwsO= (Boolean)settings.useAwsOAuth
+  Boolean useAwsO= gtSetB('useAwsOAuth')
   Boolean loginState = useAwsO ? !sess || !sess.accessToken : !sess || !sess.key
   if (loginState) {
     login()
   }
-  String path = "/rest/bed/familyStatus"
+  String path = '/rest/bed/familyStatus'
   Map statusParams = fillParams(path, null, null, useAwsO, sess, true)
-  addHttpR(path + " async")
+  addHttpR(path + ' async')
   try{
-    wrunInMillis(24000L, "timeoutFamily", [data: statusParams])
+    wrunInMillis(24000L, 'timeoutFamily', [data: statusParams])
     asynchttpGet('finishGetAsyncFamilyStatus', statusParams, [:])
   } catch (e) {
     unschedule('timeoutFamily')
-    String err= "Error making family request %s\n%s"
+    String err= 'Error making family request %s\n%s'
     debug(err, statusParams, e)
     timeoutFamily()
   }
@@ -1409,18 +1410,18 @@ void finishGetAsyncFamilyStatus(resp, Map callbackData){
   } else {
     ndata = data as Map
   }
-  if(devdbg()) debug("Response data from SleepNumber: %s", ndata)
+  if(devdbg()) debug('Response data from SleepNumber: %s', ndata)
   if(ndata){
     String myId=gtAid()
     familyMapFLD[myId] = ndata
-    updTsVal("lastFamilyDataUpdDt")
+    updTsVal('lastFamilyDataUpdDt')
     processBedData(ndata)
   }
 }
 
 void timeoutFamily(Map request=null){
   warn "family async request timeout $request"
-  remTsVal("lastFamilyDataUpdDt")
+  remTsVal('lastFamilyDataUpdDt')
   getBedData()
 }
 
@@ -1462,19 +1463,19 @@ private parseMyResp(aa,String mediaType=sNL){
 
 @CompileStatic
 Map getFoundationStatus(String bedId, String currentSide) {
-  debug("Getting Foundation Status for %s / %s", bedId, currentSide)
+  debug('Getting Foundation Status for %s / %s', bedId, currentSide)
   return httpRequest("/rest/bed/${bedId}/foundation/status")
 }
 
 @CompileStatic
 Map getFootWarmingStatus(String bedId) {
-  debug("Getting Foot Warming Status for %s", bedId)
+  debug('Getting Foot Warming Status for %s', bedId)
   return httpRequest("/rest/bed/${bedId}/foundation/footwarming")
 }
 
 @CompileStatic
 Map getResponsiveAirStatus(String bedId) {
-  debug("Getting responsive air status for %s", bedId)
+  debug('Getting responsive air status for %s', bedId)
   return httpRequest("/rest/bed/${bedId}/responsiveAir")
 }
 
@@ -1486,8 +1487,8 @@ void setResponsiveAirState(Boolean st, String devId) {
   //determineResponsiveAirSetup(bedId)
   Map body = [:]
   String side = getBedDeviceSide(device)
-  debug("Setting responsive air state %s to %s", side, st)
-  if (side.toLowerCase() == "right") {
+  debug('Setting responsive air state %s to %s', side, st)
+  if (side.toLowerCase() == 'right') {
     body << [
             rightSideEnabled: st
     ]
@@ -1497,7 +1498,7 @@ void setResponsiveAirState(Boolean st, String devId) {
     ]
   }
   httpRequestQueue(0, path: "/rest/bed/${getBedDeviceId(device)}/responsiveAir",
-          body: body, runAfter: "refreshChildDevices")
+          body: body, runAfter: 'refreshChildDevices')
 }
 
 
@@ -1513,11 +1514,11 @@ void setFoundationAdjustment(Map params, String devId) {
   String actu= (String)params?.actuator
   Integer pos= (Integer)params?.position
   if (!actu || pos == null) {
-    error("Missing param values, actuator and position are required")
+    error('Missing param values, actuator and position are required')
     return
   }
   if (!VALID_ACTUATORS.contains(actu)) {
-    error("Invalid actuator %s, valid values are %s", actu, VALID_ACTUATORS)
+    error('Invalid actuator %s, valid values are %s', actu, VALID_ACTUATORS)
     return
   }
   Map body = [
@@ -1529,12 +1530,12 @@ void setFoundationAdjustment(Map params, String devId) {
   // It takes ~35 seconds for a FlexFit3 head to go from 0-100 (or back) and about 18 seconds for the foot.
   // The timing appears to be linear which means it's 0.35 seconds per level adjusted for the head and 0.18
   // for the foot.
-  Integer currentPosition = actu == "H" ? device.currentValue("headPosition") : device.currentValue("footPosition")
+  Integer currentPosition = actu == 'H' ? device.currentValue('headPosition') : device.currentValue('footPosition')
   Integer positionDelta = Math.abs(pos - currentPosition)
-  Float movementDuration = actu == "H" ? 0.35 : 0.18
+  Float movementDuration = actu == 'H' ? 0.35 : 0.18
   Integer waitTime = Math.round(movementDuration * positionDelta).toInteger() + i1
   httpRequestQueue(waitTime, path: "/rest/bed/${getBedDeviceId(device)}/foundation/adjustment/micro",
-      body: body, runAfter: "refreshChildDevices")
+      body: body, runAfter: 'refreshChildDevices')
 }
 
 /**
@@ -1549,15 +1550,15 @@ void setFootWarmingState(Map params, String devId) {
   Integer ptemp = (Integer)params?.temp
   Integer ptimer = (Integer)params?.timer
   if (ptemp == null || ptimer == null) {
-    error("Missing param values, temp and timer are required")
+    error('Missing param values, temp and timer are required')
     return
   }
   if (!VALID_WARMING_TIMES.contains(ptimer)) {
-    error("Invalid warming time %s, valid values are %s", ptimer, VALID_WARMING_TIMES)
+    error('Invalid warming time %s, valid values are %s', ptimer, VALID_WARMING_TIMES)
     return
   }
   if (!VALID_WARMING_TEMPS.contains(ptemp)) {
-    error("Invalid warming temp %s, valid values are %s", ptemp, VALID_WARMING_TEMPS)
+    error('Invalid warming temp %s, valid values are %s', ptemp, VALID_WARMING_TEMPS)
     return
   }
   String sid = getBedDeviceSide(device)
@@ -1566,7 +1567,7 @@ void setFootWarmingState(Map params, String devId) {
           ("footWarmingTimer${sid}".toString()): ptimer
   ]
   httpRequestQueue(0, path: "/rest/bed/${getBedDeviceId(device)}/foundation/footwarming",
-      body: body, runAfter: "refreshChildDevices")
+      body: body, runAfter: 'refreshChildDevices')
 }
 
 /**
@@ -1576,21 +1577,21 @@ void setFootWarmingState(Map params, String devId) {
 void setFoundationTimer(Map params, String devId) {
   ChildDeviceWrapper device = findBedDevice(devId)
   if (!device) {
-    error("Bed device with id %s is not a valid child", devId)
+    error('Bed device with id %s is not a valid child', devId)
     return
   }
   Integer ppreset = (Integer)params?.preset
   Integer ptimer = (Integer)params?.timer
   if (ppreset == null || ptimer == null) {
-    error("Missing param values, preset and timer are required")
+    error('Missing param values, preset and timer are required')
     return
   }
   if (!VALID_PRESETS.contains(ppreset)) {
-    error("Invalid preset %s, valid values are %s", ppreset, VALID_PRESETS)
+    error('Invalid preset %s, valid values are %s', ppreset, VALID_PRESETS)
     return
   }
   if (!VALID_PRESET_TIMES.contains(ptimer)) {
-    error("Invalid timer %s, valid values are %s", ptimer, VALID_PRESET_TIMES)
+    error('Invalid timer %s, valid values are %s', ptimer, VALID_PRESET_TIMES)
     return
   }
   Map body = [
@@ -1599,7 +1600,7 @@ void setFoundationTimer(Map params, String devId) {
     positionTimer: ptimer
   ]
   httpRequestQueue(5, path: "/rest/bed/${getBedDeviceId(device)}/foundation/adjustment",
-          body: body, runAfter: "refreshChildDevices")
+          body: body, runAfter: 'refreshChildDevices')
 }
 
 /**
@@ -1611,7 +1612,7 @@ void setFoundationPreset(Integer preset, String devId) {
     return
   }
   if (!VALID_PRESETS.contains(preset)) {
-    error("Invalid preset %s, valid values are %s", preset, VALID_PRESETS)
+    error('Invalid preset %s, valid values are %s', preset, VALID_PRESETS)
     return
   }
   Map body = [
@@ -1623,7 +1624,7 @@ void setFoundationPreset(Integer preset, String devId) {
   // Rather than attempt to derive the preset relative to the current state so we can compute
   // the time (as we do for adjustment), we just use the maximum.
   httpRequestQueue(35, path: "/rest/bed/${getBedDeviceId(device)}/foundation/preset",
-      body: body, runAfter: "refreshChildDevices")
+      body: body, runAfter: 'refreshChildDevices')
 }
 
 void stopFoundationMovement(Map ignored, String devId) {
@@ -1637,9 +1638,9 @@ void stopFoundationMovement(Map ignored, String devId) {
     footMotion: i1,
     side: getBedDeviceSide(device)[iZ]
   ]
-  remTsVal("lastFamilyDataUpdDt")
+  remTsVal('lastFamilyDataUpdDt')
   httpRequestQueue(5, path: "/rest/bed/${getBedDeviceId(device)}/foundation/motion",
-          body: body, runAfter: "refreshChildDevices")
+          body: body, runAfter: 'refreshChildDevices')
 }
 
 /**
@@ -1659,7 +1660,7 @@ void setSleepNumber(Integer number, String devId) {
   ]
   // Not sure how long it takes to inflate or deflate so just wait 20s
   httpRequestQueue(20, path: "/rest/bed/${id}/sleepNumber",
-      body: body, runAfter: "refreshChildDevices")
+      body: body, runAfter: 'refreshChildDevices')
 }
 
 @Field volatile static Map<String, Map> privacyMapFLD      = [:]
@@ -1669,18 +1670,18 @@ void setSleepNumber(Integer number, String devId) {
  */
 @CompileStatic
 String getPrivacyMode(String bedId, Boolean lazy=false) {
-  Integer lastUpd = getLastTsValSecs("lastPrivacyDataUpdDt")
+  Integer lastUpd = getLastTsValSecs('lastPrivacyDataUpdDt')
   if(privacyMapFLD[bedId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
     addHttpR("/rest/bed/${bedId}/pauseMode" + sCACHE)
     debug "Getting CACHED Privacy Mode for ${bedId} ${ devdbg() ? privacyMapFLD[bedId] : sBLK}"
     return (String)privacyMapFLD[bedId].pauseMode
   }
-  debug("Getting Privacy Mode for %s", bedId)
+  debug('Getting Privacy Mode for %s', bedId)
   Map res= httpRequest("/rest/bed/${bedId}/pauseMode")
-  if(devdbg()) debug("Response data from SleepNumber: %s", res)
+  if(devdbg()) debug('Response data from SleepNumber: %s', res)
   if(res){
     privacyMapFLD[bedId]=res
-    updTsVal("lastPrivacyDataUpdDt")
+    updTsVal('lastPrivacyDataUpdDt')
   }
   return (String)res?.pauseMode
 }
@@ -1692,29 +1693,29 @@ void setPrivacyMode(Boolean mode, String devId) {
   }
   String pauseMode = mode ? sON : sOFF
   // Cloud request
-  remTsVal("lastPrivacyDataUpdDt")
-  remTsVal("lastFamilyDataUpdDt")
-  remTsVal("lastSleeperDataUpdDt")
+  remTsVal('lastPrivacyDataUpdDt')
+  remTsVal('lastFamilyDataUpdDt')
+  remTsVal('lastSleeperDataUpdDt')
   httpRequestQueue(2, path: "/rest/bed/${getBedDeviceId(device)}/pauseMode",
-          query: [mode: pauseMode], runAfter: "refreshChildDevices")
+          query: [mode: pauseMode], runAfter: 'refreshChildDevices')
 }
 
 @Field volatile static Map<String, Map> sleepNumMapFLD      = [:]
 
 @CompileStatic
 Map getSleepNumberFavorite(String bedId, Boolean lazy=false) {
-  Integer lastUpd = getLastTsValSecs("lastSleepFavoriteUpdDt")
+  Integer lastUpd = getLastTsValSecs('lastSleepFavoriteUpdDt')
   if(sleepNumMapFLD[bedId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
     addHttpR("/rest/bed/${bedId}/sleepNumberFavorite" + sCACHE)
     debug "Getting CACHED Sleep Number Favorites ${ devdbg() ? sleepNumMapFLD[bedId] : sBLK}"
     return sleepNumMapFLD[bedId]
   }
-  debug "Getting Sleep Number Favorites"
+  debug 'Getting Sleep Number Favorites'
   Map res= httpRequest("/rest/bed/${bedId}/sleepNumberFavorite")
-  if(devdbg()) debug("Response data from SleepNumber: %s", res)
+  if(devdbg()) debug('Response data from SleepNumber: %s', res)
   if(res){
     sleepNumMapFLD[bedId]=res
-    updTsVal("lastSleepFavoriteUpdDt")
+    updTsVal('lastSleepFavoriteUpdDt')
   }
   return res
 }
@@ -1727,15 +1728,15 @@ void setSleepNumberFavorite(String ignored, String devId) {
   }
   // Get the favorite for the device first, the most recent poll should be accurate
   // enough.
-  Integer favorite = device.currentValue("sleepNumberFavorite")
+  Integer favorite = device.currentValue('sleepNumberFavorite')
   String sid=getBedDeviceSide(device)
   debug "sleep number favorite for ${sid} is ${favorite}"
   if (!favorite || favorite < iZ) {
-    error("Unable to determine sleep number favorite for side %s", sid)
+    error('Unable to determine sleep number favorite for side %s', sid)
     return
   }
-  if (device.currentValue("sleepNumber") == favorite) {
-    debug "Already at favorite"
+  if (device.currentValue('sleepNumber') == favorite) {
+    debug 'Already at favorite'
     return
   }
   setSleepNumber(favorite, devId)
@@ -1748,13 +1749,13 @@ void updateSleepNumberFavorite(Integer number, String devId) {
     return
   }
   Integer dfavorite = (Math.round(number/5)*5).toInteger()
-  Integer favorite = device.currentValue("sleepNumberFavorite")
+  Integer favorite = device.currentValue('sleepNumberFavorite')
   String sid=getBedDeviceSide(device)
   debug "update sleep number favorite for ${sid} to ${dfavorite}, is ${favorite}"
 
   if (dfavorite && dfavorite > iZ && dfavorite <= 100) {
     if (dfavorite == favorite) {
-      debug "Already at favorite"
+      debug 'Already at favorite'
       return
     }
     // side "R" or "L"
@@ -1771,7 +1772,7 @@ void updateSleepNumberFavorite(Integer number, String devId) {
   } else {
     logError "Unable to update sleep number favorite for side ${sid} ${number}"
   }
-  remTsVal("lastSleepFavoriteUpdDt")
+  remTsVal('lastSleepFavoriteUpdDt')
 }
 //RIGHT_NIGHT_STAND = 1
 //LEFT_NIGHT_STAND = 2
@@ -1851,7 +1852,7 @@ void setFoundationMassage(Integer ifootspeed, Integer iheadspeed, Integer itimer
     side: sid[iZ]
   ]
   httpRequestQueue(1, path: "/rest/bed/${id}/foundation/adjustment",
-        body: body, runAfter: "refreshChildDevices")
+        body: body, runAfter: 'refreshChildDevices')
 }
 
 @Field volatile static Map<String, Map> outletMapFLD      = [:]
@@ -1861,7 +1862,7 @@ void setFoundationMassage(Integer ifootspeed, Integer iheadspeed, Integer itimer
  */
 @CompileStatic
 Map getOutletState(String bedId, Integer outlet) {
-  String val = "lastOutletUpdDt" + "${outlet}"
+  String val = 'lastOutletUpdDt' + outlet.toString()
   String idx = bedId+'_'+outlet.toString()
   Integer lastUpd = getLastTsValSecs(val)
   if(outletMapFLD[idx] && lastUpd <= 180) {
@@ -1872,7 +1873,7 @@ Map getOutletState(String bedId, Integer outlet) {
   debug "Getting Outlet data ${outlet}"
   Map res = httpRequest("/rest/bed/${bedId}/foundation/outlet",
         this.&get, null, [outletId: outlet])
-  if(devdbg()) debug("Response data from SleepNumber: %s", res)
+  if(devdbg()) debug('Response data from SleepNumber: %s', res)
   if(res){
     outletMapFLD[idx]=res
     updTsVal(val)
@@ -1886,7 +1887,7 @@ void setOutletState(String outletState, String devId) {
     return
   }
   if (!outletState) {
-    error "Missing outletState"
+    error 'Missing outletState'
     return
   }
   Integer outletNum = getBedDeviceSide(device) == sLEFT ? i1 : i2
@@ -1907,12 +1908,12 @@ void setOutletState(String bedId, Integer outletId, String ioutletState, Integer
   String outletState; outletState=ioutletState
   Integer timer; timer=itimer
   if (!bedId || !outletId || !outletState) {
-    error "Not all required arguments present"
+    error 'Not all required arguments present'
     return
   }
 
   if (timer && !VALID_LIGHT_TIMES.contains(timer)) {
-    error("Invalid underbed light timer %s.  Valid values are %s", timer, VALID_LIGHT_TIMES)
+    error('Invalid underbed light timer %s.  Valid values are %s', timer, VALID_LIGHT_TIMES)
     return
   }
 
@@ -1930,10 +1931,10 @@ void setOutletState(String bedId, Integer outletId, String ioutletState, Integer
     outletId: outletId
   ]
   String path = "/rest/bed/${bedId}/foundation/outlet"
-  String val = "lastOutletUpdDt" + "${outletId}"
+  String val = 'lastOutletUpdDt' + outletId.toString()
   remTsVal(val)
     if (refresh) {
-      httpRequestQueue(2, path: path, body: body, runAfter: "refreshChildDevices")
+      httpRequestQueue(2, path: path, body: body, runAfter: 'refreshChildDevices')
     } else {
       httpRequestQueue(0, path: path, body: body)
     }
@@ -1949,18 +1950,18 @@ Map getUnderbedLightState(String bedId) {
 
 @CompileStatic
 Map getFoundationSystem(String bedId) {
-  Integer lastUpd = getLastTsValSecs("lastFoundationSystemUpdDt")
+  Integer lastUpd = getLastTsValSecs('lastFoundationSystemUpdDt')
   if(foundationSystemMapFLD[bedId] && lastUpd <= 14400) {
     addHttpR("/rest/bed/${bedId}/foundation/system" + sCACHE)
     debug "Getting CACHED Foundation System ${ devdbg() ? foundationSystemMapFLD[bedId] : sBLK}"
     return foundationSystemMapFLD[bedId]
   }
-  debug "Getting Foundation System"
+  debug 'Getting Foundation System'
   Map res= httpRequest("/rest/bed/${bedId}/foundation/system", this.&get)
-  if(devdbg()) debug("Response data from SleepNumber: %s", res)
+  if(devdbg()) debug('Response data from SleepNumber: %s', res)
   if(res){
     foundationSystemMapFLD[bedId]=res
-    updTsVal("lastFoundationSystemUpdDt")
+    updTsVal('lastFoundationSystemUpdDt')
   }
   return res
 }
@@ -1991,7 +1992,7 @@ Map getUnderbedLightBrightness(String bedId) {
 void determineUnderbedLightSetup(String bedId) {
   Map<String,Map> bdinfo= (Map<String,Map>)state.bedInfo
   if (bdinfo[bedId].underbedoutlets == null) {
-    debug("Determining underbed lighting outlets for %s", bedId)
+    debug('Determining underbed lighting outlets for %s', bedId)
     // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
     // Determine if this bed has 1 or 2 underbed lighting outlets and store for future use.
     Map outlet3 = getOutletState(bedId, i3)
@@ -2025,7 +2026,7 @@ void setUnderbedLightState(Map params, String devId) {
   }
 
   if (!params.state) {
-    error "Missing param state"
+    error 'Missing param state'
     return
   }
 
@@ -2035,7 +2036,7 @@ void setUnderbedLightState(Map params, String devId) {
   pb= (Integer)params.brightness
 
   // A timer with a state of auto makes no sense, choose to honor state vs. timer.
-  if (ps == "auto") {
+  if (ps == 'auto') {
     pt = iZ
   }
   if (pt) {
@@ -2043,13 +2044,13 @@ void setUnderbedLightState(Map params, String devId) {
   }
 
   if (pb && !VALID_LIGHT_BRIGHTNESS.contains(pb)) {
-    error("Invalid underbed light brightness %s. Valid values are %s", pb, VALID_LIGHT_BRIGHTNESS)
+    error('Invalid underbed light brightness %s. Valid values are %s', pb, VALID_LIGHT_BRIGHTNESS)
     return
   }
 
   // First set the light state.
   Map body; body = [
-    enableAuto: ps == "auto"
+    enableAuto: ps == 'auto'
   ]
   String id = getBedDeviceId(device)
   httpRequestQueue(2, path: "/rest/bed/${id}/foundation/underbedLight", body: body)
@@ -2081,9 +2082,7 @@ void setUnderbedLightState(Map params, String devId) {
     httpRequestQueue(2, path: "/rest/bed/${id}/foundation/system", body: body)
   }
   setOutletState(id, outletNum,
-          ps == "auto" ? sOFF : ps, pt, false)
-
-  wrunIn(10L, "refreshChildDevices")
+          ps == 'auto' ? sOFF : ps, pt, true)
 }
 
 /**
@@ -2095,7 +2094,7 @@ void setUnderbedLightState(Map params, String devId) {
 void determineOutletSetup(String bedId) {
   Map<String,Map> bdinfo= (Map<String,Map>)state.bedInfo
   if (bdinfo[bedId].outlets == null) {
-    debug("Determining outlets for %s", bedId)
+    debug('Determining outlets for %s', bedId)
     // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
     // Determine if this bed has 1 or 2 outlets and store for future use.
     Map outlet1 = getOutletState(bedId, i1)
@@ -2116,7 +2115,7 @@ void determineOutletSetup(String bedId) {
 
 @CompileStatic
 Map getSleepers(Boolean lazy=false) {
-  Integer lastUpd = getLastTsValSecs("lastSleeperDataUpdDt")
+  Integer lastUpd = getLastTsValSecs('lastSleeperDataUpdDt')
   String myId=gtAid()
   String path = '/rest/sleeper'
   if(sleepersMapFLD[myId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
@@ -2124,12 +2123,12 @@ Map getSleepers(Boolean lazy=false) {
     debug "Getting CACHED Sleepers ${ devdbg() ? sleepersMapFLD[myId] : sBLK}"
     return sleepersMapFLD[myId]
   }
-  debug "Getting Sleepers"
+  debug 'Getting Sleepers'
   Map res = httpRequest(path, this.&get)
-  if(devdbg()) debug("Response data from SleepNumber: %s", res)
+  if(devdbg()) debug('Response data from SleepNumber: %s', res)
   if(res){
     sleepersMapFLD[myId]=res
-    updTsVal("lastSleeperDataUpdDt")
+    updTsVal('lastSleeperDataUpdDt')
   }
   return res
 }
@@ -2150,7 +2149,7 @@ Map getSleepData(Map ignored, String devId) {
   // Get sleeper to get list of sleeper ids
   Map sleepers = getSleepers(true)
 
-  debug("Getting sleeper ids for %s", bedId)
+  debug('Getting sleeper ids for %s', bedId)
   for (Map sleeper in (List<Map>)sleepers.sleepers) {
     if ((String)sleeper.bedId == bedId) {
       String side; side=sNL
@@ -2162,7 +2161,7 @@ Map getSleepData(Map ignored, String devId) {
           side = sRIGHT
           break
         default:
-          warn("Unknown sleeper info: %s", sleeper)
+          warn('Unknown sleeper info: %s', sleeper)
       }
       if (side != sNL) {
         ids[side] = sleeper.sleeperId
@@ -2171,33 +2170,33 @@ Map getSleepData(Map ignored, String devId) {
   }
 
   String sid=getBedDeviceSide(device)
-  debug("Getting sleep data for $device %s", ids[sid])
+  debug('Getting sleep data for %s %s', device, ids[sid])
   // Interval can be W1 for a week, D1 for a day and M1 for a month.
-  Map res = httpRequest("/rest/sleepData", this.&get, null, [
-      interval: "D1",
+  Map res = httpRequest('/rest/sleepData', this.&get, null, [
+      interval: 'D1',
       sleeper: ids[sid],
       includeSlices: false,
       date: new Date().format("yyyy-MM-dd'T'HH:mm:ss")
   ])
-  if(devdbg()) debug("Response data from SleepNumber: %s", res)
+  if(devdbg()) debug('Response data from SleepNumber: %s', res)
   return res
 }
 
 void loginAws() {
-  debug "Logging in (AWS)"
+  debug 'Logging in (AWS)'
   if (state.session?.refreshToken) {
     state.session.accessToken = null
     try {
       JSONObject jsonBody = new JSONObject()
-      jsonBody.put("RefreshToken", (String)state.session.refreshToken)
-      jsonBody.put("ClientID", LOGIN_CLIENT_ID)
+      jsonBody.put('RefreshToken', (String)state.session.refreshToken)
+      jsonBody.put('ClientID', LOGIN_CLIENT_ID)
       Map params = [
-              uri: LOGIN_URL + "/Prod/v1/token",
-              requestContentType: "application/json",
-              contentType: "application/json",
+              uri: LOGIN_URL + '/Prod/v1/token',
+              requestContentType: 'application/json',
+              contentType: 'application/json',
               headers: [
-                      "Host": LOGIN_HOST,
-                      "User-Agent": USER_AGENT,
+                      'Host': LOGIN_HOST,
+                      'User-Agent': USER_AGENT,
               ],
               body: jsonBody.toString(),
               timeout: 20
@@ -2205,15 +2204,15 @@ void loginAws() {
       addHttpR('/Prod/v1/token')
       httpPut(params) { response ->
         if (response.success) {
-          debug("refresh Success: (%s), %s", response.status, devdbg() ? response.data : 'redacted')
+          debug('refresh Success: (%s), %s', response.status, devdbg() ? response.data : 'redacted')
           state.session.accessToken = response.data.data.AccessToken
           // Refresh the access token 1 minute before it expires
-          runIn((response.data.data.ExpiresIn - 60), login)
-          state.status = "Online"
+          wrunIn(((Integer)response.data.data.ExpiresIn - 60).toLong(), 'login')
+          state.status = 'Online'
         } else {
           // If there's a failure here then purge all session data to force clean slate
           state.session = null
-          maybeLogError("login Failure refreshing Token: (%s) %s", response.status, response.data)
+          maybeLogError('login Failure refreshing Token: (%s) %s', response.status, response.data)
           state.status = sLOGINERR
         }
       }
@@ -2227,14 +2226,14 @@ void loginAws() {
     state.session = null
     try {
       JSONObject jsonBody = new JSONObject()
-      jsonBody.put("Email", (String)settings.login)
-      jsonBody.put("Password", (String)settings.password)
-      jsonBody.put("ClientID", LOGIN_CLIENT_ID)
+      jsonBody.put('Email', gtSetStr('login'))
+      jsonBody.put('Password', gtSetStr('password'))
+      jsonBody.put('ClientID', LOGIN_CLIENT_ID)
       Map params = [
-              uri: LOGIN_URL + "/Prod/v1/token",
+              uri: LOGIN_URL + '/Prod/v1/token',
               headers: [
-                      "Host": LOGIN_HOST,
-                      "User-Agent": USER_AGENT,
+                      'Host': LOGIN_HOST,
+                      'User-Agent': USER_AGENT,
               ],
               body: jsonBody.toString(),
               timeout: 20
@@ -2242,16 +2241,16 @@ void loginAws() {
       addHttpR('/Prod/v1/token Json')
       httpPostJson(params) { response ->
         if (response.success) {
-          debug("login Success: (%s), %s", response.status, devdbg() ? response.data : 'redacted')
+          debug('login Success: (%s), %s', response.status, devdbg() ? response.data : 'redacted')
           state.session = [:]
           state.session.accessToken = response.data.data.AccessToken
           state.session.refreshToken = response.data.data.RefreshToken
           // Refresh the access token 1 minute before it expires
-          runIn((response.data.data.ExpiresIn - 60), login)
+          wrunIn(((Integer)response.data.data.ExpiresIn - 60).toLong(), 'login')
           // Get cookies since this is all new state
           loginCookie()
         } else {
-          maybeLogError("login Failure getting Token: (%s) %s", response.status, response.data)
+          maybeLogError('login Failure getting Token: (%s) %s', response.status, response.data)
           state.status = sLOGINERR
         }
       }
@@ -2265,13 +2264,13 @@ void loginAws() {
 void loginCookie() {
   state.session.cookies = null
   try {
-    debug "Getting cookie"
+    debug 'Getting cookie'
     Map params = [
-            uri: API_URL + "/rest/account",
+            uri: API_URL + '/rest/account',
             headers: [
-                    "Host": API_HOST,
-                    "User-Agent": USER_AGENT,
-                    "Authorization": state.session.accessToken,
+                    'Host': API_HOST,
+                    'User-Agent': USER_AGENT,
+                    'Authorization': state.session.accessToken,
             ],
             timeout: 20
     ]
@@ -2282,54 +2281,54 @@ void loginCookie() {
         //Map sess=[:]
         //sess.key = response.data.key
         //sess.cookies = sBLK
-        response.getHeaders("Set-Cookie").each {
-          String[] cookieInfo = ((String)it.value).split(";")
-          state.session.cookies = (String)state.session.cookies + cookieInfo[iZ] + ";"
+        response.getHeaders('Set-Cookie').each {
+          String[] cookieInfo = ((String)it.value).split(';')
+          state.session.cookies = (String)state.session.cookies + cookieInfo[iZ] + ';'
           // find the expires value if it exists
           if (!expiration) {
             for (String cookie in cookieInfo) {
-              if (cookie.contains("Expires=")) {
-                expiration = cookie.split("=")[i1]
+              if (cookie.contains('Expires=')) {
+                expiration = cookie.split('=')[i1]
               }
             }
           }
         }
         Date refreshDate
         if (expiration == sNL) {
-          maybeLogError("No expiration for any cookie found in response: %s", response.getHeaders("Set-Cookie"))
+          maybeLogError('No expiration for any cookie found in response: %s', response.getHeaders('Set-Cookie'))
           refreshDate = new Date() + 1
         } else {
           refreshDate = new Date (ZonedDateTime.parse(expiration,
                   DateTimeFormatter.RFC_1123_DATE_TIME).minusDays(1L).toInstant().toEpochMilli())
         }
         runOnce(refreshDate, loginCookie)
-        state.status = "Online"
+        state.status = 'Online'
       } else {
-        maybeLogError("login Failure getting Cookie: (%s), %s", response.status, response.data)
+        maybeLogError('login Failure getting Cookie: (%s), %s', response.status, response.data)
         state.status = sLOGINERR
       }
     }
   } catch (Exception e) {
-    maybeLogError("loginCookie Error", e)
+    maybeLogError('loginCookie Error', e)
     state.status = sLOGINERR
   }
 }
 
 void loginOld() {
-  debug "Logging in (old)"
+  debug 'Logging in (old)'
   state.session = null
   try {
     JSONObject jsonBody = new JSONObject()
-    jsonBody.put("login", (String)settings.login)
-    jsonBody.put("password", (String)settings.password)
+    jsonBody.put('login', gtSetStr('login'))
+    jsonBody.put('password', gtSetStr('password'))
     Map params = [
-      uri: API_URL + "/rest/login",
-      requestContentType: "application/json",
-      contentType: "application/json",	
+      uri: API_URL + '/rest/login',
+      requestContentType: 'application/json',
+      contentType: 'application/json',
       headers: [
-        "Host": API_HOST,
-        "User-Agent": USER_AGENT,
-        "DNT": "1",
+        'Host': API_HOST,
+        'User-Agent': USER_AGENT,
+        'DNT': '1',
       ],
       body: jsonBody.toString(),
       timeout: i20
@@ -2337,17 +2336,17 @@ void loginOld() {
     addHttpR('/rest/login')
     httpPut(params) { response ->
       if (response.success) {
-        debug("login Success: (%s), %s", response.status, devdbg() ? response.data : 'redacted')
+        debug('login Success: (%s), %s', response.status, devdbg() ? response.data : 'redacted')
         Map sess=[:]
         sess.key = response.data.key
         sess.cookies = sBLK
-        response.getHeaders("Set-Cookie").each {
-          sess.cookies = sess.cookies + ((String)it.value).split(";")[iZ] + ";"
+        response.getHeaders('Set-Cookie').each {
+          sess.cookies = sess.cookies + ((String)it.value).split(';')[iZ] + ';'
         }
         state.session = sess
-        state.status = "Online"
+        state.status = 'Online'
       } else {
-        maybeLogError("login Failure: (%s) %s", response.status, response.data)
+        maybeLogError('login Failure: (%s) %s', response.status, response.data)
         state.status = sLOGINERR
       }
     }
@@ -2360,7 +2359,7 @@ void loginOld() {
 @Field static final String sLOGINERR = 'Login Error'
 
 void login() {
-  if ((Boolean) settings.useAwsOAuth) {
+  if (gtSetB('useAwsOAuth')) {
     loginAws()
   } else {
     loginOld()
@@ -2397,7 +2396,7 @@ void httpRequestQueue(Map args, Integer duration) {
 void handleRequestQueue(Boolean releaseLock = false) {
   if (releaseLock) {
     mutex.release()
-    debug "released lock"
+    debug 'released lock'
   }
   if (requestQueue.isEmpty()) return
   if(!lastLockTime) lastLockTime=now()
@@ -2417,17 +2416,17 @@ void handleRequestQueue(Boolean releaseLock = false) {
         if ((now() - lastLockTime) > 120000L /* 2 minutes */) {
           lastLockTime = now()
           if(!mutex.tryAcquire()){
-            warn "HTTP queue lock was held for more than 2 minutes, forcing release"
+            warn 'HTTP queue lock was held for more than 2 minutes, forcing release'
           }
           // In this case we should re-run.
-          remTsVal("lastFamilyDataUpdDt")
+          remTsVal('lastFamilyDataUpdDt')
           handleRequestQueue(true)
         }
       }
       return
     }
     lastLockTime = now()
-    debug "got lock"
+    debug 'got lock'
     Map request = (Map) requestQueue.poll()
     if (request) {
       ahttpRequest(request) // this can take a long time
@@ -2435,7 +2434,7 @@ void handleRequestQueue(Boolean releaseLock = false) {
       mutex.release()
     }
   } catch (Exception e) {
-    maybeLogError("Failed to run HTTP queue", e)
+    maybeLogError('Failed to run HTTP queue', e)
     mutex.release()
   }
 }
@@ -2460,25 +2459,25 @@ Map fillParams(String path, Map body, Map query, Boolean useAwsO, Map sess, Bool
   Map statusParams = [
           uri: API_URL,
           path: path,
-          requestContentType: "application/json",
-          contentType: "application/json",
+          requestContentType: 'application/json',
+          contentType: 'application/json',
           headers: [
-                  "Host": API_HOST,
-                  "User-Agent": USER_AGENT,
-                  "Cookie": sess?.cookies,
-                  "DNT": "1",
-                  "Accept-Version": SN_APP_VERSION,
-                  "X-App-Version": SN_APP_VERSION,
+                  'Host': API_HOST,
+                  'User-Agent': USER_AGENT,
+                  'Cookie': sess?.cookies,
+                  'DNT': '1',
+                  'Accept-Version': SN_APP_VERSION,
+                  'X-App-Version': SN_APP_VERSION,
           ],
           query: queryString,
           body: payload,
           timeout: i20
   ]
   if (useAwsO) {
-    statusParams.headers["Authorization"] = sess.accessToken
+    statusParams.headers['Authorization'] = sess.accessToken
   }
   String s; s= "Sending request for ${path} with query ${queryString}"
-  if (async) s+= " : ASYNC"
+  if (async) s+= ' : ASYNC'
   if (payload) s+= " : ${payload}"
   debug s
   return statusParams
@@ -2493,11 +2492,11 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
                 Boolean alreadyTriedRequest = false, Boolean async = false, Map qReq=null) {
   Map result; result = [:]
   Map sess=(Map)state.session
-  Boolean useAwsO= (Boolean)settings.useAwsOAuth
+  Boolean useAwsO= gtSetB('useAwsOAuth')
   Boolean loginState = useAwsO ? !sess || !sess.accessToken : !sess || !sess.key
   if (loginState) {
     if (alreadyTriedRequest) {
-      maybeLogError "Already attempted login but still no session key, giving up"
+      maybeLogError 'Already attempted login but still no session key, giving up'
       return result
     } else {
       login()
@@ -2512,7 +2511,7 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
   addHttpR(path+addstr)
   try {
     if(async){
-      wrunInMillis(24000L, "timeoutAreq", [data: qReq])
+      wrunInMillis(24000L, 'timeoutAreq', [data: qReq])
       asynchttpPut('ahttpRequestHandler', statusParams, [command: qReq])
       return [:]
     } else {
@@ -2520,7 +2519,7 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
         if (response.success) {
           result = response.data
         } else {
-          maybeLogError("Failed request for %s %s with payload %s:(%s) %s",
+          maybeLogError('Failed request for %s %s with payload %s:(%s) %s',
                   path, statusParams.queryString, statusParams.body, response.status, response.data)
           state.status = sAPIERR
           updateLabel()
@@ -2531,9 +2530,9 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
     return result
   } catch (Exception e) {
     if(async){ unschedule('timeoutAreq') }
-    if (e.toString().contains("Unauthorized") && !alreadyTriedRequest) {
+    if (e.toString().contains('Unauthorized') && !alreadyTriedRequest) {
       // The session is invalid so retry login before giving up.
-      info "Unauthorized, retrying login"
+      info 'Unauthorized, retrying login'
       login()
       result = httpRequest(path, method, body, query, true)
       if(async){ timeoutAreq() }
@@ -2542,14 +2541,14 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
       // There was some other error so retry if that hasn't already been done
       // otherwise give up.  Not Found errors won't improve with retry to don't
       // bother.
-      if (!alreadyTriedRequest && !e.toString().contains("Not Found")) {
-        maybeLogError("Retrying failed request %s\n%s", statusParams, e)
+      if (!alreadyTriedRequest && !e.toString().contains('Not Found')) {
+        maybeLogError('Retrying failed request %s\n%s', statusParams, e)
         result = httpRequest(path, method, body, query, true)
         if(async){ timeoutAreq() }
         return result
       } else {
-        String err= "Error making request %s\n%s"
-        if (e.toString().contains("Not Found")) {
+        String err= 'Error making request %s\n%s'
+        if (e.toString().contains('Not Found')) {
           // Don't bother polluting logs for Not Found errors as they are likely
           // either intentional (trying to figure out if outlet exists) or a code
           // bug.  In the latter case we still want diagnostic data so we use
@@ -2582,31 +2581,31 @@ void ahttpRequestHandler(resp,Map callbackData){
   Long rd; rd= ((Integer)request.duration).toLong()
   // Let this operation complete then process more requests and release the lock
   // throttle requests to 1 per second
-  if(rd > 0L) wrunInMillis(Math.round(rd * 1000.0D), "handleRequestQueue", [data: true])
-  else wrunInMillis(Math.round(1000.0D), "handleRequestQueue", [data: true])
+  if(rd > 0L) wrunInMillis(Math.round(rd * 1000.0D), 'handleRequestQueue', [data: true])
+  else wrunInMillis(Math.round(1000.0D), 'handleRequestQueue', [data: true])
 
   // If there was something to run after this then set that up as well.
   String ra = (String)request.runAfter
   if (ra) {
-    remTsVal("lastFamilyDataUpdDt")
+    remTsVal('lastFamilyDataUpdDt')
     if(rd < 1L) rd = 4L
     wrunIn(rd, ra)// [overwrite:false])
   }
-  debug "finishing async request $rCode; delay to next operation $rd seconds" + ra ? " with runafter" : sBLK
+  debug "finishing async request $rCode; delay to next operation $rd seconds" + ra ? ' with runafter' : sBLK
 }
 
 void timeoutAreq(Map request=null){
   warn "async request timeout $request"
   handleRequestQueue(true)
-  remTsVal("lastFamilyDataUpdDt")
-  wrunIn(10L, "refreshChildDevices")
+  remTsVal('lastFamilyDataUpdDt')
+  wrunIn(10L, 'refreshChildDevices')
 }
 
 
 
 /*------------------ Logging helpers ------------------*/
 Boolean okToLogError() {
-  String level = (String) settings.logLevel
+  String level = gtSetStr('logLevel')
   if (level != sNL && level.toInteger() == iZ) {
     return false
   }
@@ -2621,7 +2620,7 @@ void maybeLogError(String msg, Object... args) {
   if (!okToLogError()) {
     return
   }
-  Integer limit = (Integer) settings.limitErrorLogsMin
+  Integer limit = gtSetI('limitErrorLogsMin')
   if (!limit /* off */
       || (now() - lastErrorLogTime) > (limit * 60 * 1000)) {
     error(msg, args)
@@ -2642,16 +2641,16 @@ void error(String msg, Object... args) {
 }
 
 void debug(String msg, Object... args) {
-  String level = (String) settings.logLevel
-  if ((Boolean) settings.enableDebugLogging ||
+  String level = gtSetStr('logLevel')
+  if (gtSetB('enableDebugLogging') ||
           (level != sNL && level.toInteger() == i1)) {
     logDebug(sprintf(msg, args))
   }
 }
 
 void info(String msg, Object... args) {
-  String level = (String) settings.logLevel
-  if ((Boolean) settings.enableDebugLogging ||
+  String level = gtSetStr('logLevel')
+  if (gtSetB('enableDebugLogging') ||
           level == sNL ||
           (level.toInteger() >= i1 && level.toInteger() < i3)) {
     logInfo(sprintf(msg, args))
@@ -2659,8 +2658,8 @@ void info(String msg, Object... args) {
 }
 
 void warn(String msg, Object... args) {
-  String level = (String) settings.logLevel
-  if ((Boolean) settings.enableDebugLogging ||
+  String level = gtSetStr('logLevel')
+  if (gtSetB('enableDebugLogging') ||
           level == sNL ||
           level.toInteger() > iZ) {
     logWarn(sprintf(msg, args))
@@ -2684,18 +2683,18 @@ Long now() {
 /*------------------ Shared constants ------------------*/
 
 
-@Field static final String appVersion = "3.2.5"  // public version
-@Field static final String NAMESPACE = "rvrolyk"
-@Field static final String DRIVER_NAME = "Sleep Number Bed"
+@Field static final String appVersion = '3.2.5'  // public version
+@Field static final String NAMESPACE = 'rvrolyk'
+@Field static final String DRIVER_NAME = 'Sleep Number Bed'
 
 
 /*------------------ Logging helpers ------------------*/
 
-@Field static final String PURPLE = "purple"
-@Field static final String BLUE = "#0299b1"
-@Field static final String GRAY = "gray"
-@Field static final String ORANGE = "orange"
-@Field static final String RED = "red"
+@Field static final String PURPLE = 'purple'
+@Field static final String BLUE = '#0299b1'
+@Field static final String GRAY = 'gray'
+@Field static final String ORANGE = 'orange'
+@Field static final String RED = 'red'
 
 @Field static final String sLTH='<'
 @Field static final String sGTH='>'
@@ -2703,13 +2702,13 @@ Long now() {
 @CompileStatic
 private static String logPrefix(String msg, String color = null) {
   String myMsg= msg.replaceAll(sLTH, '&lt;').replaceAll(sGTH, '&gt;')
-  StringBuilder sb = new StringBuilder("<span ")
+  StringBuilder sb = new StringBuilder('<span ')
           .append("style='color:").append(GRAY).append(";'>")
-          .append("[v").append(appVersion).append("] ")
-          .append("</span>")
+          .append('[v').append(appVersion).append('] ')
+          .append('</span>')
           .append("<span style='color:").append(color).append(";'>")
           .append(myMsg)
-          .append("</span>")
+          .append('</span>')
   return sb.toString()
 }
 
@@ -2739,7 +2738,7 @@ private void logError(String msg, Exception ex = null) {
     }
   } catch (ignored) {}
   if (a||b) {
-    log.error logPrefix(a+" \n"+b, RED)
+    log.error logPrefix(a+' \n'+b, RED)
   }
 }
 
@@ -2764,9 +2763,16 @@ Date wtoDateTime(String t) { return (Date)toDateTime(t) }
 void wrunIn(Long t, String meth, Map options=null){ runIn(t,meth,options) }
 private void wrunInMillis(Long t,String m,Map d){ runInMillis(t,m,d) }
 private void wpauseExecution(Long t){ pauseExecution(t) }
-private gtSt(String nm){ return state."${nm}" }
+
+private gtSetting(String nm){ return settings[nm] }
+
+private String gtSetStr(String nm){ return (String)settings[nm] }
+private Boolean gtSetB(String nm){ return (Boolean)settings[nm] }
+private Integer gtSetI(String nm){ return (Integer)settings[nm] }
+
+private gtSt(String nm){ return state.get(nm) }
 /** assign to state  */
-private void assignSt(String nm,v){ state."${nm}"=v }
+private void assignSt(String nm,v){ state.put(nm,v) }
 
 String gtAid(){ return app.getId() }
 
@@ -2880,8 +2886,8 @@ def getServerItem(String key) {
 @CompileStatic
 Long GetTimeDiffSeconds(String lastDate, String sender=sNL) {
   try {
-    if(lastDate?.contains("dtNow")) { return 10000 }
-    Date lastDt = Date.parse("E MMM dd HH:mm:ss z yyyy", lastDate)
+    if(lastDate?.contains('dtNow')) { return 10000 }
+    Date lastDt = Date.parse('E MMM dd HH:mm:ss z yyyy', lastDate)
     Long start = lastDt.getTime()
     Long stop = now()
     Long diff = (Long)((stop - start) / 1000L)
@@ -2902,7 +2908,7 @@ private static TimeZone mTZ(){ return TimeZone.getDefault() } // (TimeZone)locat
 
 @CompileStatic
 static String formatDt(Date dt, Boolean tzChg=true) {
-  SimpleDateFormat tf = new SimpleDateFormat("E MMM dd HH:mm:ss z yyyy")
+  SimpleDateFormat tf = new SimpleDateFormat('E MMM dd HH:mm:ss z yyyy')
   if(tzChg) { if(mTZ()) { tf.setTimeZone(mTZ()) } }
   return (String)tf.format(dt)
 }
