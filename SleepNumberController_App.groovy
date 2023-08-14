@@ -72,6 +72,10 @@ import java.text.SimpleDateFormat
 
 @Field static final String sCACHE=' CACHE'
 
+@Field static final String sREFRESHCHILDDEVICES='refreshChildDevices'
+@Field static final String sLASTFAMILYDATA='lastFamilyDataUpdDt'
+@Field static final String sLASTBEDDATA='lastBedDataUpdDt'
+
 @Field static final Integer iZ=0
 @Field static final Integer i1=1
 @Field static final Integer i2=2
@@ -104,7 +108,7 @@ static String getLOGIN_URL(){ 'https://' + LOGIN_HOST }
 static Boolean devdbg(){ return false }
 
 definition(
-  (sNM): 'Sleep Number Controller',
+  (sNM): APP_NAME,
   namespace: NAMESPACE,
   author: 'Russ Vrolyk',
   (sDESC): 'Control your Sleep Number Flexfit bed.',
@@ -219,7 +223,7 @@ Map homePage() {
     }
        
     section((sTIT): '<b>Advanced Settings</b>') {
-      String defaultName; defaultName = 'Sleep Number Controller'
+      String defaultName; defaultName = APP_NAME
       if ((String)state.displayName) {
         defaultName = (String)state.displayName
       }
@@ -289,8 +293,8 @@ def initialize() {
   }
   subscribe(location, 'systemStart', startHandler)
 
-  remTsVal('lastBedDataUpdDt')
-  remTsVal('lastFamilyDataUpdDt')
+  remTsVal(sLASTBEDDATA)
+  remTsVal(sLASTFAMILYDATA)
   remTsVal('lastPrivacyDataUpdDt')
   remTsVal('lastSleepFavoriteUpdDt')
   remTsVal('lastSleeperDataUpdDt')
@@ -317,16 +321,17 @@ void updateLabel() {
   String appLabel; appLabel= (String) app.label
   Boolean connected; connected = false
   String dispN; dispN = (String) state.displayName
-  if(dispN.contains(' <span')){ dispN = dispN.split(' <span')[iZ] }
-  if(appLabel.contains(' <span')){ appLabel = appLabel.split(' <span')[iZ]  }
-  if (!appLabel){ appLabel = 'Sleep Number Controller' }
+  String span = ' <span style=color:'
+  if(dispN.contains(span)){ dispN = dispN.split(span)[iZ] }
+  if(appLabel.contains(span)){ appLabel = appLabel.split(span)[iZ]  }
+  if (!appLabel){ appLabel = APP_NAME }
   if (dispN != appLabel) { state.displayName = appLabel }
 
   String status; status = (String)state.status
   Boolean paused= (Boolean)state.paused
   if (status || paused) {
     String nstatus; nstatus=status
-    StringBuilder label; label = new StringBuilder("${state.displayName} <span style=color:")
+    StringBuilder label; label = new StringBuilder((String)state.displayName + span)
     if (paused) {
       nstatus = '(Paused)'
       label.append('red')
@@ -465,7 +470,7 @@ Set<String> getBedDeviceTypes(String bedId) {
 // Use with #schedule as apparently it's not good to mix #runIn method call
 // and #schedule method call to the same method.
 void scheduledRefreshChildDevices() {
-  remTsVal('lastFamilyDataUpdDt')
+  remTsVal(sLASTFAMILYDATA)
   outletMapFLD = [:]
   refreshChildDevices()
   if (gtSetB('variableRefresh')) {
@@ -501,9 +506,9 @@ void doRefresh(){
  * Called by driver when user triggers poll.
  */
 void refreshChildDevices(Map ignored, String ignoredDevId) {
-  Integer lastUpd = getLastTsValSecs('lastFamilyDataUpdDt')
+  Integer lastUpd = getLastTsValSecs(sLASTFAMILYDATA)
   if(lastUpd > 40){
-    remTsVal('lastFamilyDataUpdDt')
+    remTsVal(sLASTFAMILYDATA)
     outletMapFLD = [:]
   }
   refreshChildDevices()
@@ -607,7 +612,7 @@ Map findBedPage() {
           if (devices.size() > iZ) {
             for (ChildDeviceWrapper dev in devices) {
               if (getBedDeviceId(dev) != bdId) {
-                debug 'bedId's don't match, skipping'
+                debug "bedId's don't match, skipping"
                 continue
               }
               String dt= getBedDeviceType(dev)
@@ -656,10 +661,10 @@ static String presenceText(presence) {
 }
 
 void checkBedInfo(){
-  Integer lastUpd = getLastTsValSecs('lastBedDataUpdDt')
+  Integer lastUpd = getLastTsValSecs(sLASTBEDDATA)
   if(lastUpd > 600){
-    remTsVal('lastBedDataUpdDt')
-    remTsVal('lastFamilyDataUpdDt')
+    remTsVal(sLASTBEDDATA)
+    remTsVal(sLASTFAMILYDATA)
     initializeBedInfo()
   }
 }
@@ -1052,7 +1057,7 @@ Map getBedData(Boolean async=false) {
   Boolean lazy = async
 
   String myId=gtAid()
-  Integer lastUpd = getLastTsValSecs('lastFamilyDataUpdDt')
+  Integer lastUpd = getLastTsValSecs(sLASTFAMILYDATA)
   if(familyMapFLD[myId] && ((!lazy && lastUpd < 180) || (lazy && lastUpd <= 550))) {
     debug "Getting CACHED family status ${ devdbg() ? familyMapFLD[myId] : sBLK}"
     addHttpR('/rest/bed/familyStatus' + sCACHE)
@@ -1337,7 +1342,7 @@ ChildDeviceWrapper findBedDevice(String deviceId) {
 @CompileStatic
 Map getBeds(Boolean lazy=false) {
   String myId=gtAid()
-  Integer lastUpd = getLastTsValSecs('lastBedDataUpdDt')
+  Integer lastUpd = getLastTsValSecs(sLASTBEDDATA)
   if(sleepMapFLD[myId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
     addHttpR('/rest/bed' + sCACHE)
     debug "Getting CACHED information for all beds ${ devdbg() ? sleepMapFLD[myId] : sBLK}"
@@ -1348,7 +1353,7 @@ Map getBeds(Boolean lazy=false) {
   if(devdbg()) debug('Response data from SleepNumber: %s', res)
   if(res){
     sleepMapFLD[myId]=res
-    updTsVal('lastBedDataUpdDt')
+    updTsVal(sLASTBEDDATA)
   }
   return res
 }
@@ -1363,7 +1368,7 @@ Map getFamilyStatus() {
   if(res){
     String myId=gtAid()
     familyMapFLD[myId]=res
-    updTsVal('lastFamilyDataUpdDt')
+    updTsVal(sLASTFAMILYDATA)
   }
   return res
 }
@@ -1414,14 +1419,14 @@ void finishGetAsyncFamilyStatus(resp, Map callbackData){
   if(ndata){
     String myId=gtAid()
     familyMapFLD[myId] = ndata
-    updTsVal('lastFamilyDataUpdDt')
+    updTsVal(sLASTFAMILYDATA)
     processBedData(ndata)
   }
 }
 
 void timeoutFamily(Map request=null){
   warn "family async request timeout $request"
-  remTsVal('lastFamilyDataUpdDt')
+  remTsVal(sLASTFAMILYDATA)
   getBedData()
 }
 
@@ -1498,7 +1503,7 @@ void setResponsiveAirState(Boolean st, String devId) {
     ]
   }
   httpRequestQueue(0, path: "/rest/bed/${getBedDeviceId(device)}/responsiveAir",
-          body: body, runAfter: 'refreshChildDevices')
+          body: body, runAfter: sREFRESHCHILDDEVICES)
 }
 
 
@@ -1535,7 +1540,7 @@ void setFoundationAdjustment(Map params, String devId) {
   Float movementDuration = actu == 'H' ? 0.35 : 0.18
   Integer waitTime = Math.round(movementDuration * positionDelta).toInteger() + i1
   httpRequestQueue(waitTime, path: "/rest/bed/${getBedDeviceId(device)}/foundation/adjustment/micro",
-      body: body, runAfter: 'refreshChildDevices')
+      body: body, runAfter: sREFRESHCHILDDEVICES)
 }
 
 /**
@@ -1567,7 +1572,7 @@ void setFootWarmingState(Map params, String devId) {
           ("footWarmingTimer${sid}".toString()): ptimer
   ]
   httpRequestQueue(0, path: "/rest/bed/${getBedDeviceId(device)}/foundation/footwarming",
-      body: body, runAfter: 'refreshChildDevices')
+      body: body, runAfter: sREFRESHCHILDDEVICES)
 }
 
 /**
@@ -1600,7 +1605,7 @@ void setFoundationTimer(Map params, String devId) {
     positionTimer: ptimer
   ]
   httpRequestQueue(5, path: "/rest/bed/${getBedDeviceId(device)}/foundation/adjustment",
-          body: body, runAfter: 'refreshChildDevices')
+          body: body, runAfter: sREFRESHCHILDDEVICES)
 }
 
 /**
@@ -1624,7 +1629,7 @@ void setFoundationPreset(Integer preset, String devId) {
   // Rather than attempt to derive the preset relative to the current state so we can compute
   // the time (as we do for adjustment), we just use the maximum.
   httpRequestQueue(35, path: "/rest/bed/${getBedDeviceId(device)}/foundation/preset",
-      body: body, runAfter: 'refreshChildDevices')
+      body: body, runAfter: sREFRESHCHILDDEVICES)
 }
 
 void stopFoundationMovement(Map ignored, String devId) {
@@ -1638,9 +1643,9 @@ void stopFoundationMovement(Map ignored, String devId) {
     footMotion: i1,
     side: getBedDeviceSide(device)[iZ]
   ]
-  remTsVal('lastFamilyDataUpdDt')
+  remTsVal(sLASTFAMILYDATA)
   httpRequestQueue(5, path: "/rest/bed/${getBedDeviceId(device)}/foundation/motion",
-          body: body, runAfter: 'refreshChildDevices')
+          body: body, runAfter: sREFRESHCHILDDEVICES)
 }
 
 /**
@@ -1660,7 +1665,7 @@ void setSleepNumber(Integer number, String devId) {
   ]
   // Not sure how long it takes to inflate or deflate so just wait 20s
   httpRequestQueue(20, path: "/rest/bed/${id}/sleepNumber",
-      body: body, runAfter: 'refreshChildDevices')
+      body: body, runAfter: sREFRESHCHILDDEVICES)
 }
 
 @Field volatile static Map<String, Map> privacyMapFLD      = [:]
@@ -1694,10 +1699,10 @@ void setPrivacyMode(Boolean mode, String devId) {
   String pauseMode = mode ? sON : sOFF
   // Cloud request
   remTsVal('lastPrivacyDataUpdDt')
-  remTsVal('lastFamilyDataUpdDt')
+  remTsVal(sLASTFAMILYDATA)
   remTsVal('lastSleeperDataUpdDt')
   httpRequestQueue(2, path: "/rest/bed/${getBedDeviceId(device)}/pauseMode",
-          query: [mode: pauseMode], runAfter: 'refreshChildDevices')
+          query: [mode: pauseMode], runAfter: sREFRESHCHILDDEVICES)
 }
 
 @Field volatile static Map<String, Map> sleepNumMapFLD      = [:]
@@ -1767,7 +1772,8 @@ void updateSleepNumberFavorite(Integer number, String devId) {
       side: sid[iZ]
     ]
 
-    httpRequestQueue(2, path: "/rest/bed/${id}/sleepNumberFavorite", body: body /*, runAfter: "refreshChildDevices"*/)
+    httpRequestQueue(2, path: "/rest/bed/${id}/sleepNumberFavorite", body: body /*, runAfter: sREFRESHCHILDDEVICES*/)
+    remTsVal('lastSleepFavoriteUpdDt')
     setSleepNumber(dfavorite, devId)
   } else {
     logError "Unable to update sleep number favorite for side ${sid} ${number}"
@@ -1852,7 +1858,7 @@ void setFoundationMassage(Integer ifootspeed, Integer iheadspeed, Integer itimer
     side: sid[iZ]
   ]
   httpRequestQueue(1, path: "/rest/bed/${id}/foundation/adjustment",
-        body: body, runAfter: 'refreshChildDevices')
+        body: body, runAfter: sREFRESHCHILDDEVICES)
 }
 
 @Field volatile static Map<String, Map> outletMapFLD      = [:]
@@ -1934,7 +1940,7 @@ void setOutletState(String bedId, Integer outletId, String ioutletState, Integer
   String val = 'lastOutletUpdDt' + outletId.toString()
   remTsVal(val)
     if (refresh) {
-      httpRequestQueue(2, path: path, body: body, runAfter: 'refreshChildDevices')
+      httpRequestQueue(2, path: path, body: body, runAfter: sREFRESHCHILDDEVICES)
     } else {
       httpRequestQueue(0, path: path, body: body)
     }
@@ -2419,7 +2425,7 @@ void handleRequestQueue(Boolean releaseLock = false) {
             warn 'HTTP queue lock was held for more than 2 minutes, forcing release'
           }
           // In this case we should re-run.
-          remTsVal('lastFamilyDataUpdDt')
+          remTsVal(sLASTFAMILYDATA)
           handleRequestQueue(true)
         }
       }
@@ -2587,7 +2593,7 @@ void ahttpRequestHandler(resp,Map callbackData){
   // If there was something to run after this then set that up as well.
   String ra = (String)request.runAfter
   if (ra) {
-    remTsVal('lastFamilyDataUpdDt')
+    remTsVal(sLASTFAMILYDATA)
     if(rd < 1L) rd = 4L
     wrunIn(rd, ra)// [overwrite:false])
   }
@@ -2597,8 +2603,8 @@ void ahttpRequestHandler(resp,Map callbackData){
 void timeoutAreq(Map request=null){
   warn "async request timeout $request"
   handleRequestQueue(true)
-  remTsVal('lastFamilyDataUpdDt')
-  wrunIn(10L, 'refreshChildDevices')
+  remTsVal(sLASTFAMILYDATA)
+  wrunIn(10L, sREFRESHCHILDDEVICES)
 }
 
 
@@ -2686,6 +2692,7 @@ Long now() {
 @Field static final String appVersion = '3.2.5'  // public version
 @Field static final String NAMESPACE = 'rvrolyk'
 @Field static final String DRIVER_NAME = 'Sleep Number Bed'
+@Field static final String APP_NAME = 'Sleep Number Controller'
 
 
 /*------------------ Logging helpers ------------------*/
