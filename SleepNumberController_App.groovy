@@ -70,6 +70,10 @@ import java.text.SimpleDateFormat
 @Field static final String sOUTLET='outlet'
 @Field static final String sUNDERBEDLIGHT='underbedlight'
 
+@Field static final String sSIDE='side'
+@Field static final String sBEDID='bedId'
+@Field static final String sDEVICEID='deviceId'
+
 @Field static final String sCACHE=' CACHE'
 
 @Field static final String sREFRESHCHILDDEVICES='refreshChildDevices'
@@ -200,9 +204,9 @@ Map homePage() {
             if ((Boolean)device.isChild) {
               output += '            '
             } else {
-              output += device.bedId
+              output += device[sBEDID]
             }
-            output += " (<a href=\"/device/edit/${device.deviceId}\">dev:${device.deviceId}</a>) / ${device.name} / ${device.side} / ${device.type}"
+            output += " (<a href=\"/device/edit/${device[sDEVICEID]}\">dev:${device[sDEVICEID]}</a>) / ${device[sNM]} / ${device[sSIDE]} / ${device[sTYP]}"
             paragraph output
           }
           paragraph '<br>Note: <i>To remove a device remove it from the Devices list</i>'
@@ -351,15 +355,15 @@ void updateLabel() {
 
 /*------------------ Bed state helpers  ------------------*/
 static String getBedDeviceId(ChildDeviceWrapper bed) {
-  return (String)((Map) bed.getState()).bedId
+  return (String)((Map) bed.getState())[sBEDID]
 }
 
 static String getBedDeviceSide(ChildDeviceWrapper bed) {
-  return (String)((Map) bed.getState()).side
+  return (String)((Map) bed.getState())[sSIDE]
 }
 
 static String getBedDeviceType(ChildDeviceWrapper bed) {
-  return (String)((Map) bed.getState()).type
+  return (String)((Map) bed.getState())[sTYP]
 }
 
 /**
@@ -374,20 +378,20 @@ void initializeBedInfo() {
   Map<String, Map> stateBedInfo = [:]
   if(bedInfo){
     for (Map bed in (List<Map>)bedInfo.beds) {
-      String id = bed.bedId.toString()
+      String id = bed[sBEDID].toString()
       if(devdbg()) debug('Bed id %s', id)
       if (!stateBedInfo.containsKey(id)) {
         stateBedInfo[id] = [:]
       }
       List<String> components = []
       for (Map component in (List<Map>)bed.components) {
-        if ((String) component.type == 'Base'
+        if ((String) component[sTYP] == 'Base'
                 && ((String) component.model).toLowerCase().contains('integrated')) {
           // Integrated bases need to be treated separately as they don't appear to have
           // foundation status endpoints so don't lump this with a base type directly.
           components << 'Integrated Base'
         } else {
-          components << (String)component.type
+          components << (String)component[sTYP]
         }
       }
       stateBedInfo[id].components = components
@@ -433,18 +437,18 @@ List<Map> getBedDeviceData() {
     output << [
       (sNM): (String) device.label,
       (sTYP): type,
-      side: side,
-      deviceId: device.id,
-      bedId: bedId,
+      (sSIDE): side,
+      (sDEVICEID): device.id,
+      (sBEDID): bedId,
       isChild: false,
     ]
     for (ChildDeviceWrapper child in device.getChildDevices()) {
       output << [
         (sNM): (String)child.label,
         (sTYP): (String)device.getChildType(child.deviceNetworkId),
-        side: side,
-        deviceId: child.id,
-        bedId: bedId,
+        (sSIDE): side,
+        (sDEVICEID): child.id,
+        (sBEDID): bedId,
         isChild: true,
       ]
     }
@@ -606,7 +610,7 @@ Map findBedPage() {
         String l=sLEFT
         String r=sRIGHT
         List sidesSeen = []
-        String bdId=bed.bedId.toString()
+        String bdId=bed[sBEDID].toString()
         section("Bed: ${bdId}") {
           paragraph '<br>Note: <i>Sides are labeled as if you are laying in bed.</i>'
           if (devices.size() > iZ) {
@@ -653,7 +657,7 @@ Map findBedPage() {
 
 void addBedSelectLink(String side, String bedId, String label = sNL, String modifyCreate = 'create') {
   href 'selectBedPage', (sNM): "Bed: ${bedId}", (sTIT): label ?: "${side} Side", (sDESC): "Click to ${modifyCreate}",
-          params: [bedId: bedId, side: side, label: label]
+          params: [(sBEDID): bedId, (sSIDE): side, label: label]
 }
 
 static String presenceText(presence) {
@@ -686,6 +690,7 @@ Map selectBedPage(Map iparams) {
       }
       return
     }
+    String side; side = (String)params[sSIDE]
     section {
       paragraph """<b>Instructions</b>
 Enter a name, then choose whether or not to use child devices or a virtual container for the devices and then choose the types of devices to create.
@@ -696,18 +701,18 @@ See <a href="https://community.hubitat.com/t/release-virtual-container-driver/44
 """
         paragraph """<b>Device information</b>
 Bed ID: ${bdId}
-Side: ${params.side}
+Side: ${side}
 """ 
     }
-    Long tbedId = Math.abs(Long.valueOf((String) params.bedId))
-    String varName = "${tbedId}.${params.side}".toString()
+    Long tbedId = Math.abs(Long.valueOf((String) params[sBEDID]))
+    String varName = "${tbedId}.${side}".toString()
     String newName; newName = gtSetStr(varName)
     Boolean ucd; ucd = false
     section {
       String label = (String) params.label
       String name; name = newName
       name = !(name=='null' || name == sNL) ? name : label
-      name = !(name=='null' || name == sNL) ? name : (String) params.side
+      name = !(name=='null' || name == sNL) ? name : side
       input varName, sTXT, (sTIT): 'Device Name', defaultValue: name,
           (sDESC): 'What prefix do you want for the devices?', submitOnChange: true,
           required: true
@@ -719,7 +724,7 @@ Side: ${params.side}
         input 'useContainer', sBOOL, (sTIT): 'Use virtual container?', defaultValue: false,
            submitOnChange: true
       }
-      String side = ((String) params.side).toLowerCase()
+      side = side.toLowerCase()
       paragraph 'A presence type device exposes on/off as switching to a preset level (on) and flat (off).  Dimming will change the Sleep Number.'
       if (ucd) {
         paragraph 'This is the parent device when child devices are used'
@@ -807,8 +812,8 @@ Side: ${params.side}
       href 'createBedPage', (sTIT): 'Create Devices', (sDESC): sNL,
       params: [
         presence: params.present,
-        bedId: bdId,
-        side: params.side,
+        (sBEDID): bdId,
+        (sSIDE): params[sSIDE],
         useChildDevices: ucd,
         useContainer: gtSetB('useContainer'),
         containerName: containerName,
@@ -842,20 +847,20 @@ Map createBedPage(Map iparams) {
   if(params) state.createBedP = params else params = state.createBedP
   ChildDeviceWrapper container; container = null
   if ((Boolean) params.useContainer) {
-    container = createContainer((String) params.bedId, (String) params.containerName, (String) params.side)
+    container = createContainer((String) params[sBEDID], (String) params.containerName, (String) params[sSIDE])
   }
   List<ChildDeviceWrapper> existingDevices = getBedDevices()
   List<ChildDeviceWrapper> devices = []
   // TODO: Consider allowing more than one identical device for debug purposes.
 
-  Long bedId = Math.abs(Long.valueOf((String) params.bedId))
-  String varName = "${bedId}.${params.side}".toString()
+  Long bedId = Math.abs(Long.valueOf((String) params[sBEDID]))
+  String varName = "${bedId}.${params[sSIDE]}".toString()
   String newName; newName = gtSetStr(varName)
 
   if ((Boolean) params.useChildDevices) {
     // Bed Ids seem to always be negative so convert to positive for the device
     // id for better formatting.
-    String deviceId = "sleepnumber.${bedId}.${params.side}".toString()
+    String deviceId = "sleepnumber.${bedId}.${params[sSIDE]}".toString()
     String label = createDeviceLabel(newName, sPRESENCE)
     ChildDeviceWrapper parent; parent = existingDevices.find{ (String) it.deviceNetworkId == deviceId }
     if (parent) {
@@ -864,8 +869,8 @@ Map createBedPage(Map iparams) {
       debug('Creating parent device %s', deviceId)
       parent = addChildDevice(NAMESPACE, DRIVER_NAME, deviceId, null, [label: label])
       parent.setStatus(params.presence)
-      parent.setBedId(params.bedId)
-      parent.setSide(params.side)
+      parent.setBedId(params[sBEDID])
+      parent.setSide(params[sSIDE])
       devices.add(parent)
     }
     // If we are using child devices then we create a presence device and
@@ -894,7 +899,7 @@ Map createBedPage(Map iparams) {
     }
   } else {
     for (String type in (List<String>)params.types) {
-      String deviceId = "sleepnumber.${params.bedId}.${params.side}.${type.replaceAll(' ', '_')}".toString()
+      String deviceId = "sleepnumber.${params[sBEDID]}.${params[sSIDE]}.${type.replaceAll(' ', '_')}".toString()
       if (existingDevices.find{ it.data.vcId == deviceId }) {
         info('Not creating device %s, it already exists', deviceId)
       } else {
@@ -909,8 +914,8 @@ Map createBedPage(Map iparams) {
           device = addChildDevice(NAMESPACE, DRIVER_NAME, deviceId, null, [label: label])
         }
         device.setStatus(params.presence)
-        device.setBedId(params.bedId)
-        device.setSide(params.side)
+        device.setBedId(params[sBEDID])
+        device.setSide(params[sSIDE])
         device.setType(type)
         devices.add(device)
       }
@@ -958,14 +963,14 @@ Map diagnosticsPage(Map iparams) {
   Map bedInfo = getBeds(true)
   dynamicPage((sNM): 'diagnosticsPage') {
     for (Map bed in (List<Map>)bedInfo.beds) {
-      section("Bed: ${bed.bedId}") {
+      section("Bed: ${bed[sBEDID]}") {
         StringBuilder bedOutput; bedOutput = new StringBuilder('<ul>')
         bedOutput.append('<li>Size: ').append(bed.size)
         bedOutput.append('<li>Dual Sleep: ').append(bed.dualSleep)
         bedOutput.append('<li>Components:')
         for (Map component in (List<Map>)bed.components) {
           bedOutput.append('<ul>')
-          bedOutput.append('<li>Type: ').append(component.type)
+          bedOutput.append('<li>Type: ').append(component[sTYP])
           bedOutput.append('<li>Status: ').append(component.status)
           bedOutput.append('<li>Model: ').append(component.model)
           bedOutput.append('</ul>')
@@ -1121,7 +1126,7 @@ void processBedData(Map responseData) {
     Map bedInfo; bedInfo = (Map)gtSt('bedInfo')
 
     for (Map bed in (List<Map>)responseData.beds) {
-      String bedId1 = bed.bedId
+      String bedId1 = (String)bed[sBEDID]
       Map bedInfoBed; bedInfoBed = bedInfo ? (Map)bedInfo[bedId1] : null
       // Make sure the various bed state info is set up so we can use it later.
       if (!bedInfoBed || !bedInfoBed.components) {
@@ -1529,7 +1534,7 @@ void setFoundationAdjustment(Map params, String devId) {
   Map body = [
     speed: iZ, // 1 == slow, 0=fast
     actuator: actu,
-    side: getBedDeviceSide(device)[iZ],
+    (sSIDE): getBedDeviceSide(device)[iZ],
     position: pos // 0-100
   ]
   // It takes ~35 seconds for a FlexFit3 head to go from 0-100 (or back) and about 18 seconds for the foot.
@@ -1600,7 +1605,7 @@ void setFoundationTimer(Map params, String devId) {
     return
   }
   Map body = [
-    side: getBedDeviceSide(device)[iZ],
+    (sSIDE): getBedDeviceSide(device)[iZ],
     positionPreset: ppreset,
     positionTimer: ptimer
   ]
@@ -1623,7 +1628,7 @@ void setFoundationPreset(Integer preset, String devId) {
   Map body = [
     speed: iZ,
     preset : preset,
-    side: getBedDeviceSide(device)[iZ]
+    (sSIDE): getBedDeviceSide(device)[iZ]
   ]
   // It takes ~35 seconds for a FlexFit3 head to go from 0-100 (or back) and about 18 seconds for the foot.
   // Rather than attempt to derive the preset relative to the current state so we can compute
@@ -1641,7 +1646,7 @@ void stopFoundationMovement(Map ignored, String devId) {
     massageMotion: iZ,
     headMotion: i1,
     footMotion: i1,
-    side: getBedDeviceSide(device)[iZ]
+    (sSIDE): getBedDeviceSide(device)[iZ]
   ]
   remTsVal(sLASTFAMILYDATA)
   httpRequestQueue(5, path: "/rest/bed/${getBedDeviceId(device)}/foundation/motion",
@@ -1659,9 +1664,9 @@ void setSleepNumber(Integer number, String devId) {
 
   String id = getBedDeviceId(device)
   Map body = [
-    bedId: id,
+    (sBEDID): id,
     sleepNumber: number,
-    side: getBedDeviceSide(device)[iZ]
+    (sSIDE): getBedDeviceSide(device)[iZ]
   ]
   // Not sure how long it takes to inflate or deflate so just wait 20s
   httpRequestQueue(20, path: "/rest/bed/${id}/sleepNumber",
@@ -1767,9 +1772,9 @@ void updateSleepNumberFavorite(Integer number, String devId) {
     // setting 0-100 (rounds to nearest multiple of 5)
     String id= getBedDeviceId(device)
     Map body = [
-      bedId: id,
+      (sBEDID): id,
       sleepNumberFavorite: dfavorite,
-      side: sid[iZ]
+      (sSIDE): sid[iZ]
     ]
 
     httpRequestQueue(2, path: "/rest/bed/${id}/sleepNumberFavorite", body: body /*, runAfter: sREFRESHCHILDDEVICES*/)
@@ -1855,7 +1860,7 @@ void setFoundationMassage(Integer ifootspeed, Integer iheadspeed, Integer itimer
     headMassageMotor: headspeed,
     massageTimer: timer,
     massageWaveMode: mode,
-    side: sid[iZ]
+    (sSIDE): sid[iZ]
   ]
   httpRequestQueue(1, path: "/rest/bed/${id}/foundation/adjustment",
         body: body, runAfter: sREFRESHCHILDDEVICES)
@@ -2157,9 +2162,9 @@ Map getSleepData(Map ignored, String devId) {
 
   debug('Getting sleeper ids for %s', bedId)
   for (Map sleeper in (List<Map>)sleepers.sleepers) {
-    if ((String)sleeper.bedId == bedId) {
+    if ((String)sleeper[sBEDID] == bedId) {
       String side; side=sNL
-      switch (sleeper.side) {
+      switch (sleeper[sSIDE]) {
         case iZ:
           side = sLEFT
           break
