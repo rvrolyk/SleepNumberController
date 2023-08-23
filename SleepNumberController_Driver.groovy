@@ -30,83 +30,83 @@ import com.hubitat.app.DeviceWrapper
 import groovy.transform.CompileStatic
 import groovy.transform.Field
 
-@Field static final String sNL=(String)null
-@Field static final String sLOW='Low'
-@Field static final String sMED='Medium'
-@Field static final String sHIGH='High'
-@Field static final String sFLAT='Flat'
-@Field static final String sSTON='On'
-@Field static final String sSTOFF='Off'
+@Field static final String sNL = (String)null
+@Field static final String sLOW = 'Low'
+@Field static final String sMED = 'Medium'
+@Field static final String sHIGH = 'High'
+@Field static final String sFLAT = 'Flat'
+@Field static final String sSTON = 'On'
+@Field static final String sSTOFF = 'Off'
 
-@Field static final String sNUM='number'
-@Field static final String sSTR='string'
-@Field static final String sDATE='date'
-@Field static final String sENUM='enum'
-@Field static final String sBOOL='bool'
-@Field static final String sON='on'
-@Field static final String sOFF='off'
-@Field static final String sPRESENT='present'
-@Field static final String sNPRESENT='not present'
-@Field static final String sSWITCH='switch'
-@Field static final String sLEVEL='level'
-@Field static final String sPRESENCE='presence'
-@Field static final String sNM='name'
-@Field static final String sVL='value'
-@Field static final String sTYP='type'
+@Field static final String sNUM = 'number'
+@Field static final String sSTR = 'string'
+@Field static final String sDATE = 'date'
+@Field static final String sENUM = 'enum'
+@Field static final String sBOOL = 'bool'
+@Field static final String sON = 'on'
+@Field static final String sOFF = 'off'
+@Field static final String sPRESENT = 'present'
+@Field static final String sNPRESENT = 'not present'
+@Field static final String sSWITCH = 'switch'
+@Field static final String sLEVEL = 'level'
+@Field static final String sPRESENCE = 'presence'
+@Field static final String sNM = 'name'
+@Field static final String sVL = 'value'
+@Field static final String sTYP = 'type'
 
-@Field static final String sHEAD='head'
-@Field static final String sFOOT='foot'
-@Field static final String sFOOTWMR='foot warmer'
-@Field static final String sOUTLET='outlet'
-@Field static final String sUNDERBEDLIGHT='underbedlight'
+@Field static final String sHEAD = 'head'
+@Field static final String sFOOT = 'foot'
+@Field static final String sFOOTWMR = 'foot warmer'
+@Field static final String sOUTLET = 'outlet'
+@Field static final String sUNDERBEDLIGHT = 'underbedlight'
 
-@Field static final String sHEADPOSITION='headPosition'
-@Field static final String sFOOTPOSITION='footPosition'
-@Field static final String sFOOTWRMTEMP='footWarmingTemp'
-@Field static final String sFOOTWRMTIMER='footWarmingTimer'
-@Field static final String sSLEEPNUM='sleepNumber'
-@Field static final String sSLEEPNUMFAV='sleepNumberFavorite'
-@Field static final String sPOSITIONPRESET='positionPreset'
-@Field static final String sPOSITIONPRETIMER='positionPresetTimer'
-@Field static final String sPOSITIONTIMER='positionTimer'
-@Field static final String sPRIVACYMODE='privacyMode'
-@Field static final String sUNDERBEDLTIMER='underbedLightTimer'
-@Field static final String sUNDERBEDLSTATE='underbedLightState'
-@Field static final String sUNDERBEDLBRIGHT='underbedLightBrightness'
-@Field static final String sOUTLETSTATE='outletState'
+@Field static final String sHEADPOSITION = 'headPosition'
+@Field static final String sFOOTPOSITION = 'footPosition'
+@Field static final String sFOOTWRMTEMP = 'footWarmingTemp'
+@Field static final String sFOOTWRMTIMER = 'footWarmingTimer'
+@Field static final String sSLEEPNUM = 'sleepNumber'
+@Field static final String sSLEEPNUMFAV = 'sleepNumberFavorite'
+@Field static final String sPOSITIONPRESET = 'positionPreset'
+@Field static final String sPOSITIONPRETIMER = 'positionPresetTimer'
+@Field static final String sPOSITIONTIMER = 'positionTimer'
+@Field static final String sPRIVACYMODE = 'privacyMode'
+@Field static final String sUNDERBEDLTIMER = 'underbedLightTimer'
+@Field static final String sUNDERBEDLSTATE = 'underbedLightState'
+@Field static final String sUNDERBEDLBRIGHT = 'underbedLightBrightness'
+@Field static final String sOUTLETSTATE = 'outletState'
 
-@Field static final Integer iZ=0
-@Field static final Integer i1=1
+@Field static final Integer iZ = 0
+@Field static final Integer i1 = 1
 
-@Field static final String DNI_SEPARATOR = "-"
+@Field static final String DNI_SEPARATOR = '-'
 
-@Field static final ArrayList<String> TYPES = ["presence", "head", "foot", "foot warmer"]
+@Field static final ArrayList<String> TYPES = ['presence', 'head', 'foot', 'foot warmer']
 
-@Field static final ArrayList<String> SIDES = ["Right", "Left"]
+@Field static final ArrayList<String> SIDES = ['Right', 'Left']
 @Field static final Map<String, Integer> HEAT_TEMPS = [Off: 0, Low: 31, Medium: 57, High: 72]
-@Field static final Map<String, Integer> HEAT_TIMES = ["30m": 30, "1h": 60, "2h": 120, "3h": 180, "4h": 240, "5h": 300, "6h": 360]
-@Field static final Map<String, String> ACTUATOR_TYPES = [head: "H", foot: "F"]
-@Field static final Map<String, Integer> PRESET_TIMES = ["Off": 0, "15m": 15, "30m": 30, "45m": 45, "1h": 60, "2h": 120, "3h": 180]
+@Field static final Map<String, Integer> HEAT_TIMES = ['30m': 30, '1h': 60, '2h': 120, '3h': 180, '4h': 240, '5h': 300, '6h': 360]
+@Field static final Map<String, String> ACTUATOR_TYPES = [head: 'H', foot: 'F']
+@Field static final Map<String, Integer> PRESET_TIMES = ['Off': 0, '15m': 15, '30m': 30, '45m': 45, '1h': 60, '2h': 120, '3h': 180]
 @Field static final Map<String, Integer> PRESET_NAMES = [Favorite: 1, Flat: 4, ZeroG: 5, Snore: 6, WatchTV: 3, Read: 2]
-@Field static final ArrayList<String> UNDERBED_LIGHT_STATES = ["Auto", "On", "Off"]
+@Field static final ArrayList<String> UNDERBED_LIGHT_STATES = ['Auto', 'On', 'Off']
 @Field static final Map<String, Integer> UNDERBED_LIGHT_BRIGHTNESS = [Low: 1, Medium: 30, High: 100]
-@Field static final Map<String, Integer> UNDERBED_LIGHT_TIMES = ["Forever": 0, "15m": 15, "30m": 30, "45m": 45, "1h": 60, "2h": 120, "3h": 180]
-@Field static final ArrayList<String> OUTLET_STATES = ["On", "Off"]
+@Field static final Map<String, Integer> UNDERBED_LIGHT_TIMES = ['Forever': 0, '15m': 15, '30m': 30, '45m': 45, '1h': 60, '2h': 120, '3h': 180]
+@Field static final ArrayList<String> OUTLET_STATES = ['On', 'Off']
 
 metadata {
   definition((sNM): DRIVER_NAME,
              namespace: NAMESPACE,
-             author: "Russ Vrolyk",
-             importUrl: "https://raw.githubusercontent.com/rvrolyk/SleepNumberController/master/SleepNumberController_Driver.groovy"
+             author: 'Russ Vrolyk',
+             importUrl: 'https://raw.githubusercontent.com/rvrolyk/SleepNumberController/master/SleepNumberController_Driver.groovy'
   ) {
-    capability "Actuator"
-    capability "Switch"
-    capability "SwitchLevel"
-    capability "PresenceSensor"
-    capability "Polling"
+    capability 'Actuator'
+    capability 'Switch'
+    capability 'SwitchLevel'
+    capability 'PresenceSensor'
+    capability 'Polling'
 
     // indicator for overall connectivity to Sleep Number API
-    attribute "connection", "enum", ["online", "offline"]
+    attribute 'connection', 'enum', ['online', 'offline']
     attribute sHEADPOSITION, sNUM
     attribute sFOOTPOSITION, sNUM
     attribute sFOOTWRMTEMP, sENUM, HEAT_TEMPS.collect{ it.key }
@@ -121,53 +121,53 @@ metadata {
     // The timer for the preset change
     attribute sPOSITIONTIMER, sNUM
     attribute sPRIVACYMODE, sENUM, [sON, sOFF]
-    attribute sUNDERBEDLTIMER, sSTR // String so we can use "Forever"
+    attribute sUNDERBEDLTIMER, sSTR // String so we can use 'Forever'
     attribute sUNDERBEDLSTATE, sENUM, UNDERBED_LIGHT_STATES
     attribute sUNDERBEDLBRIGHT, sENUM, UNDERBED_LIGHT_BRIGHTNESS.collect{ it.key }
     attribute sOUTLETSTATE, sENUM, OUTLET_STATES
     // Attributes for sleep IQ data
-    attribute "sleepMessage", sSTR
-    attribute "sleepScore", sNUM
-    attribute "restfulAverage", sSTR
-    attribute "restlessAverage", sSTR
-    attribute "heartRateAverage", sNUM
-    attribute "HRVAverage", sNUM
-    attribute "breathRateAverage", sNUM
-    attribute "outOfBedTime", sSTR
-    attribute "inBedTime", sSTR
-    attribute "timeToSleep", sSTR
-    attribute "sessionStart", sDATE
-    attribute "sessionEnd", sDATE
-    attribute "sleepDataRefreshTime", sDATE
-    attribute "sleepIQSummary", sSTR
-    attribute "sessionSummary", sSTR
+    attribute 'sleepMessage', sSTR
+    attribute 'sleepScore', sNUM
+    attribute 'restfulAverage', sSTR
+    attribute 'restlessAverage', sSTR
+    attribute 'heartRateAverage', sNUM
+    attribute 'HRVAverage', sNUM
+    attribute 'breathRateAverage', sNUM
+    attribute 'outOfBedTime', sSTR
+    attribute 'inBedTime', sSTR
+    attribute 'timeToSleep', sSTR
+    attribute 'sessionStart', sDATE
+    attribute 'sessionEnd', sDATE
+    attribute 'sleepDataRefreshTime', sDATE
+    attribute 'sleepIQSummary', sSTR
+    attribute 'sessionSummary', sSTR
     // Responsive Air state - optional based on preference since it requires another HTTP request
     // and most users probably don't care about it.
-    attribute "responsiveAir", sENUM, ["true", "false"]
+    attribute 'responsiveAir', sENUM, ['true', 'false']
 
-    command "setRefreshInterval", [[(sNM): "interval", (sTYP): "NUMBER", constraints: ["NUMBER"]]]
+    command 'setRefreshInterval', [[(sNM): 'interval', (sTYP): 'NUMBER', constraints: ['NUMBER']]]
 
-    command "arrived"
-    command "departed"
-    command "setSleepNumber", [[(sNM): "sleep number", (sTYP): "NUMBER", constraints: ["NUMBER"]]]
-    command "setBedPosition", [[(sNM): "position", (sTYP): "NUMBER", constraints: ["NUMBER"]],
-      [(sNM): "actuator", (sTYP): "ENUM", constraints: ACTUATOR_TYPES.collect{ it.value }]]
-    command "setFootWarmingState", [[(sNM): "temp", (sTYP): "ENUM", constraints: HEAT_TEMPS.collect{ it.key }],
-       [(sNM): "timer", (sTYP): "ENUM", constraints: HEAT_TIMES.collect{ it.key }]]
-    command "setBedPreset", [[(sNM): "preset", (sTYP): "ENUM", constraints: PRESET_NAMES.collect{ it.key }]]
-    command "setBedPresetTimer", [[(sNM): "preset", (sTYP): "ENUM", constraints: PRESET_NAMES.collect{ it.key }],
-        [(sNM): "timer", (sTYP): "ENUM", constraints: PRESET_TIMES.collect{ it.key }]]
-    command "stopBedPosition"
-    command "enablePrivacyMode"
-    command "disablePrivacyMode"
-    command "getSleepData"
-    command "setSleepNumberFavorite"
-    command "updateSleepNumberFavorite", [[(sNM): "favorite sleep number", (sTYP): "NUMBER", constraints: ["NUMBER"]]]
-    command "setOutletState", [[(sNM): "state", (sTYP): "ENUM", constraints: OUTLET_STATES]]
-    command "setUnderbedLightState", [[(sNM): "state", (sTYP): "ENUM", constraints: UNDERBED_LIGHT_STATES],
-        [(sNM): "timer", (sTYP): "ENUM", constraints: UNDERBED_LIGHT_TIMES.collect{ it.key }],
-        [(sNM): "brightness", (sTYP): "ENUM", constraints: UNDERBED_LIGHT_BRIGHTNESS.collect{ it.key }]]
-    command "setResponsiveAirState", [[(sNM): "state", (sTYP): "ENUM", constraints: ["true", "false"]]]
+    command 'arrived'
+    command 'departed'
+    command 'setSleepNumber', [[(sNM): 'sleep number', (sTYP): 'NUMBER', constraints: ['NUMBER']]]
+    command 'setBedPosition', [[(sNM): 'position', (sTYP): 'NUMBER', constraints: ['NUMBER']],
+      [(sNM): 'actuator', (sTYP): 'ENUM', constraints: ACTUATOR_TYPES.collect{ it.value }]]
+    command 'setFootWarmingState', [[(sNM): 'temp', (sTYP): 'ENUM', constraints: HEAT_TEMPS.collect{ it.key }],
+       [(sNM): 'timer', (sTYP): 'ENUM', constraints: HEAT_TIMES.collect{ it.key }]]
+    command 'setBedPreset', [[(sNM): 'preset', (sTYP): 'ENUM', constraints: PRESET_NAMES.collect{ it.key }]]
+    command 'setBedPresetTimer', [[(sNM): 'preset', (sTYP): 'ENUM', constraints: PRESET_NAMES.collect{ it.key }],
+        [(sNM): 'timer', (sTYP): 'ENUM', constraints: PRESET_TIMES.collect{ it.key }]]
+    command 'stopBedPosition'
+    command 'enablePrivacyMode'
+    command 'disablePrivacyMode'
+    command 'getSleepData'
+    command 'setSleepNumberFavorite'
+    command 'updateSleepNumberFavorite', [[(sNM): 'favorite sleep number', (sTYP): 'NUMBER', constraints: ['NUMBER']]]
+    command 'setOutletState', [[(sNM): 'state', (sTYP): 'ENUM', constraints: OUTLET_STATES]]
+    command 'setUnderbedLightState', [[(sNM): 'state', (sTYP): 'ENUM', constraints: UNDERBED_LIGHT_STATES],
+        [(sNM): 'timer', (sTYP): 'ENUM', constraints: UNDERBED_LIGHT_TIMES.collect{ it.key }],
+        [(sNM): 'brightness', (sTYP): 'ENUM', constraints: UNDERBED_LIGHT_BRIGHTNESS.collect{ it.key }]]
+    command 'setResponsiveAirState', [[(sNM): 'state', (sTYP): 'ENUM', constraints: ['true', 'false']]]
   }
 
   preferences {
@@ -246,7 +246,7 @@ void off() {
 
 // setLevel required by SwitchLevel capability
 // including one with duration (which we currently ignore).
-void setLevel(Number val, Number duration=iZ) {
+void setLevel(Number val, Number duration = iZ) {
   if((String) state.type){
     switch ((String) state.type) {
       case sPRESENCE:
@@ -492,29 +492,29 @@ void getSleepData() {
   // Set basic attributes
   // device.currentValue(name, true) doesn't seem to avoid the cache so stash the values
   // used in the summary tiles.
-  sendEvent ((sNM): "sleepDataRefreshTime", (sVL): new Date().format("yyyy-MM-dd'T'HH:mm:ssXXX"))
-  sendEvent ((sNM): "sleepMessage", (sVL): data.sleepData.message.find{it != ''})
+  sendEvent((sNM): "sleepDataRefreshTime", (sVL): new Date().format("yyyy-MM-dd'T'HH:mm:ssXXX"))
+  sendEvent((sNM): "sleepMessage", (sVL): data.sleepData.message.find{it != ''})
   def sleepScore = data.sleepIQAvg
-  sendEvent ((sNM): "sleepScore", (sVL): sleepScore)
+  sendEvent((sNM): "sleepScore", (sVL): sleepScore)
   String restfulAvg = convertSecondsToTimeString((Integer)data.restfulAvg)
-  sendEvent ((sNM): "restfulAverage", (sVL): restfulAvg)
+  sendEvent((sNM): "restfulAverage", (sVL): restfulAvg)
   String restlessAvg = convertSecondsToTimeString((Integer)data.restlessAvg)
-  sendEvent ((sNM): "restlessAverage", (sVL): restlessAvg)
+  sendEvent((sNM): "restlessAverage", (sVL): restlessAvg)
   def heartRateAvg = data.heartRateAvg
-  sendEvent ((sNM): "heartRateAverage", (sVL): heartRateAvg)
+  sendEvent((sNM): "heartRateAverage", (sVL): heartRateAvg)
   def hrvAvg = data.hrvAvg
-  sendEvent ((sNM): "HRVAverage", (sVL): hrvAvg)
+  sendEvent((sNM): "HRVAverage", (sVL): hrvAvg)
   def breathRateAvg = data.respirationRateAvg
-  sendEvent ((sNM): "breathRateAverage", (sVL): breathRateAvg)
+  sendEvent((sNM): "breathRateAverage", (sVL): breathRateAvg)
   def outOfBedTime = convertSecondsToTimeString((Integer)data.outOfBedTotal)
-  sendEvent ((sNM): "outOfBedTime", (sVL): outOfBedTime)
+  sendEvent((sNM): "outOfBedTime", (sVL): outOfBedTime)
   def inBedTime = convertSecondsToTimeString((Integer)data.inBedTotal)
-  sendEvent ((sNM): "inBedTime", (sVL): inBedTime)
+  sendEvent((sNM): "inBedTime", (sVL): inBedTime)
   String timeToSleep = convertSecondsToTimeString((Integer)data.fallAsleepPeriod)
-  sendEvent ((sNM): "timeToSleep", (sVL): timeToSleep)
+  sendEvent((sNM): "timeToSleep", (sVL): timeToSleep)
   List<Map> slpsess= (List<Map>)((List<Map>)data.sleepData)[iZ].sessions
-  sendEvent ((sNM): "sessionStart", (sVL): slpsess[iZ].startDate)
-  sendEvent ((sNM): "sessionEnd", (sVL): slpsess[slpsess.size() - i1].endDate)
+  sendEvent((sNM): "sessionStart", (sVL): slpsess[iZ].startDate)
+  sendEvent((sNM): "sessionEnd", (sVL): slpsess[slpsess.size() - i1].endDate)
 
   String table = '<table class="sleep-tiles %extraClasses" style="width:100%;font-size:12px;font-size:1.5vmax" id="%id">'
   // Set up tile attributes
@@ -530,12 +530,12 @@ void getSleepData() {
   iqTile += "${heartRateAvg}</td>"
   iqTile += '<td style="text-align: center">' + hrvAvg + '</td></tr>'
   iqTile += '</table>'
-  sendEvent ((sNM): "sleepIQSummary", (sVL): iqTile)
+  sendEvent((sNM): "sleepIQSummary", (sVL): iqTile)
   // Basic tile to aggregate session stats: time in bed, time to sleep, restful, restless, bed exits
   String summaryTile
   summaryTile = table.replaceFirst('%id', "session-summary-${((String)device.getLabel()).toLowerCase().replaceAll(" ", "_")}")
       .replaceFirst('%extraClasses', "session-summary")
-  summaryTile += "<tr><td colspan=2>In bed for ${inBedTime}</td></tr>"
+  summaryTile += "<tr><td colspan = 2>In bed for ${inBedTime}</td></tr>"
   summaryTile += '<tr><th style="text-align: center; width: 50%">Time to fall asleep</th><th style="text-align: center">Restful</th></tr>'
   summaryTile += '<tr><td style="text-align: center">' + timeToSleep + '</td>'
   summaryTile += '<td style="text-align: center">' + restfulAvg + '</td></tr>'
@@ -543,7 +543,7 @@ void getSleepData() {
   summaryTile += '<tr><td style="text-align: center">' + restlessAvg + '</td>'
   summaryTile += '<td style="text-align: center">' + outOfBedTime + '</td>'
   summaryTile += '</tr></table>'
-  sendEvent ((sNM): "sessionSummary", (sVL): summaryTile)
+  sendEvent((sNM): "sessionSummary", (sVL): summaryTile)
 }
 
 static String convertSecondsToTimeString(Integer secondsToConvert) {
@@ -560,7 +560,7 @@ void setStatus(Map<String,Object> params) {
   // No type means we are using parent/child devices.
   List<String> validAttributes = device.supportedAttributes.collect{ (String) it.name }
   for (Map.Entry<String,Object>param in params) {
-    String pk=param.key
+    String pk = param.key
     if (pk in validAttributes) {
       def value; value = param.value
       // Translate some of the values into something more meaningful for comparison
@@ -586,11 +586,11 @@ void setStatus(Map<String,Object> params) {
         debug "Setting ${pk} to ${value}, it was ${attributeValue}"
       }
       // Figure out what child device to send to based on the key.
-      Boolean dfltdone; dfltdone = false
+      Boolean defaultDone; defaultDone = false
       switch (pk) {
         case sPRESENCE:
           setPresence((Boolean)value)
-          dfltdone = true
+          defaultDone = true
           break
         case sSLEEPNUM:
           // This is for this device so just send the event.
@@ -599,7 +599,7 @@ void setStatus(Map<String,Object> params) {
         case sPOSITIONPRESET:
           if (value == sFLAT) {
             sendEvent ((sNM): sSWITCH, (sVL): sOFF)
-          } else if (value == (String)settings.presetLevel) {
+          } else if (value == (String) settings.presetLevel) {
             // On if the level is the desired preset.
             // Note this means it's off even when raised if it doesn't match a preset which
             // may not make sense given there is a level.  But since it can be "turned on"
@@ -662,9 +662,9 @@ void setStatus(Map<String,Object> params) {
           // switch and level events.
           break
       }
-      if(!dfltdone) {
+      if (!defaultDone) {
         // Send an event with the key name to catalog it and set the attribute.
-        sendEvent ((sNM): pk, (sVL): value)
+        sendEvent((sNM): pk, (sVL): value)
       }
     } else {
       logError "Invalid status attribute ${pk}"
@@ -675,9 +675,9 @@ void setStatus(Map<String,Object> params) {
 // Used to set individual device states.
 void setStatusOld(Map<String,Object> params) {
   debug "setStatusOld(${params})"
-  List<String> validAttributes = device.supportedAttributes.collect{ (String)it.name }
+  List<String> validAttributes = device.supportedAttributes.collect{ (String) it.name }
   for (Map.Entry<String,Object>param in params) {
-    String pk=param.key
+    String pk = param.key
     if (pk in validAttributes) {
       def value; value = param.value
 
@@ -698,31 +698,31 @@ void setStatusOld(Map<String,Object> params) {
       // If this is a head or foot device, we need to sync level with the relevant
       // position, if it's presence, then we sync level with the sleep number value.
       String stype = (String)state.type
-      Boolean dfltdone; dfltdone = false
+      Boolean defaultDone; defaultDone = false
       switch (pk){
         case sPRESENCE:
           setPresence((Boolean)value)
-          dfltdone = true
+          defaultDone = true
           break
         case sSLEEPNUM:
-          if(stype == sPRESENCE) sendEvent ((sNM): sLEVEL, (sVL): value)
+          if(stype == sPRESENCE) sendEvent((sNM): sLEVEL, (sVL): value)
           break
         case sHEADPOSITION:
-          if(stype == sHEAD) sendEvent ((sNM): sLEVEL, (sVL): value)
+          if(stype == sHEAD) sendEvent((sNM): sLEVEL, (sVL): value)
           break
         case sFOOTPOSITION:
-          if(stype == sFOOT) sendEvent ((sNM): sLEVEL, (sVL): value)
+          if(stype == sFOOT) sendEvent((sNM): sLEVEL, (sVL): value)
           break
         case sPOSITIONPRESET:
           if (stype != sFOOTWMR) {
             if (value == sFLAT) {
-              sendEvent ((sNM): sSWITCH, (sVL): sOFF)
-            } else if (value == (String)settings.presetLevel) {
+              sendEvent((sNM): sSWITCH, (sVL): sOFF)
+            } else if (value == (String) settings.presetLevel) {
               // On if the level is the desired preset.
               // Note this means it's off even when raised if it doesn't match a preset which
               // may not make sense given there is a level.  But since it can be "turned on"
               // when not at preset level, the behavior (if not the indicator) seems logical.
-              sendEvent ((sNM): sSWITCH, (sVL): sON)
+              sendEvent((sNM): sSWITCH, (sVL): sON)
             }
           }
           break
@@ -743,14 +743,14 @@ void setStatusOld(Map<String,Object> params) {
                 level = 3
                 break
             }
-            sendEvent ((sNM): sSWITCH, (sVL): level > iZ ? sON : sOFF)
+            sendEvent((sNM): sSWITCH, (sVL): level > iZ ? sON : sOFF)
             if(level > iZ) sendEvent ((sNM): sLEVEL, (sVL): level)
           }
           break
       }
-      if(!dfltdone) {
+      if (!defaultDone) {
         // Send an event with the key name to catalog it and set the attribute.
-        sendEvent ((sNM): pk, (sVL): value)
+        sendEvent((sNM): pk, (sVL): value)
       }
     } else {
       logError "Invalid status attribute ${pk}"
@@ -760,7 +760,7 @@ void setStatusOld(Map<String,Object> params) {
 
 void setConnectionState(Boolean connected) {
   // sendEvent checks if value is unchanged and does nothing automatically
-  sendEvent ((sNM): "connection", (sVL): connected ? "online" : "offline")
+  sendEvent((sNM): "connection", (sVL): connected ? "online" : "offline")
 }
 
 Map sendToParent(String method, Object data = null) {
@@ -774,16 +774,17 @@ Map sendToParent(String method, Object data = null) {
 }
 
 void debug(String msg) {
-  if ((Boolean)settings.logEnable) {
+  if ((Boolean) settings.logEnable) {
     logDebug msg
   }
 }
 
-@Field static final String sBLANK         = ''
-@Field static final String sLINEBR        = '<br>'
+@Field static final String sBLANK = ''
+@Field static final String sLINEBR = '<br>'
 
-static String span(String str, String clr=sNL, String sz=sNL, Boolean bld=false, Boolean br=false) { return str ? "<span ${(clr || sz || bld) ? "style='${clr ? "color: ${clr};" : sBLANK}${sz ? "font-size: ${sz};" : sBLANK}${bld ? "font-weight: bold;" : sBLANK}'" : sBLANK}>${str}</span>${br ? sLINEBR : sBLANK}" : sBLANK }
-
+static String span(String str, String clr = sNL, String sz = sNL, Boolean bld = false, Boolean br = false) {
+  return str ? "<span ${(clr || sz || bld) ? "style = '${clr ? "color: ${clr};" : sBLANK}${sz ? "font-size: ${sz};" : sBLANK}${bld ? "font-weight: bold;" : sBLANK}'" : sBLANK}>${str}</span>${br ? sLINEBR : sBLANK}" : sBLANK
+}
 
 //-----------------------------------------------------------------------------
 // Methods specific to old device support
@@ -844,7 +845,7 @@ void componentRefresh(DeviceWrapper device) {
 
 String getChildType(String childNetworkId) {
   // network id is $parentId-type
-  return childNetworkId.substring( ((String)device.deviceNetworkId).length() + i1)
+  return childNetworkId.substring(((String)device.deviceNetworkId).length() + i1)
 }
 
 void componentOn(DeviceWrapper device) {
@@ -977,7 +978,6 @@ void componentSetLevel(DeviceWrapper device, Number level, Number duration) {
   }
 }
 
-
 static Boolean childValueChanged(DeviceWrapper device, String name, Object newValue) {
   String currentValue = device.currentValue(name)
   if (name == sLEVEL) {
@@ -1027,14 +1027,11 @@ void componentStopLevelChange(DeviceWrapper device) {
   logInfo "stopLevelChange not supported"
 }
 
-
 /*------------------ Shared constants ------------------*/
 
-
-@Field static final String appVersion = "3.2.5"  // public version
+@Field static final String appVersion = "3.2.6"  // public version
 @Field static final String NAMESPACE = "rvrolyk"
 @Field static final String DRIVER_NAME = "Sleep Number Bed"
-
 
 /*------------------ Logging helpers ------------------*/
 
@@ -1047,10 +1044,10 @@ void componentStopLevelChange(DeviceWrapper device) {
 @CompileStatic
 private static String logPrefix(String msg, String color = null) {
   StringBuilder sb = new StringBuilder("<span ")
-          .append("style='color:").append(GRAY).append(";'>")
+          .append("style = 'color:").append(GRAY).append(";'>")
           .append("[v").append(appVersion).append("] ")
           .append("</span>")
-          .append("<span style='color:").append(color).append(";'>")
+          .append("<span style = 'color:").append(color).append(";'>")
           .append(msg)
           .append("</span>")
   return sb.toString()
