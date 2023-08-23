@@ -2689,7 +2689,7 @@ Long now() {
 /*------------------ Shared constants ------------------*/
 
 
-@Field static final String appVersion = '3.2.6'  // public version
+@Field static final String appVersion = '3.2.8'  // public version
 @Field static final String NAMESPACE = 'rvrolyk'
 @Field static final String DRIVER_NAME = 'Sleep Number Bed'
 @Field static final String APP_NAME = 'Sleep Number Controller'

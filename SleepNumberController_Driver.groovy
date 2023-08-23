@@ -1029,17 +1029,17 @@ void componentStopLevelChange(DeviceWrapper device) {
 
 /*------------------ Shared constants ------------------*/
 
-@Field static final String appVersion = "3.2.6"  // public version
-@Field static final String NAMESPACE = "rvrolyk"
-@Field static final String DRIVER_NAME = "Sleep Number Bed"
+@Field static final String appVersion = '3.2.8'  // public version
+@Field static final String NAMESPACE = 'rvrolyk'
+@Field static final String DRIVER_NAME = 'Sleep Number Bed'
 
 /*------------------ Logging helpers ------------------*/
 
-@Field static final String PURPLE = "purple"
-@Field static final String BLUE = "#0299b1"
-@Field static final String GRAY = "gray"
-@Field static final String ORANGE = "orange"
-@Field static final String RED = "red"
+@Field static final String PURPLE = 'purple'
+@Field static final String BLUE = '#0299b1'
+@Field static final String GRAY = 'gray'
+@Field static final String ORANGE = 'orange'
+@Field static final String RED = 'red'
 
 @CompileStatic
 private static String logPrefix(String msg, String color = null) {
