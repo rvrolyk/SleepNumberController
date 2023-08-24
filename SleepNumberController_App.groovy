@@ -1373,9 +1373,8 @@ Map getFamilyStatus() {
 }
 
 
-void getAsyncFamilyStatus(Boolean alreadyTriedRequest=false) {
+void getAsyncFamilyStatus(Boolean alreadyTriedRequest = false) {
   debug 'Getting family status async'
-
   Map sess = (Map) state.session
   Boolean useAwsO = getSettingB('useAwsOAuth')
   Boolean loginState = useAwsO ? !sess || !sess.accessToken : !sess || !sess.key
@@ -2502,10 +2501,10 @@ void ahttpRequest(Map request) {
 }
 
 Map httpRequest(String path, Closure method = this.&get, Map body = null, Map query = null,
-                Boolean alreadyTriedRequest = false, Boolean async = false, Map qReq = null, Boolean wasasync = false) {
+                Boolean alreadyTriedRequest = false, Boolean async = false, Map qReq = null, Boolean wasAsync = false) {
   Map result; result = [:]
   Map sess = (Map) state.session
-  Boolean useAwsO= getSettingB('useAwsOAuth')
+  Boolean useAwsO = getSettingB('useAwsOAuth')
   Boolean loginState = useAwsO ? !sess || !sess.accessToken : !sess || !sess.key
   if (loginState) {
     if (alreadyTriedRequest) {
@@ -2514,8 +2513,8 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
     } else {
       login()
       result = httpRequest(path, method, body, query, true, false, qReq, async)
-      if(wasasync){
-        if(result) {
+      if (wasAsync) {
+        if (result) {
           finishAsyncReq(qReq, 200)
         } else {
           timeoutAreq(qReq)
@@ -2707,7 +2706,7 @@ Long now() {
 /*------------------ Shared constants ------------------*/
 
 
-@Field static final String appVersion = '3.2.8'  // public version
+@Field static final String appVersion = '3.2.9'  // public version
 @Field static final String NAMESPACE = 'rvrolyk'
 @Field static final String DRIVER_NAME = 'Sleep Number Bed'
 @Field static final String APP_NAME = 'Sleep Number Controller'
