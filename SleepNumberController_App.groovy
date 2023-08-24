@@ -1373,14 +1373,21 @@ Map getFamilyStatus() {
 }
 
 
-void getAsyncFamilyStatus() {
+void getAsyncFamilyStatus(Boolean alreadyTriedRequest=false) {
   debug 'Getting family status async'
 
   Map sess = (Map) state.session
   Boolean useAwsO = getSettingB('useAwsOAuth')
   Boolean loginState = useAwsO ? !sess || !sess.accessToken : !sess || !sess.key
   if (loginState) {
-    login()
+    if (alreadyTriedRequest) {
+      maybeLogError 'getAsyncFamilyStatus: Already attempted login but still no session key, giving up'
+      return
+    } else {
+      login()
+      getAsyncFamilyStatus(true)
+      return
+    }
   }
   String path = '/rest/bed/familyStatus'
   Map statusParams = fillParams(path, null, null, useAwsO, sess, true)
@@ -2495,18 +2502,26 @@ void ahttpRequest(Map request) {
 }
 
 Map httpRequest(String path, Closure method = this.&get, Map body = null, Map query = null,
-                Boolean alreadyTriedRequest = false, Boolean async = false, Map qReq = null) {
+                Boolean alreadyTriedRequest = false, Boolean async = false, Map qReq = null, Boolean wasasync = false) {
   Map result; result = [:]
   Map sess = (Map) state.session
   Boolean useAwsO= getSettingB('useAwsOAuth')
   Boolean loginState = useAwsO ? !sess || !sess.accessToken : !sess || !sess.key
   if (loginState) {
     if (alreadyTriedRequest) {
-      maybeLogError 'Already attempted login but still no session key, giving up'
+      maybeLogError "httpRequest: Already attempted login but still no session key, giving up, path: $path"
       return result
     } else {
       login()
-      return httpRequest(path, method, body, query, true)
+      result = httpRequest(path, method, body, query, true, false, qReq, async)
+      if(wasasync){
+        if(result) {
+          finishAsyncReq(qReq, 200)
+        } else {
+          timeoutAreq(qReq)
+        }
+      }
+      return result
     }
   }
 
@@ -2540,8 +2555,8 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
       // The session is invalid so retry login before giving up.
       info 'Unauthorized, retrying login'
       login()
-      result = httpRequest(path, method, body, query, true)
-      if (async) { timeoutAreq() }
+      result = httpRequest(path, method, body, query, true, false, qReq, async)
+      if (async) { timeoutAreq(qReq) }
       return result
     } else {
       // There was some other error so retry if that hasn't already been done
@@ -2549,7 +2564,7 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
       // bother.
       if (!alreadyTriedRequest && !e.toString().contains('Not Found')) {
         maybeLogError('Retrying failed request %s\n%s', statusParams, e)
-        result = httpRequest(path, method, body, query, true)
+        result = httpRequest(path, method, body, query, true, false, qReq, async)
         if (async) { timeoutAreq() }
         return result
       } else {
@@ -2560,13 +2575,13 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
           // bug.  In the latter case we still want diagnostic data so we use
           // debug logging.
           debug(err, statusParams, e)
-          if (async) { timeoutAreq() }
+          if (async) { timeoutAreq(qReq) }
           return result
         }
         maybeLogError(err, statusParams, e)
         state.status = sAPIERR
         updateLabel()
-        if (async) { timeoutAreq() }
+        if (async) { timeoutAreq(qReq) }
         return result
       }
     }
@@ -2576,14 +2591,17 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
 @Field static final String sAPIERR = 'API Error'
 
 void ahttpRequestHandler(resp,Map callbackData) {
-  Map request = (Map)callbackData?.command
+  Map request = (Map) callbackData?.command
   unschedule('timeoutAreq')
   Integer rCode; rCode = (Integer) resp.status
   if (resp.hasError()) {
     debug "retrying async request as synchronous $rCode"
     httpRequest((String) request.path, this.&put, (Map) request.body, (Map) request.query, false, false, request)
   }
+  finishAsyncReq(request, rCode)
+}
 
+void finishAsyncReq(Map request, Integer rCode) {
   Long rd; rd= ((Integer) request.duration).toLong()
   // Let this operation complete then process more requests and release the lock
   // throttle requests to 1 per second
@@ -2601,7 +2619,7 @@ void ahttpRequestHandler(resp,Map callbackData) {
 }
 
 void timeoutAreq(Map request = null) {
-  warn "async request timeout $request"
+  warn "async request failure or timeout $request"
   handleRequestQueue(true)
   remTsVal(sLASTFAMILYDATA)
   wrunIn(10L, sREFRESHCHILDDEVICES)
