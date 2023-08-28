@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "3.2.9",
+  "version": "3.3.0",
   "minimumHEVersion": "2.2.2",
-  "releaseNotes": "updates by imnotbob to add retry on family status errors",
-  "dateReleased": "2023-08-24",
+  "releaseNotes": "fix NullPointerException during setup",
+  "dateReleased": "2023-08-28",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",
   "payPalUrl": "https://www.paypal.com/paypalme/rvrolyk",

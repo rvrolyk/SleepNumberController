@@ -74,7 +74,7 @@ import java.text.SimpleDateFormat
 @Field static final String sBEDID = 'bedId'
 @Field static final String sDEVICEID = 'deviceId'
 
-@Field static final String sCACHE=' CACHE'
+@Field static final String sCACHE = ' CACHE'
 
 @Field static final String sREFRESHCHILDDEVICES = 'refreshChildDevices'
 @Field static final String sLASTFAMILYDATA = 'lastFamilyDataUpdDt'
@@ -228,8 +228,8 @@ Map homePage() {
        
     section((sTIT): '<b>Advanced Settings</b>') {
       String defaultName; defaultName = APP_NAME
-      if ((String)state.displayName) {
-        defaultName = (String)state.displayName
+      if ((String) state.displayName) {
+        defaultName = (String) state.displayName
       }
       app.updateLabel(defaultName)
 
@@ -322,17 +322,17 @@ void startAction() {
 
 void updateLabel() {
   // Store the user's original label in state.displayName
-  String appLabel; appLabel= (String) app.label
+  String appLabel; appLabel = (String) app.label
   Boolean connected; connected = false
   String dispN; dispN = (String) state.displayName
   String span = ' <span style=color:'
-  if (dispN.contains(span)) { dispN = dispN.split(span)[iZ] }
+  if (dispN && dispN.contains(span)) { dispN = dispN.split(span)[iZ] }
   if (appLabel.contains(span)) { appLabel = appLabel.split(span)[iZ]  }
   if (!appLabel) { appLabel = APP_NAME }
   if (dispN != appLabel) { state.displayName = appLabel }
 
-  String status; status = (String)state.status
-  Boolean paused= (Boolean)state.paused
+  String status; status = (String) state.status
+  Boolean paused = (Boolean) state.paused
   if (status || paused) {
     String nstatus; nstatus = status
     StringBuilder label; label = new StringBuilder((String)state.displayName + span)
@@ -602,12 +602,12 @@ Map findBedPage() {
   Map responseData = getBedData()
   List<ChildDeviceWrapper> devices = getBedDevices()
   List childDevices = []
-  List<Map> beds= responseData ? (List<Map>)responseData.beds : []
+  List<Map> beds = responseData ? (List<Map>)responseData.beds : []
   dynamicPage(name: 'findBedPage') {
     if (beds.size() > iZ) {
+      String l = sLEFT
+      String r = sRIGHT
       for (Map bed in beds) {
-        String l = sLEFT
-        String r = sRIGHT
         List sidesSeen = []
         String bdId = bed[sBEDID].toString()
         section("Bed: ${bdId}") {
@@ -636,7 +636,9 @@ Map findBedPage() {
                   addBedSelectLink(r, bdId)
                 }
               }
-            } else app.removeSetting('createNewChildDevices')
+            } else {
+              app.removeSetting('createNewChildDevices')
+            }
           }
           if (!sidesSeen.contains(l)) {
             addBedSelectLink(l, bdId)
@@ -1348,7 +1350,7 @@ Map getBeds(Boolean lazy = false) {
     return sleepMapFLD[myId]
   }
   debug 'Getting information for all beds'
-  Map res= httpRequest('/rest/bed')
+  Map res = httpRequest('/rest/bed')
   if (devdbg()) debug('Response data from SleepNumber: %s', res)
   if (res) {
     sleepMapFLD[myId] = res
@@ -1452,7 +1454,7 @@ private parseMyResp(aa,String mediaType = sNL) {
   ret = null
   if (aa instanceof String || aa instanceof GString) {
     String a = aa.toString() //.trim()
-    Boolean expectJson= mediaType ? mediaType.contains(sJSON):false
+    Boolean expectJson = mediaType ? mediaType.contains(sJSON):false
     try {
       if (stJsonBracket(a)) {
         ret = (LinkedHashMap) new JsonSlurper().parseText(a)
@@ -1688,7 +1690,7 @@ String getPrivacyMode(String bedId, Boolean lazy = false) {
     return (String)privacyMapFLD[bedId].pauseMode
   }
   debug('Getting Privacy Mode for %s', bedId)
-  Map res= httpRequest("/rest/bed/${bedId}/pauseMode")
+  Map res = httpRequest("/rest/bed/${bedId}/pauseMode")
   if (devdbg()) debug('Response data from SleepNumber: %s', res)
   if (res) {
     privacyMapFLD[bedId]=res
@@ -1722,7 +1724,7 @@ Map getSleepNumberFavorite(String bedId, Boolean lazy = false) {
     return sleepNumMapFLD[bedId]
   }
   debug 'Getting Sleep Number Favorites'
-  Map res= httpRequest("/rest/bed/${bedId}/sleepNumberFavorite")
+  Map res = httpRequest("/rest/bed/${bedId}/sleepNumberFavorite")
   if (devdbg()) debug('Response data from SleepNumber: %s', res)
   if (res) {
     sleepNumMapFLD[bedId] = res
@@ -1771,7 +1773,7 @@ void updateSleepNumberFavorite(Integer number, String devId) {
     }
     // side "R" or "L"
     // setting 0-100 (rounds to nearest multiple of 5)
-    String id= getBedDeviceId(device)
+    String id = getBedDeviceId(device)
     Map body = [
       (sBEDID): id,
       sleepNumberFavorite: dfavorite,
@@ -1855,7 +1857,7 @@ void setFoundationMassage(Integer ifootspeed, Integer iheadspeed, Integer itimer
   //  mode 0-3
   //  side "R" or "L"
   String side = getBedDeviceSide(device)
-  String id= getBedDeviceId(device)
+  String id = getBedDeviceId(device)
   Map body = [
     footMassageMotor: footspeed,
     headMassageMotor: headspeed,
@@ -1969,7 +1971,7 @@ Map getFoundationSystem(String bedId) {
     return foundationSystemMapFLD[bedId]
   }
   debug 'Getting Foundation System'
-  Map res= httpRequest("/rest/bed/${bedId}/foundation/system", this.&get)
+  Map res = httpRequest("/rest/bed/${bedId}/foundation/system", this.&get)
   if (devdbg()) debug('Response data from SleepNumber: %s', res)
   if (res) {
     foundationSystemMapFLD[bedId]=res
@@ -2002,7 +2004,7 @@ Map getUnderbedLightBrightness(String bedId) {
  *  @return   fills in state.bedInfo.underbedoutlets
  */
 void determineUnderbedLightSetup(String bedId) {
-  Map<String,Map> bdinfo= (Map<String,Map>) state.bedInfo
+  Map<String,Map> bdinfo = (Map<String,Map>) state.bedInfo
   if (bdinfo[bedId].underbedoutlets == null) {
     debug('Determining underbed lighting outlets for %s', bedId)
     // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
@@ -2042,7 +2044,7 @@ void setUnderbedLightState(Map params, String devId) {
     return
   }
 
-  String ps; ps= ((String) params.state).toLowerCase()
+  String ps; ps = ((String) params.state).toLowerCase()
   Integer pt,pb
   pt = (Integer) params.timer
   pb = (Integer) params.brightness
@@ -2104,7 +2106,7 @@ void setUnderbedLightState(Map params, String devId) {
  *  @return   fills in state.bedInfo.outlets
  */
 void determineOutletSetup(String bedId) {
-  Map<String,Map> bdinfo= (Map<String,Map>) state.bedInfo
+  Map<String,Map> bdinfo = (Map<String,Map>) state.bedInfo
   if (bdinfo[bedId].outlets == null) {
     debug('Determining outlets for %s', bedId)
     // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
@@ -2349,7 +2351,7 @@ void loginOld() {
     httpPut(params) { response ->
       if (response.success) {
         debug('login Success: (%s), %s', response.status, devdbg() ? response.data : 'redacted')
-        Map sess=[:]
+        Map sess = [:]
         sess.key = response.data.key
         sess.cookies = sBLK
         response.getHeaders('Set-Cookie').each {
@@ -2488,7 +2490,7 @@ Map fillParams(String path, Map body, Map query, Boolean useAwsO, Map sess, Bool
   if (useAwsO) {
     statusParams.headers['Authorization'] = sess.accessToken
   }
-  String s; s= "Sending request for ${path} with query ${queryString}"
+  String s; s = "Sending request for ${path} with query ${queryString}"
   if (async) s+= ' : ASYNC'
   if (payload) s+= " : ${payload}"
   debug s
@@ -2567,7 +2569,7 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
         if (async) { timeoutAreq() }
         return result
       } else {
-        String err= 'Error making request %s\n%s'
+        String err = 'Error making request %s\n%s'
         if (e.toString().contains('Not Found')) {
           // Don't bother polluting logs for Not Found errors as they are likely
           // either intentional (trying to figure out if outlet exists) or a code
@@ -2601,7 +2603,7 @@ void ahttpRequestHandler(resp,Map callbackData) {
 }
 
 void finishAsyncReq(Map request, Integer rCode) {
-  Long rd; rd= ((Integer) request.duration).toLong()
+  Long rd; rd = ((Integer) request.duration).toLong()
   // Let this operation complete then process more requests and release the lock
   // throttle requests to 1 per second
   if (rd > 0L) wrunInMillis(Math.round(rd * 1000.0D), 'handleRequestQueue', [data: true])
@@ -2705,12 +2707,10 @@ Long now() {
 
 /*------------------ Shared constants ------------------*/
 
-
-@Field static final String appVersion = '3.2.9'  // public version
+@Field static final String appVersion = '3.3.0'  // public version
 @Field static final String NAMESPACE = 'rvrolyk'
 @Field static final String DRIVER_NAME = 'Sleep Number Bed'
 @Field static final String APP_NAME = 'Sleep Number Controller'
-
 
 /*------------------ Logging helpers ------------------*/
 
@@ -2725,7 +2725,7 @@ Long now() {
 
 @CompileStatic
 private static String logPrefix(String msg, String color = null) {
-  String myMsg= msg.replaceAll(sLTH, '&lt;').replaceAll(sGTH, '&gt;')
+  String myMsg = msg.replaceAll(sLTH, '&lt;').replaceAll(sGTH, '&gt;')
   StringBuilder sb = new StringBuilder('<span ')
           .append("style='color:").append(GRAY).append(";'>")
           .append('[v').append(appVersion).append('] ')
@@ -2933,7 +2933,7 @@ static String dumpListDesc(List data,Integer level, List<Boolean> lastLevel, Str
     } else if (par instanceof List || par instanceof ArrayList) {
       Map newmap = [:]
       newmap[lbl] = par
-      Boolean t1 = cnt==sz
+      Boolean t1 = cnt == sz
       newLevel[level] = t1
       str += dumpMapDesc(newmap, level, newLevel, cnt, sz, !t1, html, reorder)
     } else {
