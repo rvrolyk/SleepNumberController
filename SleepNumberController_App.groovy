@@ -2616,7 +2616,7 @@ void finishAsyncReq(Map request, Integer rCode) {
     if (rd < 1L) rd = 4L
     wrunIn(rd, ra)// [overwrite:false])
   }
-  debug "finishing async request $rCode; delay to next operation $rd seconds" + ra ? ' with runafter' : sBLK
+  debug "finishing async request $rCode; delay to next operation $rd seconds" + (ra ? ' with runafter' : sBLK)
 }
 
 void timeoutAreq(Map request = null) {
@@ -2625,8 +2625,6 @@ void timeoutAreq(Map request = null) {
   remTsVal(sLASTFAMILYDATA)
   wrunIn(10L, sREFRESHCHILDDEVICES)
 }
-
-
 
 /*------------------ Logging helpers ------------------*/
 Boolean okToLogError() {
