@@ -51,7 +51,7 @@ import java.text.SimpleDateFormat
 @Field static final String sLEFT = 'Left'
 @Field static final String sPAUSED = 'paused'
 @Field static final String sACTIVE = 'active'
-@FIELD static final String sARGS = 'args'
+@Field static final String sARGS = 'args'
 
 @Field static final String sNUM = 'number'
 @Field static final String sTXT = 'text'
@@ -110,7 +110,7 @@ static String getLOGIN_URL() { 'https://' + LOGIN_HOST }
 @Field static final ArrayList<Integer> VALID_LIGHT_TIMES = [15, 30, 45, 60, 120, 180]
 @Field static final ArrayList<Integer> VALID_LIGHT_BRIGHTNESS = [1, 30, 100]
 @Field static final Map<String, String> LOG_LEVELS = ['0': 'Off', '1': 'Debug', '2': 'Info', '3': 'Warn']
-@FIELD static final Map<String, String> BAM_KEYS = [
+@Field static final Map<String, String> BAM_KEYS = [
   'HaltAllActuators': 'ACHA',
   'GetSystemConfiguration': 'SYCG',
   'SetSleepiqPrivacyState': 'SPRS',
@@ -1758,7 +1758,7 @@ String getPrivacyMode(String bedId, Boolean lazy = false) {
   Map res = null
   if (newApi) {
     res = httpRequest(createBamKeyUrl(bedId, state.bedInfo[bedId].accountId), this.&put,
-        body: [sKEY: BAM_KEY['GetSleepiqPrivacyState']]
+        body: [sKEY: BAM_KEY['GetSleepiqPrivacyState']])
   } else {
     res = httpRequest("/rest/bed/${bedId}/pauseMode")
   }
