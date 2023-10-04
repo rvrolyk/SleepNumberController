@@ -895,7 +895,7 @@ Map createBedPage(Map iparams) {
   if ((Boolean) params.useChildDevices) {
     // Bed Ids seem to always be negative so convert to positive for the device
     // id for better formatting.
-    String deviceId = "sleepnumber.${bedId}.${params[sSIDE]}".toString()
+    String deviceId = "sleepnumber.${bedId}.${params[sSIDE]}".toString() + (IS_BETA ? 'beta' : sBLK)
     String label = createDeviceLabel(newName, sPRESENCE)
     ChildDeviceWrapper parent; parent = existingDevices.find{ (String) it.deviceNetworkId == deviceId }
     if (parent) {
@@ -1741,7 +1741,6 @@ void setSleepNumber(Integer number, String devId) {
 /**
  * Privacy mode cached
  */
-@CompileStatic
 String getPrivacyMode(String bedId, Boolean lazy = false) {
   Integer lastUpd = getLastTsValSecs('lastPrivacyDataUpdDt')
   Boolean newApi = state.bedInfo[bedId].newApi
@@ -2015,7 +2014,6 @@ void setOutletState(String outletState, String devId) {
  * @param timer: optional indicating a valid minute duration (for outlets 3 and 4 only)
  * @param refresh: boolean indicating whether or not to skip refreshing state, refreshes by default
  */
-@CompileStatic
 void setOutletState(String bedId, Integer outletId, String ioutletState, Integer itimer = null,
                     Boolean refresh = true) {
   Boolean newApi = state.bedInfo[bedId].newApi
@@ -2819,10 +2817,13 @@ Long now() {
 
 /*------------------ Shared constants ------------------*/
 
+@Field static final Boolean IS_BETA = true
 @Field static final String appVersion = '3.3.0'  // public version
 @Field static final String NAMESPACE = 'rvrolyk'
 @Field static final String DRIVER_NAME = 'Sleep Number Bed'
-@Field static final String APP_NAME = 'Sleep Number Controller'
+@Field static final String APP_PREFIX = 'Sleep Number Controller'
+@Field static final String BETA_SUFFIX = ' Beta'
+static String getAPP_NAME() { APP_PREFIX + (IS_BETA ? BETA_SUFFIX : sBLK) }
 
 /*------------------ Logging helpers ------------------*/
 
