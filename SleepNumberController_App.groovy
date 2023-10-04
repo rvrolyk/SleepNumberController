@@ -110,7 +110,7 @@ static String getLOGIN_URL() { 'https://' + LOGIN_HOST }
 @Field static final ArrayList<Integer> VALID_LIGHT_TIMES = [15, 30, 45, 60, 120, 180]
 @Field static final ArrayList<Integer> VALID_LIGHT_BRIGHTNESS = [1, 30, 100]
 @Field static final Map<String, String> LOG_LEVELS = ['0': 'Off', '1': 'Debug', '2': 'Info', '3': 'Warn']
-@Field static final Map<String, String> BAM_KEYS = [
+@Field static final Map<String, String> BAM_KEY = [
   'HaltAllActuators': 'ACHA',
   'GetSystemConfiguration': 'SYCG',
   'SetSleepiqPrivacyState': 'SPRS',
@@ -1756,8 +1756,8 @@ String getPrivacyMode(String bedId, Boolean lazy = false) {
   debug('Getting Privacy Mode for %s', bedId)
   Map res = null
   if (newApi) {
-    res = httpRequest(createBamKeyUrl(bedId, state.bedInfo[bedId].accountId), this.&put,
-        body: [sKEY: BAM_KEY['GetSleepiqPrivacyState']])
+    res = httpRequest(createBamKeyUrl(bedId, state.bedInfo[bedId].accountId),
+		    this.&put, [sKEY: BAM_KEY['GetSleepiqPrivacyState']])
   } else {
     res = httpRequest("/rest/bed/${bedId}/pauseMode")
   }
@@ -2062,7 +2062,6 @@ Map getUnderbedLightState(String bedId) {
 }
 
 @Field volatile static Map<String, Map> foundationSystemMapFLD = [:]
-
 
 @CompileStatic
 Map getFoundationSystem(String bedId) {
