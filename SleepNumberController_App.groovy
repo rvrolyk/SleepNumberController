@@ -69,6 +69,7 @@ import java.text.SimpleDateFormat
 @Field static final String sACCT_ID = 'accountId'
 @Field static final String sTIT = 'title'
 @Field static final String sDESC = 'description'
+@Field static final String sSRC_APP = 'sourceApplication'
 
 @Field static final String sHEAD = 'head'
 @Field static final String sFOOT = 'foot'
@@ -1757,7 +1758,7 @@ String getPrivacyMode(String bedId, Boolean lazy = false) {
   Map res = null
   if (newApi) {
     res = httpRequest(createBamKeyUrl(bedId, state.bedInfo[bedId].accountId),
-		    this.&put, [sKEY: BAM_KEY['GetSleepiqPrivacyState']])
+		    this.&put, [sKEY: BAM_KEY['GetSleepiqPrivacyState', sARGS: '', sSRC_APP: APP_PREFIX]])
   } else {
     res = httpRequest("/rest/bed/${bedId}/pauseMode")
   }
@@ -1774,6 +1775,7 @@ void setPrivacyMode(Boolean mode, String devId) {
   if (!device) {
     return
   }
+  String bedId = getBedDeviceId(device)
   Boolean newApi = state.bedInfo[bedId].newApi
   // Cloud request
   remTsVal('lastPrivacyDataUpdDt')
@@ -1782,11 +1784,11 @@ void setPrivacyMode(Boolean mode, String devId) {
   if (newApi) {
     String pauseMode = mode ? sPAUSED : sACTIVE
     httpRequestQueue(2, path: createBamKeyUrl(bedId, state.bedInfo[bedId].accountId),
-      body: [sKEY: BAM_KEY['SetSleepiqPrivacyState'], sARGS: pauseMode],
+      body: [sKEY: BAM_KEY['SetSleepiqPrivacyState'], sARGS: pauseMode, sSRC_APP: APP_PREFIX],
       runAfter: sREFRESHCHILDDEVICES)
   } else {
     String pauseMode = mode ? sON : sOFF
-    httpRequestQueue(2, path: "/rest/bed/${getBedDeviceId(device)}/pauseMode",
+    httpRequestQueue(2, path: "/rest/bed/${bedId}/pauseMode",
             query: [mode: pauseMode], runAfter: sREFRESHCHILDDEVICES)
   }
 }
