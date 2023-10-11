@@ -1797,6 +1797,11 @@ void setPrivacyMode(Boolean mode, String devId) {
 
 @CompileStatic
 Map getSleepNumberFavorite(String bedId, Boolean lazy = false) {
+  Boolean newApi = state.bedInfo[bedId].newApi
+  if (newApi) {
+    warn "new API not supported yet"
+    return
+  }	
   Integer lastUpd = getLastTsValSecs('lastSleepFavoriteUpdDt')
   if (sleepNumMapFLD[bedId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
     addHttpR("/rest/bed/${bedId}/sleepNumberFavorite" + sCACHE)
@@ -1971,6 +1976,11 @@ void setFoundationMassage(Integer ifootspeed, Integer iheadspeed, Integer itimer
  */
 @CompileStatic
 Map getOutletState(String bedId, Integer outlet) {
+  Boolean newApi = state.bedInfo[bedId].newApi
+  if (newApi) {
+    warn "new API not supported yet"
+    return
+  }	
   String val = 'lastOutletUpdDt' + outlet.toString()
   String idx = bedId+'_'+outlet.toString()
   Integer lastUpd = getLastTsValSecs(val)
@@ -2090,6 +2100,11 @@ Map getFoundationSystem(String bedId) {
  *     may calls getOutletState * 2 (C)
  */
 Map getUnderbedLightBrightness(String bedId) {
+  Boolean newApi = state.bedInfo[bedId].newApi
+  if (newApi) {
+    warn "new API not supported yet"
+    return
+  }
   determineUnderbedLightSetup(bedId)
   Map brightness = getFoundationSystem(bedId)
   if (brightness && ((List) ((Map) state.bedInfo[bedId]).underbedoutlets).size() == i1) {
