@@ -36,6 +36,7 @@ import java.time.*
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Semaphore
+import java.util.regex.Pattern
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 
@@ -51,7 +52,6 @@ import java.text.SimpleDateFormat
 @Field static final String sLEFT = 'Left'
 @Field static final String sPAUSED = 'paused'
 @Field static final String sACTIVE = 'active'
-@Field static final String sARGS = 'args'
 
 @Field static final String sNUM = 'number'
 @Field static final String sTXT = 'text'
@@ -65,11 +65,9 @@ import java.text.SimpleDateFormat
 @Field static final String sVL = 'value'
 @Field static final String sTYP = 'type'
 @Field static final String sGEN = 'generation'
-@Field static final String sKEY = 'key'
 @Field static final String sACCT_ID = 'accountId'
 @Field static final String sTIT = 'title'
 @Field static final String sDESC = 'description'
-@Field static final String sSRC_APP = 'sourceApplication'
 
 @Field static final String sHEAD = 'head'
 @Field static final String sFOOT = 'foot'
@@ -1310,7 +1308,8 @@ void processBedData(Map responseData) {
         if (!sleepNumberFavorites[bedId]) {
           sleepNumberFavorites[bedId] = getSleepNumberFavorite(bedId, true)
         }
-        Integer favorite = ((Map)sleepNumberFavorites[bedId]).get("sleepNumberFavorite" + bedSideStr, -1)
+	// For now account for the fact that favorite may not be present (due to new API)
+        Integer favorite = sleepNumberFavorites[bedId] ? ((Map)sleepNumberFavorites[bedId]).get("sleepNumberFavorite" + bedSideStr, -1) : 0
         if (favorite >= iZ) {
           statusMap << [
             sleepNumberFavorite: favorite
@@ -1503,23 +1502,33 @@ private parseMyResp(aa,String mediaType = sNL) {
   return ret
 }
 
-
-
-@CompileStatic
 Map getFoundationStatus(String bedId, String currentSide) {
   debug('Getting Foundation Status for %s / %s', bedId, currentSide)
+  Boolean newApi = state.bedInfo[bedId].newApi
+  if (newApi) {
+    warn "new API not supported yet"
+    return
+  }
   return httpRequest("/rest/bed/${bedId}/foundation/status")
 }
 
-@CompileStatic
 Map getFootWarmingStatus(String bedId) {
   debug('Getting Foot Warming Status for %s', bedId)
+  Boolean newApi = state.bedInfo[bedId].newApi
+  if (newApi) {
+    warn "new API not supported yet"
+    return
+  }
   return httpRequest("/rest/bed/${bedId}/foundation/footwarming")
 }
 
-@CompileStatic
 Map getResponsiveAirStatus(String bedId) {
   debug('Getting responsive air status for %s', bedId)
+  Boolean newApi = state.bedInfo[bedId].newApi
+  if (newApi) {
+    warn "new API not supported yet"
+    return
+  }
   return httpRequest("/rest/bed/${bedId}/responsiveAir")
 }
 
@@ -1758,7 +1767,7 @@ String getPrivacyMode(String bedId, Boolean lazy = false) {
   Map res = null
   if (newApi) {
     res = httpRequest(createBamKeyUrl(bedId, state.bedInfo[bedId].accountId),
-		    this.&put, [sKEY: BAM_KEY['GetSleepiqPrivacyState'], sARGS: '', sSRC_APP: APP_PREFIX])
+		    this.&put, [key: BAM_KEY['GetSleepiqPrivacyState'], args: '', sourceApplication: APP_PREFIX])
   } else {
     res = httpRequest("/rest/bed/${bedId}/pauseMode")
   }
@@ -1767,7 +1776,7 @@ String getPrivacyMode(String bedId, Boolean lazy = false) {
     privacyMapFLD[bedId]=res
     updTsVal('lastPrivacyDataUpdDt')
   }
-  return newApi ? res?.paused : (String) res?.pauseMode
+  return newApi ? processBamKeyResponse(res) == 'paused' : (String) res?.pauseMode
 }
 
 void setPrivacyMode(Boolean mode, String devId) {
@@ -1784,7 +1793,7 @@ void setPrivacyMode(Boolean mode, String devId) {
   if (newApi) {
     String pauseMode = mode ? sPAUSED : sACTIVE
     httpRequestQueue(2, path: createBamKeyUrl(bedId, state.bedInfo[bedId].accountId),
-      body: [sKEY: BAM_KEY['SetSleepiqPrivacyState'], sARGS: pauseMode, sSRC_APP: APP_PREFIX],
+      body: [key: BAM_KEY['SetSleepiqPrivacyState'], args: pauseMode, sourceApplication: APP_PREFIX],
       runAfter: sREFRESHCHILDDEVICES)
   } else {
     String pauseMode = mode ? sON : sOFF
@@ -1795,7 +1804,6 @@ void setPrivacyMode(Boolean mode, String devId) {
 
 @Field volatile static Map<String, Map> sleepNumMapFLD = [:]
 
-@CompileStatic
 Map getSleepNumberFavorite(String bedId, Boolean lazy = false) {
   Boolean newApi = state.bedInfo[bedId].newApi
   if (newApi) {
@@ -1974,7 +1982,6 @@ void setFoundationMassage(Integer ifootspeed, Integer iheadspeed, Integer itimer
 /**
  * get oulet state cached
  */
-@CompileStatic
 Map getOutletState(String bedId, Integer outlet) {
   Boolean newApi = state.bedInfo[bedId].newApi
   if (newApi) {
@@ -2825,6 +2832,13 @@ def get(Map params, Closure closure) {
 
 def put(Map params, Closure closure) {
   httpPut(params, closure)
+}
+
+@Field static final Pattern sBAM_PASS = Pattern.compile('PASS:')
+
+@CompileStatic
+String processBamKeyResponse(Map response) {
+  return ((String) response['cdcResponse']).replaceFirst(sBAM_PASS, '')
 }
 
 Long now() {
