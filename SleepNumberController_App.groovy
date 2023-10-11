@@ -1758,7 +1758,7 @@ String getPrivacyMode(String bedId, Boolean lazy = false) {
   Map res = null
   if (newApi) {
     res = httpRequest(createBamKeyUrl(bedId, state.bedInfo[bedId].accountId),
-		    this.&put, [sKEY: BAM_KEY['GetSleepiqPrivacyState', sARGS: '', sSRC_APP: APP_PREFIX]])
+		    this.&put, [sKEY: BAM_KEY['GetSleepiqPrivacyState'], sARGS: '', sSRC_APP: APP_PREFIX])
   } else {
     res = httpRequest("/rest/bed/${bedId}/pauseMode")
   }
