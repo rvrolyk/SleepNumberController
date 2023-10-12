@@ -1506,7 +1506,8 @@ Map getFoundationStatus(String bedId, String currentSide) {
   debug('Getting Foundation Status for %s / %s', bedId, currentSide)
 	/*
  In order to use the new api, we need to build the feature values here for old and new
- new may not expose a timer to move to preset?
+ ACSP - args: <side> <preset name, eg flat> <time eg 30> to set preset timer
+ ACCP - args: <side> => returns time?
  new will require N calls, once to get features and then a call per feature to get value
  */
   Boolean newApi = state.bedInfo[bedId].newApi
