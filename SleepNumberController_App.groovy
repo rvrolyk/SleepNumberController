@@ -159,7 +159,7 @@ Map homePage() {
       input ((sNM): 'login', (sTYP): sTXT, (sTIT): 'sleepnumber.com email',
           (sDESC): 'Email address you use with Sleep Number', submitOnChange: true)
       input ((sNM): 'password', (sTYP): 'password', (sTIT): 'sleepnumber.com password',
-          (sDESC): 'Password you use with Sleep Number', submitOnChange: true)
+          (sDESC): 'Password you use with Sleep Number', submitOnChange: false /* true causes iOS passwords to mess this up */)
       // User may opt for constant refresh or a variable one.
       Boolean defaultVariableRefresh = gtSetting('variableRefresh') != null && !getSettingB('variableRefresh') ? false : getSettingI('refreshInterval') == null
       input ('variableRefresh', sBOOL, (sTIT): 'Use variable refresh interval? (recommended)', defaultValue: defaultVariableRefresh,
