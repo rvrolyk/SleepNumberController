@@ -1530,7 +1530,7 @@ Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
       List<String> features = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetSystemConfiguration'))
       // Decompose features into just active ones and add that to state so we don't have to continue looking them up
       // as they shouldn't change
-      List<String> activeFeatures = [FEATURE_NAMES, features].transpose().grep(f -> f[1] == "yes").collect({ it[0] as String })
+      List<String> activeFeatures = [FEATURE_NAMES, features].transpose().grep{ it[1] == "yes" }.collect({ it[0] as String })
       setState('systemConfiguration', activeFeatures)
     }
     // Actuators and presets
