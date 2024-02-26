@@ -100,12 +100,13 @@ static String getLOGIN_URL() { 'https://' + LOGIN_HOST }
 @Field static final String USER_AGENT = 'SleepIQ/1669639706 CFNetwork/1399 Darwin/22.1.0'
 @Field static final String SN_APP_VERSION = '4.8.40'
 
-@Field static final ArrayList<String> VALID_ACTUATORS = ['H', 'F']
+// TODO: Figure out how to share relevant values with the driver
+@Field static final Map<String, String> VALID_ACTUATORS = ['H': 'Head', 'F': 'Foot']
 @Field static final ArrayList<Integer> VALID_SPEEDS = [0, 1, 2, 3]
 @Field static final ArrayList<Integer> VALID_WARMING_TIMES = [30, 60, 120, 180, 240, 300, 360]
-@Field static final ArrayList<Integer> VALID_WARMING_TEMPS = [0, 31, 57, 72]
+@Field static final Map<Integer, String> VALID_WARMING_TEMPS = [0: 'off', 31: 'low', 57: 'medium', 72: 'high']
 @Field static final ArrayList<Integer> VALID_PRESET_TIMES = [0, 15, 30, 45, 60, 120, 180]
-@Field static final ArrayList<Integer> VALID_PRESETS = [1, 2, 3, 4, 5, 6]
+@Field static final Map<Integer, String> VALID_PRESETS = [1: 'favorite', 2: 'read', 3: 'watch_tv', 4: 'flat', 5: 'zero_g', 6: 'snore']
 @Field static final ArrayList<Integer> VALID_LIGHT_TIMES = [15, 30, 45, 60, 120, 180]
 @Field static final ArrayList<Integer> VALID_LIGHT_BRIGHTNESS = [1, 30, 100]
 @Field static final Map<String, String> LOG_LEVELS = ['0': 'Off', '1': 'Debug', '2': 'Info', '3': 'Warn']
@@ -120,11 +121,37 @@ static String getLOGIN_URL() { 'https://' + LOGIN_HOST }
   'SetFavoriteSleepNumber': 'SNFS',
   'GetFavoriteSleepNumber': 'SNFG',
   'SetUnderbedLightSettings': 'UBLS',
+  'SetUnderbedLightAutoSettings': 'UBAS',
   'GetUnderbedLightSettings': 'UBLG',
+  'GetUnderbedLightAutoSettings': 'UBAG',
   'GetActuatorPosition': 'ACTG',
   'SetActuatorTargetPosition': 'ACTS',
   'SetTargetPresetWithoutTimer': 'ASTP',
+  'SetTargetPresetWithTimer': 'ACSP',
   'GetCurrentPreset': 'AGCP',
+  'SetResponsiveAirState': 'LRAS',
+  'GetResponsiveAirState': 'LRAG',
+  'SetFootWarming': 'FWTS',
+  'GetFootWarming': 'FWTG',
+]
+
+@Field static List<String> FEATURE_NAMES = [
+        "bedType", // seems to always be 'dual'?  Maybe on some beds it's single?
+        "pressureControlEnabledFlag",
+        "articulationEnableFlag",
+        "underbedLightEnableFlag",
+        "rapidSleepSettingEnableFlag",
+        "thermalControlEnabledFlag",
+        "rightHeadActuator",
+        "rightFootActuator",
+        "leftHeadActuator",
+        "leftFootActuator",
+        "flatPreset",
+        "favoritePreset",
+        "snorePreset",
+        "zeroGravityPreset",
+        "watchTvPreset",
+        "readPreset",
 ]
 
 @Field static final String PAUSE = 'Pause'
@@ -1104,8 +1131,6 @@ Map getBedData(Boolean async = false) {
   return null
 }
 
-
-
 /**
  * Updates the bed devices with the given data.
  * This may make several rest calls depending on devices found
@@ -1135,7 +1160,6 @@ void processBedData(Map responseData) {
   Map<String, List> outletData = [:]
   Map<String, Map> underbedLightData = [:]
   Map<String, Object> responsiveAir = [:]
-
 
   for (ChildDeviceWrapper device in getBedDevices()) {
     String bedId = getBedDeviceId(device)
@@ -1175,7 +1199,7 @@ void processBedData(Map responseData) {
             && !foundationStatus[bedId]
             && (deviceTypes.contains(sHEAD) || deviceTypes.contains(sFOOT))
           ) {
-          foundationStatus[bedId] = getFoundationStatus(bedId, bedSideStr)
+          foundationStatus[bedId] = getFoundationStatus(bedId)
           if (!foundationStatus[bedId]) {
             bedFailures[bedId] = true
           }
@@ -1281,18 +1305,12 @@ void processBedData(Map responseData) {
         // Check for valid foundation status and footwarming status data before trying to use it
         // as it's possible the HTTP calls failed.
         if (foundationStatus[bedId]) {
-	        // Positions are in hex so convert to a decimal
-          Integer headPosition = convertHexToNumber((String)foundationStatus[bedId]."fs${bedSideStr}HeadPosition")
-          Integer footPosition = convertHexToNumber((String)foundationStatus[bedId]."fs${bedSideStr}FootPosition")
-          String bedPreset = foundationStatus[bedId]."fsCurrentPositionPreset${bedSideStr}"
-          // There's also a MSB timer but not sure when that gets set.  Least significant bit seems used for all valid times.
-          Integer positionTimer = convertHexToNumber((String)foundationStatus[bedId]."fs${bedSideStr}PositionTimerLSB")
-          statusMap << [
-            headPosition: headPosition,
-            footPosition:  footPosition,
-            positionPreset: bedPreset,
-            positionPresetTimer: foundationStatus[bedId]."fsTimerPositionPreset${bedSideStr}",
-            positionTimer: positionTimer
+         statusMap << [
+            headPosition: foundationStatus[bedId]["headPosition"],
+            footPosition:  foundationStatus[bedId]["footPosition"],
+            positionPreset: foundationStatus[bedId]["bedPreset"],
+            positionPresetTimer: foundationStatus[bedId]["positionPresetTimer"],
+            positionTimer: foundationStatus[bedId]["positionTimer"]
           ]
         } else if (!loggedError[bedId]) {
           //debug("Not updating foundation state, %s", (bedFailures.get(bedId) ? "error making requests" : "no data"))
@@ -1308,7 +1326,7 @@ void processBedData(Map responseData) {
         if (!sleepNumberFavorites[bedId]) {
           sleepNumberFavorites[bedId] = getSleepNumberFavorite(bedId, true)
         }
-	// For now account for the fact that favorite may not be present (due to new API)
+	   // For now account for the fact that favorite may not be present (due to new API)
         Integer favorite = sleepNumberFavorites[bedId] ? ((Map)sleepNumberFavorites[bedId]).get("sleepNumberFavorite" + bedSideStr, -1) : 0
         if (favorite >= iZ) {
           statusMap << [
@@ -1404,7 +1422,6 @@ Map getFamilyStatus() {
   return res
 }
 
-
 void getAsyncFamilyStatus(Boolean alreadyTriedRequest = false) {
   debug 'Getting family status async'
   Map sess = (Map) state.session
@@ -1448,7 +1465,7 @@ void finishGetAsyncFamilyStatus(resp, Map callbackData) {
   def data; data = resp.data
   Map ndata
   if (data != null && !(data instanceof Map) && !(data instanceof List)) {
-    ndata = (Map) parseMyResp(data,mediaType)
+    ndata = (Map) parseMyResp(data, mediaType)
   } else {
     ndata = data as Map
   }
@@ -1493,7 +1510,7 @@ private parseMyResp(aa,String mediaType = sNL) {
       } else if (expectJson || (mediaType in ['application/octet-stream'] && a.size() % i4 == iZ) ) { // HE can return data Base64
         String dec = new String(a.decodeBase64())
         if (dec != sNL) {
-          def t0 = parseMyResp(dec,sBLK)
+          def t0 = parseMyResp(dec, sBLK)
           ret = t0 == null ? dec : t0
         }
       }
@@ -1502,40 +1519,83 @@ private parseMyResp(aa,String mediaType = sNL) {
   return ret
 }
 
-Map getFoundationStatus(String bedId, String currentSide) {
-  debug('Getting Foundation Status for %s / %s', bedId, currentSide)
-	/*
- In order to use the new api, we need to build the feature values here for old and new
- ACSP - args: <side> <preset name, eg flat> <time eg 30> to set preset timer
- ACCP - args: <side> => returns time?
- new will require N calls, once to get features and then a call per feature to get value
- */
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
-    warn "new API not supported yet"
-    return
+Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
+  //  ACCP - args: <side> => returns time?  TODO: What did I mean by this??
+  debug('Getting Foundation Status for %s', bedId)
+  Map<String, Map<String, Object>> response = [:]
+  if (isFuzion(bedId)) {
+    if (!getState('systemConfiguration')) {
+      debug("Getting system configuration to determine features")
+      // call GetSystemConfiguration synchronously to get the list of supported features
+      List<String> features = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetSystemConfiguration'))
+      // Decompose features into just active ones and add that to state so we don't have to continue looking them up
+      // as they shouldn't change
+      List<String> activeFeatures = [FEATURE_NAMES, features].transpose().grep(f -> f[1] == "yes").collect({ it[0] })
+      setState('systemConfiguration', activeFeatures)
+    }
+    // Actuators and presets
+    [sRIGHT.toLowerCase(), sLEFT.toLowerCase()].each { side ->
+      if (fuzionHasFeature("articulationEnableFlag")) {
+        [sHEAD, sFOOT].each { actuator ->
+          if (fuzionHasFeature("${side}${actuator.capitalize()}Actuator")) {
+            response[side]["${actuator}Position"] = processBamKeyResponse(
+                    makeBamKeyHttpRequest(bedId, 'GetActuatorPosition', [side, actuator]))[0]
+          }
+        }
+      }
+      response[side]["positionPreset"] = processBamKeyResponse(
+              makeBamKeyHttpRequest(bedId, 'GetCurrentPreset', [side]))[0]
+      // TODO - fuzion: asyncsleepiq doesn't seem to have the preset timer functionality so not sure what to use for that.
+    }
+  } else {
+    Map status = httpRequest("/rest/bed/${bedId}/foundation/status")
+    [sRIGHT, sLEFT].each { side ->
+      // Positions are in hex so convert to a decimal
+      if (status.containsKey("fs${side}HeadPosition")) response[side]["headPosition"] = convertHexToNumber((String) status["fs${side}HeadPosition"])
+      if (status.containsKey("fs${side}FootPosition")) response[side]["footPosition"] = convertHexToNumber((String) status["fs${side}FootPosition"])
+      if (status.containsKey("fsCurrentPositionPreset${side}")) response[side]["positionPreset"] = status["fsCurrentPositionPreset${side}"]
+      // Time remaining to activate preset
+      // There's also a MSB timer but not sure when that gets set.  Least significant bit seems used for all valid times.
+      if (status.containsKey("fs${side}PositionTimerLSB")) response[side]["positionTimer"] = convertHexToNumber((String) status["fs${side}PositionTimerLSB"])
+      // The preset that will be activated after timer expires
+      if (status.containsKey("fsTimerPositionPreset${side}")) response[side]["positionPresetTimer"] = status["fsTimerPositionPreset${side}"]
+    }
   }
-  return httpRequest("/rest/bed/${bedId}/foundation/status")
+  return response
 }
 
 Map getFootWarmingStatus(String bedId) {
   debug('Getting Foot Warming Status for %s', bedId)
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
-    warn "new API not supported yet"
-    return
+  Map response = [:]
+  if (isFuzion(bedId)) {
+    // The new API doesn't have an overall status so we have to call for left and right and then build a response
+    // like the old API
+    // TODO: check features before making call - rapidSleepSettingEnableFlag
+    List<String> values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFootWarming', ['left']))
+    response['footWarmingStatusLeft'] = values[1] // the old API only had temp vs. an on/off value so just use that
+    response['footWarmingTimerLeft'] = values[2]
+    values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFootWarming', ['right']))
+    response['footWarmingStatusRight'] = values[1]
+    response['footWarmingTimerRight'] = values[2]
+  } else {
+    response = httpRequest("/rest/bed/${bedId}/foundation/footwarming")
   }
-  return httpRequest("/rest/bed/${bedId}/foundation/footwarming")
+  return response
 }
 
 Map getResponsiveAirStatus(String bedId) {
   debug('Getting responsive air status for %s', bedId)
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
-    warn "new API not supported yet"
-    return
+  Map response = [:]
+  if (isFuzion(bedId)) {
+    // New API is responsive air state per side w/ value of true or false so synthezise the old response
+    List<String> values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetResponsiveAirState', ['left']))
+    response['leftSideEnabled'] = values[0].equals('1') ? 'true' : 'false'
+    values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetResponsiveAirState', ['right']))
+    response['rightSideEnabled'] = values[0].equals('1') ? 'true' : 'false'
+  } else {
+    response = httpRequest("/rest/bed/${bedId}/responsiveAir")
   }
-  return httpRequest("/rest/bed/${bedId}/responsiveAir")
+  return response
 }
 
 void setResponsiveAirState(Boolean st, String devId) {
@@ -1543,28 +1603,27 @@ void setResponsiveAirState(Boolean st, String devId) {
   if (!device) {
     return
   }
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
-    warn "new API not supported yet"
-    return
-  }
-  //determineResponsiveAirSetup(bedId)
-  Map body = [:]
-  String side = getBedDeviceSide(device)
+  String bedId = getBedDeviceId(device)
+  String side = getBedDeviceSide(device).toLowerCase()
   debug('Setting responsive air state %s to %s', side, st)
-  if (side.toLowerCase() == 'right') {
-    body << [
-            rightSideEnabled: st
-    ]
-  } else {
-    body << [
-            leftSideEnabled: st
-    ]
-  }
-  httpRequestQueue(0, path: "/rest/bed/${getBedDeviceId(device)}/responsiveAir",
-          body: body, runAfter: sREFRESHCHILDDEVICES)
-}
 
+  if (isFuzion(getBedDeviceId(device))) {
+    addBamKeyRequestToQueue(bedId, 'SetResponsiveAirState', [side, st ? "1" : "0"], 0, sREFRESHCHILDDEVICES)
+  } else {
+    Map body = [:]
+    if (side == 'right') {
+      body << [
+              rightSideEnabled: st
+      ]
+    } else {
+      body << [
+              leftSideEnabled: st
+      ]
+    }
+    httpRequestQueue(0, path: "/rest/bed/${bedId}/responsiveAir",
+            body: body, runAfter: sREFRESHCHILDDEVICES)
+  }
+}
 
 /**
  * Params must be a Map containing keys actuator and position.
@@ -1575,27 +1634,16 @@ void setFoundationAdjustment(Map params, String devId) {
   if (!device) {
     return
   }
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
-    warn "new API not supported yet"
-    return
-  }
   String actu = (String) params?.actuator
   Integer pos = (Integer) params?.position
   if (!actu || pos == null) {
     error('Missing param values, actuator and position are required')
     return
   }
-  if (!VALID_ACTUATORS.contains(actu)) {
-    error('Invalid actuator %s, valid values are %s', actu, VALID_ACTUATORS)
+  if (!VALID_ACTUATORS.keySet().contains(actu)) {
+    error('Invalid actuator %s, valid values are %s', actu, VALID_ACTUATORS.keySet())
     return
   }
-  Map body = [
-    speed: iZ, // 1 == slow, 0 = fast
-    actuator: actu,
-    (sSIDE): getBedDeviceSide(device)[iZ],
-    position: pos // 0-100
-  ]
   // It takes ~35 seconds for a FlexFit3 head to go from 0-100 (or back) and about 18 seconds for the foot.
   // The timing appears to be linear which means it's 0.35 seconds per level adjusted for the head and 0.18
   // for the foot.
@@ -1603,8 +1651,22 @@ void setFoundationAdjustment(Map params, String devId) {
   Integer positionDelta = Math.abs(pos - currentPosition)
   Float movementDuration = actu == 'H' ? 0.35 : 0.18
   Integer waitTime = Math.round(movementDuration * positionDelta).toInteger() + i1
-  httpRequestQueue(waitTime, path: "/rest/bed/${getBedDeviceId(device)}/foundation/adjustment/micro",
-      body: body, runAfter: sREFRESHCHILDDEVICES)
+
+  String bedId = getBedDeviceId(device)
+  if (isFuzion(bedId)) {
+    addBamKeyRequestToQueue(bedId, 'SetActuatorTargetPosition',
+            [getBedDeviceSide(device)[iZ].toLowerCase(), VALID_ACTUATORS.get(actu).toLowerCase(), pos.toString()],
+            waitTime, sREFRESHCHILDDEVICES)
+  } else {
+    Map body = [
+            speed   : iZ, // 1 == slow, 0 = fast
+            actuator: actu,
+            (sSIDE) : getBedDeviceSide(device)[iZ],
+            position: pos // 0-100
+    ]
+    httpRequestQueue(waitTime, path: "/rest/bed/${bedId}/foundation/adjustment/micro",
+            body: body, runAfter: sREFRESHCHILDDEVICES)
+  }
 }
 
 /**
@@ -1616,13 +1678,8 @@ void setFootWarmingState(Map params, String devId) {
   if (!device) {
     return
   }
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
-    warn "new API not supported yet"
-    return
-  }
-  Integer ptemp = (Integer)params?.temp
-  Integer ptimer = (Integer)params?.timer
+  Integer ptemp = (Integer) params?.temp
+  Integer ptimer = (Integer) params?.timer
   if (ptemp == null || ptimer == null) {
     error('Missing param values, temp and timer are required')
     return
@@ -1631,17 +1688,24 @@ void setFootWarmingState(Map params, String devId) {
     error('Invalid warming time %s, valid values are %s', ptimer, VALID_WARMING_TIMES)
     return
   }
-  if (!VALID_WARMING_TEMPS.contains(ptemp)) {
-    error('Invalid warming temp %s, valid values are %s', ptemp, VALID_WARMING_TEMPS)
+  if (!VALID_WARMING_TEMPS.keySet().contains(ptemp)) {
+    error('Invalid warming temp %s, valid values are %s', ptemp, VALID_WARMING_TEMPS.keySet())
     return
   }
-  String sid = getBedDeviceSide(device)
-  Map body = [
-          ("footWarmingTemp${sid}".toString()): ptemp,
-          ("footWarmingTimer${sid}".toString()): ptimer
-  ]
-  httpRequestQueue(0, path: "/rest/bed/${getBedDeviceId(device)}/foundation/footwarming",
-      body: body, runAfter: sREFRESHCHILDDEVICES)
+  String side = getBedDeviceSide(device)
+  String bedId = getBedDeviceId(device)
+  if (isFuzion(bedId)) {
+    // TODO: Check feature flag (rapidSleepSettingEnableFlag)?
+    addBamKeyRequestToQueue(bedId, 'SetFootWarming',
+            [side.toLowerCase(), VALID_WARMING_TEMPS.get(ptemp), ptimer.toString()], 0, sREFRESHCHILDDEVICES)
+  } else {
+    Map body = [
+            ("footWarmingTemp${side}".toString()) : ptemp,
+            ("footWarmingTimer${side}".toString()): ptimer
+    ]
+    httpRequestQueue(0, path: "/rest/bed/${getBedDeviceId(device)}/foundation/footwarming",
+            body: body, runAfter: sREFRESHCHILDDEVICES)
+  }
 }
 
 /**
@@ -1654,32 +1718,34 @@ void setFoundationTimer(Map params, String devId) {
     error('Bed device with id %s is not a valid child', devId)
     return
   }
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
-    warn "new API not supported yet"
-    return
-  }
   Integer ppreset = (Integer) params?.preset
   Integer ptimer = (Integer) params?.timer
   if (ppreset == null || ptimer == null) {
     error('Missing param values, preset and timer are required')
     return
   }
-  if (!VALID_PRESETS.contains(ppreset)) {
-    error('Invalid preset %s, valid values are %s', ppreset, VALID_PRESETS)
+  if (!VALID_PRESETS.keySet().contains(ppreset)) {
+    error('Invalid preset %s, valid values are %s', ppreset, VALID_PRESETS.keySet())
     return
   }
   if (!VALID_PRESET_TIMES.contains(ptimer)) {
     error('Invalid timer %s, valid values are %s', ptimer, VALID_PRESET_TIMES)
     return
   }
-  Map body = [
-    (sSIDE): getBedDeviceSide(device)[iZ],
-    positionPreset: ppreset,
-    positionTimer: ptimer
-  ]
-  httpRequestQueue(5, path: "/rest/bed/${getBedDeviceId(device)}/foundation/adjustment",
-          body: body, runAfter: sREFRESHCHILDDEVICES)
+  String bedId = getBedDeviceId(device)
+  if (isFuzion(bedId)) {
+    addBamKeyRequestToQueue(bedId, 'SetTargetPresetWithTimer',
+            [getBedDeviceSide(device)[iZ].toLowerCase(), VALID_PRESETS.get(preset), ptimer.toString()],
+            5, sREFRESHCHILDDEVICES)
+  } else {
+    Map body = [
+            (sSIDE)       : getBedDeviceSide(device)[iZ],
+            positionPreset: ppreset,
+            positionTimer : ptimer
+    ]
+    httpRequestQueue(5, path: "/rest/bed/${bedId}/foundation/adjustment",
+            body: body, runAfter: sREFRESHCHILDDEVICES)
+  }
 }
 
 /**
@@ -1690,25 +1756,27 @@ void setFoundationPreset(Integer preset, String devId) {
   if (!device) {
     return
   }
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
-    warn "new API not supported yet"
+  if (!VALID_PRESETS.keySet().contains(preset)) {
+    error('Invalid preset %s, valid values are %s', preset, VALID_PRESETS.keySet())
     return
   }
-  if (!VALID_PRESETS.contains(preset)) {
-    error('Invalid preset %s, valid values are %s', preset, VALID_PRESETS)
-    return
-  }
-  Map body = [
-    speed: iZ,
-    preset : preset,
-    (sSIDE): getBedDeviceSide(device)[iZ]
-  ]
   // It takes ~35 seconds for a FlexFit3 head to go from 0-100 (or back) and about 18 seconds for the foot.
   // Rather than attempt to derive the preset relative to the current state so we can compute
   // the time (as we do for adjustment), we just use the maximum.
-  httpRequestQueue(35, path: "/rest/bed/${getBedDeviceId(device)}/foundation/preset",
-      body: body, runAfter: sREFRESHCHILDDEVICES)
+  Integer duration = 35
+  String bedId = getBedDeviceId(device)
+  if (isFuzion(bedId)) {
+    addBamKeyRequestToQueue(bedId, 'SetTargetPresetWithoutTimer', [getBedDeviceSide(device)[iZ].toLowerCase(),
+               VALID_PRESETS.get(preset)], duration, sREFRESHCHILDDEVICES)
+  } else {
+    Map body = [
+            speed  : iZ,
+            preset : preset,
+            (sSIDE): getBedDeviceSide(device)[iZ]
+    ]
+    httpRequestQueue(duration, path: "/rest/bed/${bedId}/foundation/preset",
+            body: body, runAfter: sREFRESHCHILDDEVICES)
+  }
 }
 
 void stopFoundationMovement(Map ignored, String devId) {
@@ -1716,131 +1784,27 @@ void stopFoundationMovement(Map ignored, String devId) {
   if (!device) {
     return
   }
-  Map body = [
-    massageMotion: iZ,
-    headMotion: i1,
-    footMotion: i1,
-    (sSIDE): getBedDeviceSide(device)[iZ]
-  ]
   remTsVal(sLASTFAMILYDATA)
-  httpRequestQueue(5, path: "/rest/bed/${getBedDeviceId(device)}/foundation/motion",
-          body: body, runAfter: sREFRESHCHILDDEVICES)
-}
-
-/**
- * The side is derived from the specified device
- */
-void setSleepNumber(Integer number, String devId) {
-  ChildDeviceWrapper device = findBedDevice(devId)
-  if (!device) {
-    return
-  }
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
-    warn "new API not supported yet"
-    return
-  }
-
-  String id = getBedDeviceId(device)
-  Map body = [
-    (sBEDID): id,
-    sleepNumber: number,
-    (sSIDE): getBedDeviceSide(device)[iZ]
-  ]
-  // Not sure how long it takes to inflate or deflate so just wait 20s
-  httpRequestQueue(20, path: "/rest/bed/${id}/sleepNumber",
-      body: body, runAfter: sREFRESHCHILDDEVICES)
-}
-
-@Field volatile static Map<String, Map> privacyMapFLD = [:]
-
-/**
- * Privacy mode cached
- */
-String getPrivacyMode(String bedId, Boolean lazy = false) {
-  Integer lastUpd = getLastTsValSecs('lastPrivacyDataUpdDt')
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (privacyMapFLD[bedId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
-    if (newApi) {
-      addHttpR(createBamKeyUrl(bedId, state.bedInfo[bedId].accountId) + " GetSleepiqPrivacyState" + sCACHE)
-    } else {
-      addHttpR("/rest/bed/${bedId}/pauseMode" + sCACHE)
-    }
-    debug "Getting CACHED Privacy Mode for ${bedId} ${ devdbg() ? privacyMapFLD[bedId] : sBLK}"
-    return (String)privacyMapFLD[bedId].pauseMode
-  }
-  debug('Getting Privacy Mode for %s', bedId)
-  Map res = null
-  if (newApi) {
-    res = httpRequest(createBamKeyUrl(bedId, state.bedInfo[bedId].accountId),
-		    this.&put, [key: BAM_KEY['GetSleepiqPrivacyState'], args: '', sourceApplication: APP_PREFIX])
-  } else {
-    res = httpRequest("/rest/bed/${bedId}/pauseMode")
-  }
-  if (devdbg()) debug('Response data from SleepNumber: %s', res)
-  if (res) {
-    privacyMapFLD[bedId]=res
-    updTsVal('lastPrivacyDataUpdDt')
-  }
-  return newApi ? processBamKeyResponse(res) == 'paused' : (String) res?.pauseMode
-}
-
-void setPrivacyMode(Boolean mode, String devId) {
-  ChildDeviceWrapper device = findBedDevice(devId)
-  if (!device) {
-    return
-  }
   String bedId = getBedDeviceId(device)
-  Boolean newApi = state.bedInfo[bedId].newApi
-  // Cloud request
-  remTsVal('lastPrivacyDataUpdDt')
-  remTsVal(sLASTFAMILYDATA)
-  remTsVal('lastSleeperDataUpdDt')
-  if (newApi) {
-    String pauseMode = mode ? sPAUSED : sACTIVE
-    httpRequestQueue(2, path: createBamKeyUrl(bedId, state.bedInfo[bedId].accountId),
-      body: [key: BAM_KEY['SetSleepiqPrivacyState'], args: pauseMode, sourceApplication: APP_PREFIX],
-      runAfter: sREFRESHCHILDDEVICES)
-  } else {
-    String pauseMode = mode ? sON : sOFF
-    httpRequestQueue(2, path: "/rest/bed/${bedId}/pauseMode",
-            query: [mode: pauseMode], runAfter: sREFRESHCHILDDEVICES)
+  if (isFuzion(bedId)) {
+    // TODO - Fuzion: asyncsleepiq doesn't use a side for this command but it sure seems like it should take one.  Test this.
+    addBamKeyRequestToQueue(bedId, 'HaltAllActuators', [/*getBedDeviceSide(device)[iZ].toLowerCase()*/], 5, sREFRESHCHILDDEVICES)
+   } else {
+    Map body = [
+            massageMotion: iZ,
+            headMotion   : i1,
+            footMotion   : i1,
+            (sSIDE)      : getBedDeviceSide(device)[iZ]
+    ]
+    httpRequestQueue(5, path: "/rest/bed/${bedId}/foundation/motion",
+            body: body, runAfter: sREFRESHCHILDDEVICES)
   }
-}
-
-@Field volatile static Map<String, Map> sleepNumMapFLD = [:]
-
-Map getSleepNumberFavorite(String bedId, Boolean lazy = false) {
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
-    warn "new API not supported yet"
-    return
-  }	
-  Integer lastUpd = getLastTsValSecs('lastSleepFavoriteUpdDt')
-  if (sleepNumMapFLD[bedId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
-    addHttpR("/rest/bed/${bedId}/sleepNumberFavorite" + sCACHE)
-    debug "Getting CACHED Sleep Number Favorites ${ devdbg() ? sleepNumMapFLD[bedId] : sBLK}"
-    return sleepNumMapFLD[bedId]
-  }
-  debug 'Getting Sleep Number Favorites'
-  Map res = httpRequest("/rest/bed/${bedId}/sleepNumberFavorite")
-  if (devdbg()) debug('Response data from SleepNumber: %s', res)
-  if (res) {
-    sleepNumMapFLD[bedId] = res
-    updTsVal('lastSleepFavoriteUpdDt')
-  }
-  return res
 }
 
 // set sleep number to current favorite
 void setSleepNumberFavorite(String ignored, String devId) {
   ChildDeviceWrapper device = findBedDevice(devId)
   if (!device) {
-    return
-  }
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
-    warn "new API not supported yet"
     return
   }
   // Get the favorite for the device first, the most recent poll should be accurate
@@ -1865,11 +1829,7 @@ void updateSleepNumberFavorite(Integer number, String devId) {
   if (!device) {
     return
   }
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
-    warn "new API not supported yet"
-    return
-  }
+  // favorite setting 0-100 (rounds to nearest multiple of 5)
   Integer dfavorite = (Math.round(number / 5) * 5).toInteger()
   Integer favorite = device.currentValue('sleepNumberFavorite')
   String sid = getBedDeviceSide(device)
@@ -1880,16 +1840,19 @@ void updateSleepNumberFavorite(Integer number, String devId) {
       debug 'Already at favorite'
       return
     }
-    // side "R" or "L"
-    // setting 0-100 (rounds to nearest multiple of 5)
-    String id = getBedDeviceId(device)
-    Map body = [
-      (sBEDID): id,
-      sleepNumberFavorite: dfavorite,
-      (sSIDE): sid[iZ]
-    ]
-
-    httpRequestQueue(2, path: "/rest/bed/${id}/sleepNumberFavorite", body: body /*, runAfter: sREFRESHCHILDDEVICES*/)
+    String bedId = getBedDeviceId(device)
+    if (isFuzion(bedId)) {
+      addBamKeyRequestToQueue(bedId, 'SetFavoriteSleepNumber',
+              [getBedDeviceSide(device)[iZ].toLowerCase(), dfavorite.toString()])
+    } else {
+      // side "R" or "L"
+      Map body = [
+              (sBEDID)           : bedId,
+              sleepNumberFavorite: dfavorite,
+              (sSIDE)            : sid[iZ]
+      ]
+      httpRequestQueue(0, path: "/rest/bed/${bedId}/sleepNumberFavorite", body: body)
+    }
     remTsVal('lastSleepFavoriteUpdDt')
     setSleepNumber(dfavorite, devId)
   } else {
@@ -1897,6 +1860,108 @@ void updateSleepNumberFavorite(Integer number, String devId) {
   }
   remTsVal('lastSleepFavoriteUpdDt')
 }
+
+/**
+ * The side is derived from the specified device
+ */
+void setSleepNumber(Integer number, String devId) {
+  ChildDeviceWrapper device = findBedDevice(devId)
+  if (!device) {
+    return
+  }
+  String bedId = getBedDeviceId(device)
+  // Not sure how long it takes to inflate or deflate so just wait 20s
+  Integer duration = 20
+  if (isFuzion(bedId)) {
+    addBamKeyRequestToQueue(bedId, 'StartSleepNumberAdjustment', [getBedDeviceSide(device)[iZ], number.toString()],
+            duration, sREFRESHCHILDDEVICES)
+  } else {
+    Map body = [
+            (sBEDID)   : bedId,
+            sleepNumber: number,
+            (sSIDE)    : getBedDeviceSide(device)[iZ]
+    ]
+    httpRequestQueue(duration, path: "/rest/bed/${bedId}/sleepNumber",
+            body: body, runAfter: sREFRESHCHILDDEVICES)
+  }
+}
+
+@Field volatile static Map<String, Map> privacyMapFLD = [:]
+
+/**
+ * Privacy mode cached
+ */
+String getPrivacyMode(String bedId, Boolean lazy = false) {
+  Integer lastUpd = getLastTsValSecs('lastPrivacyDataUpdDt')
+  if (privacyMapFLD[bedId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
+    if (isFuzion(bedId)) {
+      addHttpR(createBamKeyUrl(bedId, state.bedInfo[bedId].accountId) + " GetSleepiqPrivacyState" + sCACHE)
+    } else {
+      addHttpR("/rest/bed/${bedId}/pauseMode" + sCACHE)
+    }
+    debug "Getting CACHED Privacy Mode for ${bedId} ${ devdbg() ? privacyMapFLD[bedId] : sBLK}"
+    return (String)privacyMapFLD[bedId].pauseMode
+  }
+  debug('Getting Privacy Mode for %s', bedId)
+  Map res = null
+  if (isFuzion(bedId)) {
+    Boolean paused = processBamKeyResponse(
+            makeBamKeyHttpRequest(bedId, 'GetSleepiqPrivacyState'))[0].equals('paused')
+    res = ['pauseMode': paused ? 'paused' : 'active'] // what goes here?
+  } else {
+    res = httpRequest("/rest/bed/${bedId}/pauseMode")
+  }
+  if (devdbg()) debug('Response data from SleepNumber: %s', res)
+  if (res) {
+    privacyMapFLD[bedId] = res
+    updTsVal('lastPrivacyDataUpdDt')
+  }
+  return (String) res?.pauseMode
+}
+
+void setPrivacyMode(Boolean mode, String devId) {
+  ChildDeviceWrapper device = findBedDevice(devId)
+  if (!device) {
+    return
+  }
+  String bedId = getBedDeviceId(device)
+  // Cloud request
+  remTsVal('lastPrivacyDataUpdDt')
+  remTsVal(sLASTFAMILYDATA)
+  remTsVal('lastSleeperDataUpdDt')
+  if (isFuzion(bedId)) {
+    String pauseMode = mode ? sPAUSED : sACTIVE
+    addBamKeyRequestToQueue(bedId, 'SetSleepiqPrivacyState', [pauseMode], 2, sREFRESHCHILDDEVICES)
+  } else {
+    String pauseMode = mode ? sON : sOFF
+    httpRequestQueue(2, path: "/rest/bed/${bedId}/pauseMode",
+            query: [mode: pauseMode], runAfter: sREFRESHCHILDDEVICES)
+  }
+}
+
+@Field volatile static Map<String, Map> sleepNumMapFLD = [:]
+
+Map getSleepNumberFavorite(String bedId, Boolean lazy = false) {
+  if (isFuzion(bedId)) {
+    warn "new API not supported yret"
+    return
+  }	
+  Integer lastUpd = getLastTsValSecs('lastSleepFavoriteUpdDt')
+  if (sleepNumMapFLD[bedId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
+    addHttpR("/rest/bed/${bedId}/sleepNumberFavorite" + sCACHE)
+    debug "Getting CACHED Sleep Number Favorites ${ devdbg() ? sleepNumMapFLD[bedId] : sBLK}"
+    return sleepNumMapFLD[bedId]
+  }
+  debug 'Getting Sleep Number Favorites'
+  Map res = httpRequest("/rest/bed/${bedId}/sleepNumberFavorite")
+  if (devdbg()) debug('Response data from SleepNumber: %s', res)
+  if (res) {
+    sleepNumMapFLD[bedId] = res
+    updTsVal('lastSleepFavoriteUpdDt')
+  }
+  return res
+}
+
 //RIGHT_NIGHT_STAND = 1
 //LEFT_NIGHT_STAND = 2
 //RIGHT_NIGHT_LIGHT = 3
@@ -1951,8 +2016,8 @@ void updateSleepNumberFavorite(Integer number, String devId) {
 void setFoundationMassage(Integer ifootspeed, Integer iheadspeed, Integer itimer = iZ, Integer mode = iZ, String devId) {
   ChildDeviceWrapper device = findBedDevice(devId)
   if (!device) return
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
+  if (isFuzion(getBedDeviceId(device))) {
+    // TODO - fuzion: Add this
     warn "new API not supported yet"
     return
   }
@@ -1989,8 +2054,7 @@ void setFoundationMassage(Integer ifootspeed, Integer iheadspeed, Integer itimer
  * get oulet state cached
  */
 Map getOutletState(String bedId, Integer outlet) {
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
+  if (isFuzion(bedId)) {
     warn "new API not supported yet"
     return
   }	
@@ -2018,11 +2082,6 @@ void setOutletState(String outletState, String devId) {
   if (!device) {
     return
   }
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
-    warn "new API not supported yet"
-    return
-  }
   if (!outletState) {
     error 'Missing outletState'
     return
@@ -2041,8 +2100,8 @@ void setOutletState(String outletState, String devId) {
  */
 void setOutletState(String bedId, Integer outletId, String ioutletState, Integer itimer = null,
                     Boolean refresh = true) {
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
+  if (isFuzion(bedId)) {
+    // TODO - fuzion: Add this
     warn "new API not supported yet"
     return
   }
@@ -2110,11 +2169,10 @@ Map getFoundationSystem(String bedId) {
  * get underbed brigntness
  * rest calls
  *     calls getFoundationSystem (C)
- *     may calls getOutletState * 2 (C)
+ *     may call getOutletState * 2 (C)
  */
 Map getUnderbedLightBrightness(String bedId) {
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
+  if (isFuzion(bedId)) {
     warn "new API not supported yet"
     return
   }
@@ -2169,8 +2227,8 @@ void setUnderbedLightState(Map params, String devId) {
   if (!device) {
     return
   }
-  Boolean newApi = state.bedInfo[bedId].newApi
-  if (newApi) {
+  if (isFuzion(getBedDeviceId(device))) {
+    // TODO - fuzion: Add this
     warn "new API not supported yet"
     return
   }
@@ -2596,12 +2654,54 @@ private void addHttpR(String path) {
   Map<String,Integer> cnts = httpCntsMapFLD[myId] ?: [:]
   cnts[path] = (cnts[path] ? cnts[path] : iZ) + i1
   httpCntsMapFLD[myId] = cnts
-  httpCntsMapFLD = httpCntsMapFLD
+  //httpCntsMapFLD = httpCntsMapFLD
+}
+
+private Boolean isFuzion(String bedId) {
+  return state.bedInfo[bedId].newApi
+}
+
+private Boolean fuzionHasFeature(String feature) {
+  List<String> currentConfiguration = getState('systemConfiguration') as List<String>
+  return currentConfiguration.contains(feature)
+}
+
+private Map makeBamKeyHttpRequest(String bedId, String key, List<String> bamKeyArgs = []) {
+  return httpRequest(createBamKeyUrl(bedId, state.bedInfo[bedId].accountId as String),
+      this.&put, createBamKeyArgs(key, bamKeyArgs))
+}
+
+/**
+ * Creates a request for a Fuzion bed with the given key.
+ */
+private void addBamKeyRequestToQueue(String bedId, String key, List<String> bamKeyArgs = [],
+                                     Integer duration = 0, String runAfter = null) {
+  String accountId = state.bedInfo[bedId].accountId
+  if (accountId == null) {
+    error "No account id for bed ${bedId} available"
+    return
+  }
+  httpRequestQueue(duration, path: createBamKeyUrl(bedId, accountId),
+          body: createBamKeyArgs(key, bamKeyArgs), runAfter: runAfter)
 }
 
 @CompileStatic
 private String createBamKeyUrl(String bedId, String accountId) {
   return "/rest/sn/v1/accounts/${accountId}/beds/${bedId}/bamkey"
+}
+
+@CompileStatic
+private Map<String, String> createBamKeyArgs(String key, String arg) {
+  return [
+          key: BAM_KEY[key],
+          args: arg,
+          sourceApplication: APP_PREFIX
+  ]
+}
+
+@CompileStatic
+private Map<String, String> createBamKeyArgs(String key, List<String> args) {
+  return createBamKeyArgs(key, args.join(" "))
 }
 
 @CompileStatic
@@ -2732,13 +2832,14 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
 
 @Field static final String sAPIERR = 'API Error'
 
-void ahttpRequestHandler(resp,Map callbackData) {
+void ahttpRequestHandler(resp, Map callbackData) {
   Map request = (Map) callbackData?.command
   unschedule('timeoutAreq')
   Integer rCode; rCode = (Integer) resp.status
   if (resp.hasError()) {
     debug "retrying async request as synchronous $rCode"
-    httpRequest((String) request.path, this.&put, (Map) request.body, (Map) request.query, false, false, request)
+    httpRequest((String) request.path, (Closure) request.method, (Map) request.body,
+            (Map) request.query, false, false, request)
   }
   finishAsyncReq(request, rCode)
 }
@@ -2843,8 +2944,14 @@ def put(Map params, Closure closure) {
 @Field static final Pattern sBAM_PASS = Pattern.compile('PASS:')
 
 @CompileStatic
-String processBamKeyResponse(Map response) {
-  return ((String) response['cdcResponse']).replaceFirst(sBAM_PASS, '')
+List<String> processBamKeyResponse(Map response) {
+  if (response.keySet().isEmpty() || response.containsKey('cdcResponse')) {
+    // Bad response so return an empty list instead.
+    warn("response from bam key request seems invalid: ${response}")
+    return []
+  } else {
+    return ((String) response['cdcResponse']).replaceFirst(sBAM_PASS, '').tokenize()
+  }
 }
 
 Long now() {

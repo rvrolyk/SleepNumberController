@@ -435,7 +435,7 @@ void setSleepNumberFavorite() {
 }
 
 void updateSleepNumberFavorite(Number val) {
-  debug "setSleepNumberFavorite(${val})"
+  debug "updateSleepNumberFavorite(${val})"
   if (val > iZ && val <= 100) {
     sendToParent("updateSleepNumberFavorite", val)
   } else {
