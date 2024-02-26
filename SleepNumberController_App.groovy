@@ -1530,7 +1530,7 @@ Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
       List<String> features = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetSystemConfiguration'))
       // Decompose features into just active ones and add that to state so we don't have to continue looking them up
       // as they shouldn't change
-      List<String> activeFeatures = [FEATURE_NAMES, features].transpose().grep(f -> f[1] == "yes").collect({ it[0] })
+      List<String> activeFeatures = [FEATURE_NAMES, features].transpose().grep(f -> f[1] == "yes").collect({ it[0] as String })
       setState('systemConfiguration', activeFeatures)
     }
     // Actuators and presets
@@ -1903,7 +1903,7 @@ String getPrivacyMode(String bedId, Boolean lazy = false) {
     return (String)privacyMapFLD[bedId].pauseMode
   }
   debug('Getting Privacy Mode for %s', bedId)
-  Map res = null
+  Map res
   if (isFuzion(bedId)) {
     Boolean paused = processBamKeyResponse(
             makeBamKeyHttpRequest(bedId, 'GetSleepiqPrivacyState'))[0].equals('paused')
@@ -1944,7 +1944,7 @@ void setPrivacyMode(Boolean mode, String devId) {
 Map getSleepNumberFavorite(String bedId, Boolean lazy = false) {
   if (isFuzion(bedId)) {
     warn "new API not supported yret"
-    return
+    return [:]
   }	
   Integer lastUpd = getLastTsValSecs('lastSleepFavoriteUpdDt')
   if (sleepNumMapFLD[bedId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
@@ -2056,7 +2056,7 @@ void setFoundationMassage(Integer ifootspeed, Integer iheadspeed, Integer itimer
 Map getOutletState(String bedId, Integer outlet) {
   if (isFuzion(bedId)) {
     warn "new API not supported yet"
-    return
+    return [:]
   }	
   String val = 'lastOutletUpdDt' + outlet.toString()
   String idx = bedId+'_'+outlet.toString()
@@ -2174,7 +2174,7 @@ Map getFoundationSystem(String bedId) {
 Map getUnderbedLightBrightness(String bedId) {
   if (isFuzion(bedId)) {
     warn "new API not supported yet"
-    return
+    return [:]
   }
   determineUnderbedLightSetup(bedId)
   Map brightness = getFoundationSystem(bedId)
@@ -3067,7 +3067,6 @@ private void updTsVal(String key, String dt = sNL) {
   Map data = tsDtMapFLD[appId] ?: [:]
   if (key) data[key]=val
   tsDtMapFLD[appId] = data
-  tsDtMapFLD = tsDtMapFLD
 }
 
 @CompileStatic
@@ -3087,7 +3086,6 @@ private void remTsVal(key) {
       //if (sKey in svdTSValsFLD) { remServerItem(sKey) }
     }
     tsDtMapFLD[appId] = data
-    tsDtMapFLD = tsDtMapFLD
   }
 }
 
