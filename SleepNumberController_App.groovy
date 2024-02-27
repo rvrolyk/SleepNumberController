@@ -1568,6 +1568,8 @@ Map getFootWarmingStatus(String bedId) {
   debug('Getting Foot Warming Status for %s', bedId)
   Map response = [:]
   if (isFuzion(bedId)) {
+	  // TODO: check asyncsleepiq on this first
+	  // https://github.com/kbickar/asyncsleepiq/blob/main/asyncsleepiq/fuzion/foot_warmer.py
     // The new API doesn't have an overall status so we have to call for left and right and then build a response
     // like the old API
     // TODO: check features before making call - rapidSleepSettingEnableFlag
@@ -1941,11 +1943,7 @@ void setPrivacyMode(Boolean mode, String devId) {
 
 @Field volatile static Map<String, Map> sleepNumMapFLD = [:]
 
-Map getSleepNumberFavorite(String bedId, Boolean lazy = false) {
-  if (isFuzion(bedId)) {
-    warn "new API not supported yret"
-    return [:]
-  }	
+Map getSleepNumberFavorite(String bedId, Boolean lazy = false) {	
   Integer lastUpd = getLastTsValSecs('lastSleepFavoriteUpdDt')
   if (sleepNumMapFLD[bedId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
     addHttpR("/rest/bed/${bedId}/sleepNumberFavorite" + sCACHE)
@@ -1953,7 +1951,14 @@ Map getSleepNumberFavorite(String bedId, Boolean lazy = false) {
     return sleepNumMapFLD[bedId]
   }
   debug 'Getting Sleep Number Favorites'
-  Map res = httpRequest("/rest/bed/${bedId}/sleepNumberFavorite")
+  Map res
+  if (isFuzion(bedId)) {
+	  // TODO: synthesize map
+	  // { bedID... sleepNumberFavoriteRight: xx, sleepNumberFavoriteLeft:xx }
+	  // new ;  args = [SIDES_FULL[self.side].lower()]
+    processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFavoriteSleepNumber))[0]
+  }
+  res = httpRequest("/rest/bed/${bedId}/sleepNumberFavorite")
   if (devdbg()) debug('Response data from SleepNumber: %s', res)
   if (res) {
     sleepNumMapFLD[bedId] = res
