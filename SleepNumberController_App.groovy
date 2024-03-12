@@ -1306,11 +1306,11 @@ void processBedData(Map responseData) {
         // as it's possible the HTTP calls failed.
         if (foundationStatus[bedId]) {
          statusMap << [
-            headPosition: foundationStatus[bedId]["headPosition"],
-            footPosition:  foundationStatus[bedId]["footPosition"],
-            positionPreset: foundationStatus[bedId]["bedPreset"],
-            positionPresetTimer: foundationStatus[bedId]["positionPresetTimer"],
-            positionTimer: foundationStatus[bedId]["positionTimer"]
+            headPosition: foundationStatus[bedId][bedSideStr]["headPosition"],
+            footPosition:  foundationStatus[bedId][bedSideStr]["footPosition"],
+            positionPreset: foundationStatus[bedId][bedSideStr]["bedPreset"],
+            positionPresetTimer: foundationStatus[bedId][bedSideStr]["positionPresetTimer"],
+            positionTimer: foundationStatus[bedId][bedSideStr]["positionTimer"]
           ]
         } else if (!loggedError[bedId]) {
           //debug("Not updating foundation state, %s", (bedFailures.get(bedId) ? "error making requests" : "no data"))
@@ -1534,8 +1534,11 @@ Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
       setState('systemConfiguration', activeFeatures)
     }
     // Actuators and presets
+    // TODO - fuzion: Not all beds have right/left, head/foot.  Need to store which ones this has so we can use
+    // that data later.
+   // TODO - NEXT - this is busted - need to create map correctly
     [sRIGHT.toLowerCase(), sLEFT.toLowerCase()].each { side ->
-      if (fuzionHasFeature("articulationEnableFlag")) {
+      if (fuzionHasFeature('articulationEnableFlag')) {
         [sHEAD, sFOOT].each { actuator ->
           if (fuzionHasFeature("${side}${actuator.capitalize()}Actuator")) {
             response[side]["${actuator}Position"] = processBamKeyResponse(
@@ -1568,17 +1571,16 @@ Map getFootWarmingStatus(String bedId) {
   debug('Getting Foot Warming Status for %s', bedId)
   Map response = [:]
   if (isFuzion(bedId)) {
-	  // TODO: check asyncsleepiq on this first
-	  // https://github.com/kbickar/asyncsleepiq/blob/main/asyncsleepiq/fuzion/foot_warmer.py
     // The new API doesn't have an overall status so we have to call for left and right and then build a response
     // like the old API
     // TODO: check features before making call - rapidSleepSettingEnableFlag
-    List<String> values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFootWarming', ['left']))
-    response['footWarmingStatusLeft'] = values[1] // the old API only had temp vs. an on/off value so just use that
-    response['footWarmingTimerLeft'] = values[2]
-    values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFootWarming', ['right']))
-    response['footWarmingStatusRight'] = values[1]
-    response['footWarmingTimerRight'] = values[2]
+    List<String> values = []
+    [sRIGHT, sLEFT].each { side -> 
+      // TODO: Probably need to see if the bed has both sides before calling both of these
+      values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFootWarming', [side.toLowerCase()]))
+      response["footWarmingStatus${side}"] = values[1] // the old API only had temp vs. an on/off value so just use that
+      response["footWarmingTimer${side}"] = values[2]
+    }
   } else {
     response = httpRequest("/rest/bed/${bedId}/foundation/footwarming")
   }
@@ -1590,10 +1592,10 @@ Map getResponsiveAirStatus(String bedId) {
   Map response = [:]
   if (isFuzion(bedId)) {
     // New API is responsive air state per side w/ value of true or false so synthezise the old response
-    List<String> values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetResponsiveAirState', ['left']))
-    response['leftSideEnabled'] = values[0].equals('1') ? 'true' : 'false'
-    values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetResponsiveAirState', ['right']))
-    response['rightSideEnabled'] = values[0].equals('1') ? 'true' : 'false'
+   [sRIGHT.toLowerCase(), sLEFT.toLowerCase()].each { side -> 
+     List<String> values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetResponsiveAirState', [side]))
+     response["${side}SideEnabled"] = values[0].equals('1') ? 'true' : 'false'
+   }
   } else {
     response = httpRequest("/rest/bed/${bedId}/responsiveAir")
   }
@@ -1953,12 +1955,14 @@ Map getSleepNumberFavorite(String bedId, Boolean lazy = false) {
   debug 'Getting Sleep Number Favorites'
   Map res
   if (isFuzion(bedId)) {
-	  // TODO: synthesize map
-	  // { bedID... sleepNumberFavoriteRight: xx, sleepNumberFavoriteLeft:xx }
-	  // new ;  args = [SIDES_FULL[self.side].lower()]
-    processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFavoriteSleepNumber))[0]
+// TODO fuzion: synthesize map
+    [sRIGHT, sLEFT].each { side ->
+      String val = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFavoriteSleepNumber', [side.toLowerCase()]))[0]
+      res["sleepNumberFavorite${side}"] = val
+    }
+  } else {
+    res = httpRequest("/rest/bed/${bedId}/sleepNumberFavorite")
   }
-  res = httpRequest("/rest/bed/${bedId}/sleepNumberFavorite")
   if (devdbg()) debug('Response data from SleepNumber: %s', res)
   if (res) {
     sleepNumMapFLD[bedId] = res
@@ -2950,7 +2954,7 @@ def put(Map params, Closure closure) {
 
 @CompileStatic
 List<String> processBamKeyResponse(Map response) {
-  if (response.keySet().isEmpty() || response.containsKey('cdcResponse')) {
+  if (response.keySet().isEmpty() || !response.containsKey('cdcResponse')) {
     // Bad response so return an empty list instead.
     warn("response from bam key request seems invalid: ${response}")
     return []
