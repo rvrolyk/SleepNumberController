@@ -1523,6 +1523,10 @@ Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
   //  ACCP - args: <side> => returns time?  TODO: What did I mean by this??
   debug('Getting Foundation Status for %s', bedId)
   Map<String, Map<String, Object>> response = [:]
+  // TODO: Not all beds have right/left.  Need to store which ones this has so we can use
+  // that data later.
+  response[sRIGHT.toLowerCase()] = [:]
+  response[sLEFT.toLowerCase()] = [:]
   if (isFuzion(bedId)) {
     if (!getState('systemConfiguration')) {
       debug("Getting system configuration to determine features")
@@ -1534,19 +1538,18 @@ Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
       setState('systemConfiguration', activeFeatures)
     }
     // Actuators and presets
-    // TODO - fuzion: Not all beds have right/left, head/foot.  Need to store which ones this has so we can use
-    // that data later.
-   // TODO - NEXT - this is busted - need to create map correctly
-    [sRIGHT.toLowerCase(), sLEFT.toLowerCase()].each { side ->
+    // TODO: Use data stored about bed to decide left/right and head/foot.
+    [sRIGHT, sLEFT].each { side ->
+      String sideLower = side.toLowerCase()
       if (fuzionHasFeature('articulationEnableFlag')) {
         [sHEAD, sFOOT].each { actuator ->
-          if (fuzionHasFeature("${side}${actuator.capitalize()}Actuator")) {
+          if (fuzionHasFeature("${sideLower}${actuator.capitalize()}Actuator")) {
             response[side]["${actuator}Position"] = processBamKeyResponse(
-                    makeBamKeyHttpRequest(bedId, 'GetActuatorPosition', [side, actuator]))[0]
+                    makeBamKeyHttpRequest(bedId, 'GetActuatorPosition', [sideLower, actuator]))[0]
           }
         }
       }
-      response[side]["positionPreset"] = processBamKeyResponse(
+      response[side]['bedPreset'] = processBamKeyResponse(
               makeBamKeyHttpRequest(bedId, 'GetCurrentPreset', [side]))[0]
       // TODO - fuzion: asyncsleepiq doesn't seem to have the preset timer functionality so not sure what to use for that.
     }
@@ -1554,14 +1557,14 @@ Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
     Map status = httpRequest("/rest/bed/${bedId}/foundation/status")
     [sRIGHT, sLEFT].each { side ->
       // Positions are in hex so convert to a decimal
-      if (status.containsKey("fs${side}HeadPosition")) response[side]["headPosition"] = convertHexToNumber((String) status["fs${side}HeadPosition"])
-      if (status.containsKey("fs${side}FootPosition")) response[side]["footPosition"] = convertHexToNumber((String) status["fs${side}FootPosition"])
-      if (status.containsKey("fsCurrentPositionPreset${side}")) response[side]["positionPreset"] = status["fsCurrentPositionPreset${side}"]
+      if (status.containsKey("fs${side}HeadPosition")) response[side]['headPosition'] = convertHexToNumber((String) status["fs${side}HeadPosition"])
+      if (status.containsKey("fs${side}FootPosition")) response[side]['footPosition'] = convertHexToNumber((String) status["fs${side}FootPosition"])
+      if (status.containsKey("fsCurrentPositionPreset${side}")) response[side]['bedPreset'] = status["fsCurrentPositionPreset${side}"]
       // Time remaining to activate preset
       // There's also a MSB timer but not sure when that gets set.  Least significant bit seems used for all valid times.
-      if (status.containsKey("fs${side}PositionTimerLSB")) response[side]["positionTimer"] = convertHexToNumber((String) status["fs${side}PositionTimerLSB"])
+      if (status.containsKey("fs${side}PositionTimerLSB")) response[side]['positionTimer'] = convertHexToNumber((String) status["fs${side}PositionTimerLSB"])
       // The preset that will be activated after timer expires
-      if (status.containsKey("fsTimerPositionPreset${side}")) response[side]["positionPresetTimer"] = status["fsTimerPositionPreset${side}"]
+      if (status.containsKey("fsTimerPositionPreset${side}")) response[side]['positionPresetTimer'] = status["fsTimerPositionPreset${side}"]
     }
   }
   return response
