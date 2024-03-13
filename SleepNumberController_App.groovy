@@ -1958,7 +1958,6 @@ Map getSleepNumberFavorite(String bedId, Boolean lazy = false) {
   debug 'Getting Sleep Number Favorites'
   Map res
   if (isFuzion(bedId)) {
-// TODO fuzion: synthesize map
     [sRIGHT, sLEFT].each { side ->
       String val = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFavoriteSleepNumber', [side.toLowerCase()]))[0]
       res["sleepNumberFavorite${side}"] = val
@@ -2959,7 +2958,7 @@ def put(Map params, Closure closure) {
 List<String> processBamKeyResponse(Map response) {
   if (response.keySet().isEmpty() || !response.containsKey('cdcResponse')) {
     // Bad response so return an empty list instead.
-    warn("response from bam key request seems invalid: ${response}")
+    warn("Response from bam key request seems invalid: ${response}")
     return []
   } else {
     return ((String) response['cdcResponse']).replaceFirst(sBAM_PASS, '').tokenize()
