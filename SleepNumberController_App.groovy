@@ -624,7 +624,7 @@ void configureVariableRefreshInterval() {
     }
     Date now = new Date()
     if (getSettingStr('dayStart') == null || getSettingStr('nightStart') == null) {
-      error('Either dayStart(%s) or nightStart(%s) was null', getSettingStr('dayStart'), getSettingStr('nightStart'))
+      error('Either dayStart(%s) and/or nightStart(%s) was null', getSettingStr('dayStart'), getSettingStr('nightStart'))
       night = false
     } else {
       if (wtimeOfDayIsBetween(wtoDateTime(getSettingStr('dayStart')), wtoDateTime(getSettingStr('nightStart')), now)) {
@@ -1331,8 +1331,7 @@ void processBedData(Map responseData) {
         if (!sleepNumberFavorites[bedId]) {
           sleepNumberFavorites[bedId] = getSleepNumberFavorite(bedId, true)
         }
-	   // For now account for the fact that favorite may not be present (due to new API)
-        Integer favorite = sleepNumberFavorites[bedId] ? ((Map)sleepNumberFavorites[bedId]).get("sleepNumberFavorite" + bedSideStr, -1) : 0
+        Integer favorite = ((Map)sleepNumberFavorites[bedId]).get("sleepNumberFavorite" + bedSideStr, -1) as Integer
         if (favorite >= iZ) {
           statusMap << [
             sleepNumberFavorite: favorite
