@@ -623,11 +623,16 @@ void configureVariableRefreshInterval() {
       (!t || t == sPRESENCE) && (Boolean) it.isPresent()
     }
     Date now = new Date()
-    if (wtimeOfDayIsBetween(wtoDateTime(getSettingStr('dayStart')), wtoDateTime(getSettingStr('nightStart')), now)) {
-      if (presentChildren.size() > iZ) return // if someone is still in bed, don't change anything
+    if (getSettingStr('dayStart') == null || getSettingStr('nightStart') == null) {
+      error('Either dayStart(%s) or nightStart(%s) was null', getSettingStr('dayStart'), getSettingStr('nightStart'))
       night = false
     } else {
-      night = true
+      if (wtimeOfDayIsBetween(wtoDateTime(getSettingStr('dayStart')), wtoDateTime(getSettingStr('nightStart')), now)) {
+        if (presentChildren.size() > iZ) return // if someone is still in bed, don't change anything
+        night = false
+      } else {
+        night = true
+      }
     }
   }
 
@@ -1525,8 +1530,8 @@ Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
   Map<String, Map<String, Object>> response = [:]
   // TODO: Not all beds have right/left.  Need to store which ones this has so we can use
   // that data later.
-  response[sRIGHT.toLowerCase()] = [:]
-  response[sLEFT.toLowerCase()] = [:]
+  response[sRIGHT] = [:]
+  response[sLEFT] = [:]
   if (isFuzion(bedId)) {
     if (!getState('systemConfiguration')) {
       debug("Getting system configuration to determine features")
@@ -3294,4 +3299,3 @@ static String myObj(obj) {
 }
 
 // vim: tabstop=2 shiftwidth=2 expandtab
-
