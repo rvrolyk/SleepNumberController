@@ -1956,7 +1956,7 @@ Map getSleepNumberFavorite(String bedId, Boolean lazy = false) {
     return sleepNumMapFLD[bedId]
   }
   debug 'Getting Sleep Number Favorites'
-  Map res
+  Map res = [:]
   if (isFuzion(bedId)) {
     [sRIGHT, sLEFT].each { side ->
       String val = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFavoriteSleepNumber', [side.toLowerCase()]))[0]
