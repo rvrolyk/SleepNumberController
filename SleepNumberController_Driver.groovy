@@ -1029,9 +1029,12 @@ void componentStopLevelChange(DeviceWrapper device) {
 
 /*------------------ Shared constants ------------------*/
 
+@Field static final Boolean IS_BETA = true
 @Field static final String appVersion = '3.3.0'  // public version
 @Field static final String NAMESPACE = 'rvrolyk'
-@Field static final String DRIVER_NAME = 'Sleep Number Bed'
+@Field static final String DRIVER_PREFIX = 'Sleep Number Bed'
+@Field static final String BETA_SUFFIX = ' Beta'
+static String getDRIVER_NAME() { DRIVER_PREFIX + (IS_BETA ? BETA_SUFFIX : '') }
 
 /*------------------ Logging helpers ------------------*/
 

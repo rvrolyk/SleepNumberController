@@ -208,7 +208,7 @@ Map homePage() {
       input ((sNM): 'login', (sTYP): sTXT, (sTIT): 'sleepnumber.com email',
           (sDESC): 'Email address you use with Sleep Number', submitOnChange: true)
       input ((sNM): 'password', (sTYP): 'password', (sTIT): 'sleepnumber.com password',
-          (sDESC): 'Password you use with Sleep Number', submitOnChange: true)
+          (sDESC): 'Password you use with Sleep Number', submitOnChange: false /* true causes iOS passwords to mess this up */)
       // User may opt for constant refresh or a variable one.
       Boolean defaultVariableRefresh = gtSetting('variableRefresh') != null && !getSettingB('variableRefresh') ? false : getSettingI('refreshInterval') == null
       input ('variableRefresh', sBOOL, (sTIT): 'Use variable refresh interval? (recommended)', defaultValue: defaultVariableRefresh,
@@ -2988,10 +2988,11 @@ Long now() {
 @Field static final Boolean IS_BETA = true
 @Field static final String appVersion = '3.3.0'  // public version
 @Field static final String NAMESPACE = 'rvrolyk'
-@Field static final String DRIVER_NAME = 'Sleep Number Bed'
+@Field static final String DRIVER_PREFIX = 'Sleep Number Bed'
 @Field static final String APP_PREFIX = 'Sleep Number Controller'
 @Field static final String BETA_SUFFIX = ' Beta'
 static String getAPP_NAME() { APP_PREFIX + (IS_BETA ? BETA_SUFFIX : sBLK) }
+static String getDRIVER_NAME() { DRIVER_PREFIX + (IS_BETA ? BETA_SUFFIX : sBLK) }
 
 /*------------------ Logging helpers ------------------*/
 
