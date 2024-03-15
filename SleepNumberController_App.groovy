@@ -1837,8 +1837,12 @@ void setSleepNumberFavorite(String ignored, String devId) {
   setSleepNumber(favorite, devId)
 }
 
-// update the sleep number favorite
-void updateSleepNumberFavorite(Integer number, String devId) {
+/**
+ * Update the sleep number favorite
+ * Note the number is actual an Integer but the Hubitat driver->app call
+ * changes Number to BigDecimal.
+ */
+void updateSleepNumberFavorite(BigDecimal number, String devId) {
   ChildDeviceWrapper device = findBedDevice(devId)
   if (!device) {
     return
@@ -1877,8 +1881,10 @@ void updateSleepNumberFavorite(Integer number, String devId) {
 
 /**
  * The side is derived from the specified device
+ * Note the number is actual an Integer but the Hubitat driver->app call
+ * changes Number to BigDecimal.
  */
-void setSleepNumber(Integer number, String devId) {
+void setSleepNumber(BigDecimal number, String devId) {
   ChildDeviceWrapper device = findBedDevice(devId)
   if (!device) {
     return
