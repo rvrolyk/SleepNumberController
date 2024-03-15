@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "3.3.1",
+  "version": "3.3.2",
   "minimumHEVersion": "2.2.2",
-  "releaseNotes": "set submitOnChange to false for password to avoid iOS problems",
-  "dateReleased": "2023-11-06",
+  "releaseNotes": "fix bug setting sleep number and favorite",
+  "dateReleased": "2024-03-15",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",
   "payPalUrl": "https://www.paypal.com/paypalme/rvrolyk",

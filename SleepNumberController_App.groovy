@@ -1658,8 +1658,10 @@ void stopFoundationMovement(Map ignored, String devId) {
 
 /**
  * The side is derived from the specified device
+ * Note the number is actual an Integer but the Hubitat driver->app call
+ * changes Number to BigDecimal.
  */
-void setSleepNumber(Integer number, String devId) {
+void setSleepNumber(BigDecimal number, String devId) {
   ChildDeviceWrapper device = findBedDevice(devId)
   if (!device) {
     return
@@ -1755,8 +1757,12 @@ void setSleepNumberFavorite(String ignored, String devId) {
   setSleepNumber(favorite, devId)
 }
 
-// update the sleep number favorite
-void updateSleepNumberFavorite(Integer number, String devId) {
+/**
+ * Update the sleep number favorite
+ * Note the number is actual an Integer but the Hubitat driver->app call
+ * changes Number to BigDecimal.
+ */
+void updateSleepNumberFavorite(BigDecimal number, String devId) {
   ChildDeviceWrapper device = findBedDevice(devId)
   if (!device) {
     return
@@ -2705,7 +2711,7 @@ Long now() {
 
 /*------------------ Shared constants ------------------*/
 
-@Field static final String appVersion = '3.3.0'  // public version
+@Field static final String appVersion = '3.3.2'  // public version
 @Field static final String NAMESPACE = 'rvrolyk'
 @Field static final String DRIVER_NAME = 'Sleep Number Bed'
 @Field static final String APP_NAME = 'Sleep Number Controller'
@@ -3027,4 +3033,3 @@ static String myObj(obj) {
 }
 
 // vim: tabstop=2 shiftwidth=2 expandtab
-
