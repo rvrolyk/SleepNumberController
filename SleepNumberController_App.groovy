@@ -111,7 +111,7 @@ static String getLOGIN_URL() { 'https://' + LOGIN_HOST }
 @Field static final ArrayList<Integer> VALID_LIGHT_BRIGHTNESS = [1, 30, 100]
 @Field static final Map<String, String> LOG_LEVELS = ['0': 'Off', '1': 'Debug', '2': 'Info', '3': 'Warn']
 @Field static final Map<String, String> BAM_KEY = [
-  'HaltAllActuators': 'ACHA',
+  'HaltAllActuators': 'ACHA', // used to stop movement - not per side
   'GetSystemConfiguration': 'SYCG',
   'SetSleepiqPrivacyState': 'SPRS',
   'GetSleepiqPrivacyState': 'SPRG',
@@ -1801,8 +1801,9 @@ void stopFoundationMovement(Map ignored, String devId) {
   remTsVal(sLASTFAMILYDATA)
   String bedId = getBedDeviceId(device)
   if (isFuzion(bedId)) {
-    // TODO - Fuzion: asyncsleepiq doesn't use a side for this command but it sure seems like it should take one.  Test this.
-    addBamKeyRequestToQueue(bedId, 'HaltAllActuators', [/*getBedDeviceSide(device)[iZ].toLowerCase()*/], 5, sREFRESHCHILDDEVICES)
+    // Apparently Fuzion beds just stop *all* actuators when a user presses stop in the app.
+    // So no side is provided in the arguments for this call.
+    addBamKeyRequestToQueue(bedId, 'HaltAllActuators', [], 5, sREFRESHCHILDDEVICES)
    } else {
     Map body = [
             massageMotion: iZ,
