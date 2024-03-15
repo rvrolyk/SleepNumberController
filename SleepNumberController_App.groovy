@@ -1664,15 +1664,16 @@ void setFoundationAdjustment(Map params, String devId) {
   Integer waitTime = Math.round(movementDuration * positionDelta).toInteger() + i1
 
   String bedId = getBedDeviceId(device)
+  String side = getBedDeviceSide(device)
   if (isFuzion(bedId)) {
     addBamKeyRequestToQueue(bedId, 'SetActuatorTargetPosition',
-            [getBedDeviceSide(device)[iZ].toLowerCase(), VALID_ACTUATORS.get(actu).toLowerCase(), pos.toString()],
+            [side.toLowerCase(), VALID_ACTUATORS.get(actu).toLowerCase(), pos.toString()],
             waitTime, sREFRESHCHILDDEVICES)
   } else {
     Map body = [
             speed   : iZ, // 1 == slow, 0 = fast
             actuator: actu,
-            (sSIDE) : getBedDeviceSide(device)[iZ],
+            (sSIDE) : side[iZ],
             position: pos // 0-100
     ]
     httpRequestQueue(waitTime, path: "/rest/bed/${bedId}/foundation/adjustment/micro",
@@ -1744,13 +1745,14 @@ void setFoundationTimer(Map params, String devId) {
     return
   }
   String bedId = getBedDeviceId(device)
+  String side = getBedDeviceSide(device)
   if (isFuzion(bedId)) {
     addBamKeyRequestToQueue(bedId, 'SetTargetPresetWithTimer',
-            [getBedDeviceSide(device)[iZ].toLowerCase(), VALID_PRESETS.get(preset), ptimer.toString()],
+            [side.toLowerCase(), VALID_PRESETS.get(preset), ptimer.toString()],
             5, sREFRESHCHILDDEVICES)
   } else {
     Map body = [
-            (sSIDE)       : getBedDeviceSide(device)[iZ],
+            (sSIDE)       : side[iZ],
             positionPreset: ppreset,
             positionTimer : ptimer
     ]
@@ -1776,14 +1778,15 @@ void setFoundationPreset(Integer preset, String devId) {
   // the time (as we do for adjustment), we just use the maximum.
   Integer duration = 35
   String bedId = getBedDeviceId(device)
+  String side = getBedDeviceSide(device)
   if (isFuzion(bedId)) {
-    addBamKeyRequestToQueue(bedId, 'SetTargetPresetWithoutTimer', [getBedDeviceSide(device)[iZ].toLowerCase(),
+    addBamKeyRequestToQueue(bedId, 'SetTargetPresetWithoutTimer', [side.toLowerCase(),
                VALID_PRESETS.get(preset)], duration, sREFRESHCHILDDEVICES)
   } else {
     Map body = [
             speed  : iZ,
             preset : preset,
-            (sSIDE): getBedDeviceSide(device)[iZ]
+            (sSIDE): side[iZ]
     ]
     httpRequestQueue(duration, path: "/rest/bed/${bedId}/foundation/preset",
             body: body, runAfter: sREFRESHCHILDDEVICES)
@@ -1854,7 +1857,7 @@ void updateSleepNumberFavorite(Integer number, String devId) {
     String bedId = getBedDeviceId(device)
     if (isFuzion(bedId)) {
       addBamKeyRequestToQueue(bedId, 'SetFavoriteSleepNumber',
-              [getBedDeviceSide(device)[iZ].toLowerCase(), dfavorite.toString()])
+              [sid.toLowerCase(), dfavorite.toString()])
     } else {
       // side "R" or "L"
       Map body = [
@@ -1881,16 +1884,17 @@ void setSleepNumber(Integer number, String devId) {
     return
   }
   String bedId = getBedDeviceId(device)
+  String side = getBedDeviceSide(device)
   // Not sure how long it takes to inflate or deflate so just wait 20s
   Integer duration = 20
   if (isFuzion(bedId)) {
-    addBamKeyRequestToQueue(bedId, 'StartSleepNumberAdjustment', [getBedDeviceSide(device)[iZ], number.toString()],
+    addBamKeyRequestToQueue(bedId, 'StartSleepNumberAdjustment', [side.toLowerCase(), number.toString()],
             duration, sREFRESHCHILDDEVICES)
   } else {
     Map body = [
             (sBEDID)   : bedId,
             sleepNumber: number,
-            (sSIDE)    : getBedDeviceSide(device)[iZ]
+            (sSIDE)    : side[iZ]
     ]
     httpRequestQueue(duration, path: "/rest/bed/${bedId}/sleepNumber",
             body: body, runAfter: sREFRESHCHILDDEVICES)
