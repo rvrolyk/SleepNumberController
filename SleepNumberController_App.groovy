@@ -1929,7 +1929,7 @@ String getPrivacyMode(String bedId, Boolean lazy = false) {
   if (isFuzion(bedId)) {
     Boolean paused = processBamKeyResponse(
             makeBamKeyHttpRequest(bedId, 'GetSleepiqPrivacyState'))[0].equals('paused')
-    res = ['pauseMode': paused ? 'paused' : 'active'] // what goes here?
+    res = ['pauseMode': paused ? 'on' : 'off'] // what goes here?
   } else {
     res = httpRequest("/rest/bed/${bedId}/pauseMode")
   }
