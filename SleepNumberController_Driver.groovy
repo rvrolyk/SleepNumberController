@@ -30,35 +30,18 @@ import com.hubitat.app.DeviceWrapper
 import groovy.transform.CompileStatic
 import groovy.transform.Field
 
-@Field static final String sNL = (String)null
+#include rvrolyk.SleepNumberLibraryBeta
+
 @Field static final String sLOW = 'Low'
 @Field static final String sMED = 'Medium'
 @Field static final String sHIGH = 'High'
 @Field static final String sFLAT = 'Flat'
-@Field static final String sSTON = 'On'
-@Field static final String sSTOFF = 'Off'
 
-@Field static final String sNUM = 'number'
-@Field static final String sSTR = 'string'
-@Field static final String sDATE = 'date'
-@Field static final String sENUM = 'enum'
-@Field static final String sBOOL = 'bool'
-@Field static final String sON = 'on'
-@Field static final String sOFF = 'off'
 @Field static final String sPRESENT = 'present'
 @Field static final String sNPRESENT = 'not present'
-@Field static final String sSWITCH = 'switch'
 @Field static final String sLEVEL = 'level'
-@Field static final String sPRESENCE = 'presence'
-@Field static final String sNM = 'name'
-@Field static final String sVL = 'value'
-@Field static final String sTYP = 'type'
-
-@Field static final String sHEAD = 'head'
-@Field static final String sFOOT = 'foot'
-@Field static final String sFOOTWMR = 'foot warmer'
-@Field static final String sOUTLET = 'outlet'
-@Field static final String sUNDERBEDLIGHT = 'underbedlight'
+@Field static final String sSTR = 'string'
+@Field static final String sDATE = 'date'
 
 @Field static final String sHEADPOSITION = 'headPosition'
 @Field static final String sFOOTPOSITION = 'footPosition'
@@ -75,23 +58,9 @@ import groovy.transform.Field
 @Field static final String sUNDERBEDLBRIGHT = 'underbedLightBrightness'
 @Field static final String sOUTLETSTATE = 'outletState'
 
-@Field static final Integer iZ = 0
-@Field static final Integer i1 = 1
-
 @Field static final String DNI_SEPARATOR = '-'
 
 @Field static final ArrayList<String> TYPES = ['presence', 'head', 'foot', 'foot warmer']
-
-@Field static final ArrayList<String> SIDES = ['Right', 'Left']
-@Field static final Map<String, Integer> HEAT_TEMPS = [Off: 0, Low: 31, Medium: 57, High: 72]
-@Field static final Map<String, Integer> HEAT_TIMES = ['30m': 30, '1h': 60, '2h': 120, '3h': 180, '4h': 240, '5h': 300, '6h': 360]
-@Field static final Map<String, String> ACTUATOR_TYPES = [head: 'H', foot: 'F']
-@Field static final Map<String, Integer> PRESET_TIMES = ['Off': 0, '15m': 15, '30m': 30, '45m': 45, '1h': 60, '2h': 120, '3h': 180]
-@Field static final Map<String, Integer> PRESET_NAMES = [Favorite: 1, Flat: 4, ZeroG: 5, Snore: 6, WatchTV: 3, Read: 2]
-@Field static final ArrayList<String> UNDERBED_LIGHT_STATES = ['Auto', 'On', 'Off']
-@Field static final Map<String, Integer> UNDERBED_LIGHT_BRIGHTNESS = [Low: 1, Medium: 30, High: 100]
-@Field static final Map<String, Integer> UNDERBED_LIGHT_TIMES = ['Forever': 0, '15m': 15, '30m': 30, '45m': 45, '1h': 60, '2h': 120, '3h': 180]
-@Field static final ArrayList<String> OUTLET_STATES = ['On', 'Off']
 
 metadata {
   definition((sNM): DRIVER_NAME,
@@ -1025,64 +994,6 @@ void componentStartLevelChange(DeviceWrapper device, String direction) {
 
 void componentStopLevelChange(DeviceWrapper device) {
   logInfo "stopLevelChange not supported"
-}
-
-/*------------------ Shared constants ------------------*/
-
-@Field static final Boolean IS_BETA = true
-@Field static final String appVersion = '3.3.0'  // public version
-@Field static final String NAMESPACE = 'rvrolyk'
-@Field static final String DRIVER_PREFIX = 'Sleep Number Bed'
-@Field static final String BETA_SUFFIX = ' Beta'
-static String getDRIVER_NAME() { DRIVER_PREFIX + (IS_BETA ? BETA_SUFFIX : '') }
-
-/*------------------ Logging helpers ------------------*/
-
-@Field static final String PURPLE = 'purple'
-@Field static final String BLUE = '#0299b1'
-@Field static final String GRAY = 'gray'
-@Field static final String ORANGE = 'orange'
-@Field static final String RED = 'red'
-
-@CompileStatic
-private static String logPrefix(String msg, String color = null) {
-  StringBuilder sb = new StringBuilder("<span ")
-          .append("style = 'color:").append(GRAY).append(";'>")
-          .append("[v").append(appVersion).append("] ")
-          .append("</span>")
-          .append("<span style = 'color:").append(color).append(";'>")
-          .append(msg)
-          .append("</span>")
-  return sb.toString()
-}
-
-private void logTrace(String msg) {
-  log.trace logPrefix(msg, GRAY)
-}
-
-private void logDebug(String msg) {
-  log.debug logPrefix(msg, PURPLE)
-}
-
-private void logInfo(String msg) {
-  log.info logPrefix(msg, BLUE)
-}
-
-private void logWarn(String msg) {
-  log.warn logPrefix(msg, ORANGE)
-}
-
-private void logError(String msg, Exception ex = null) {
-  log.error logPrefix(msg, RED)
-  String a; a = sNL
-  try {
-    if (ex) {
-      a = getExceptionMessageWithLine(ex)
-    }
-  } catch (ignored) {}
-  if (a) {
-    log.error logPrefix(a, RED)
-  }
 }
 
 // vim: tabstop=2 shiftwidth=2 expandtab

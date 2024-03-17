@@ -40,40 +40,19 @@ import java.util.regex.Pattern
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 
+#include rvrolyk.SleepNumberLibraryBeta
+
 @Field static ConcurrentLinkedQueue requestQueue = new ConcurrentLinkedQueue()
 @Field static Semaphore mutex = new Semaphore(1)
 @Field volatile static Long lastLockTime = 0L
 @Field static Long lastErrorLogTime = 0L
 
-@Field static final String sNL = (String)null
-@Field static final String sSTON = 'On'
-@Field static final String sSTOFF = 'Off'
-@Field static final String sRIGHT = 'Right'
-@Field static final String sLEFT = 'Left'
 @Field static final String sPAUSED = 'paused'
 @Field static final String sACTIVE = 'active'
-
-@Field static final String sNUM = 'number'
-@Field static final String sTXT = 'text'
-@Field static final String sENUM = 'enum'
-@Field static final String sBOOL = 'bool'
-@Field static final String sON = 'on'
-@Field static final String sOFF = 'off'
-@Field static final String sSWITCH = 'switch'
-@Field static final String sPRESENCE = 'presence'
-@Field static final String sNM = 'name'
-@Field static final String sVL = 'value'
-@Field static final String sTYP = 'type'
 @Field static final String sGEN = 'generation'
 @Field static final String sACCT_ID = 'accountId'
 @Field static final String sTIT = 'title'
 @Field static final String sDESC = 'description'
-
-@Field static final String sHEAD = 'head'
-@Field static final String sFOOT = 'foot'
-@Field static final String sFOOTWMR = 'foot warmer'
-@Field static final String sOUTLET = 'outlet'
-@Field static final String sUNDERBEDLIGHT = 'underbedlight'
 
 @Field static final String sSIDE = 'side'
 @Field static final String sBEDID = 'bedId'
@@ -85,13 +64,6 @@ import java.text.SimpleDateFormat
 @Field static final String sLASTFAMILYDATA = 'lastFamilyDataUpdDt'
 @Field static final String sLASTBEDDATA = 'lastBedDataUpdDt'
 
-@Field static final Integer iZ = 0
-@Field static final Integer i1 = 1
-@Field static final Integer i2 = 2
-@Field static final Integer i3 = 3
-@Field static final Integer i4 = 4
-@Field static final Integer i20 = 20
-
 @Field static final String API_HOST = 'prod-api.sleepiq.sleepnumber.com'
 static String getAPI_URL() { 'https://' + API_HOST }
 @Field static final String LOGIN_HOST = 'l06it26kuh.execute-api.us-east-1.amazonaws.com'
@@ -99,17 +71,8 @@ static String getLOGIN_URL() { 'https://' + LOGIN_HOST }
 @Field static final String LOGIN_CLIENT_ID = 'jpapgmsdvsh9rikn4ujkodala'
 @Field static final String USER_AGENT = 'SleepIQ/1669639706 CFNetwork/1399 Darwin/22.1.0'
 @Field static final String SN_APP_VERSION = '4.8.40'
-
-// TODO: Figure out how to share relevant values with the driver
-@Field static final Map<String, String> VALID_ACTUATORS = ['H': 'Head', 'F': 'Foot']
-@Field static final ArrayList<Integer> VALID_SPEEDS = [0, 1, 2, 3]
-@Field static final ArrayList<Integer> VALID_WARMING_TIMES = [30, 60, 120, 180, 240, 300, 360]
-@Field static final Map<Integer, String> VALID_WARMING_TEMPS = [0: 'off', 31: 'low', 57: 'medium', 72: 'high']
-@Field static final ArrayList<Integer> VALID_PRESET_TIMES = [0, 15, 30, 45, 60, 120, 180]
-@Field static final Map<Integer, String> VALID_PRESETS = [1: 'favorite', 2: 'read', 3: 'watch_tv', 4: 'flat', 5: 'zero_g', 6: 'snore']
-@Field static final ArrayList<Integer> VALID_LIGHT_TIMES = [15, 30, 45, 60, 120, 180]
-@Field static final ArrayList<Integer> VALID_LIGHT_BRIGHTNESS = [1, 30, 100]
 @Field static final Map<String, String> LOG_LEVELS = ['0': 'Off', '1': 'Debug', '2': 'Info', '3': 'Warn']
+
 @Field static final Map<String, String> BAM_KEY = [
   'HaltAllActuators': 'ACHA', // used to stop movement - not per side
   'GetSystemConfiguration': 'SYCG',
@@ -136,22 +99,22 @@ static String getLOGIN_URL() { 'https://' + LOGIN_HOST }
 ]
 
 @Field static List<String> FEATURE_NAMES = [
-        "bedType", // seems to always be 'dual'?  Maybe on some beds it's single?
-        "pressureControlEnabledFlag",
-        "articulationEnableFlag",
-        "underbedLightEnableFlag",
-        "rapidSleepSettingEnableFlag",
-        "thermalControlEnabledFlag",
-        "rightHeadActuator",
-        "rightFootActuator",
-        "leftHeadActuator",
-        "leftFootActuator",
-        "flatPreset",
-        "favoritePreset",
-        "snorePreset",
-        "zeroGravityPreset",
-        "watchTvPreset",
-        "readPreset",
+        'bedType', // seems to always be 'dual'?  Maybe on some beds it's single?
+        'pressureControlEnabledFlag',
+        'articulationEnableFlag',
+        'underbedLightEnableFlag',
+        'rapidSleepSettingEnableFlag',
+        'thermalControlEnabledFlag',
+        'rightHeadActuator',
+        'rightFootActuator',
+        'leftHeadActuator',
+        'leftFootActuator',
+        'flatPreset',
+        'favoritePreset',
+        'snorePreset',
+        'zeroGravityPreset',
+        'watchTvPreset',
+        'readPreset',
 ]
 
 @Field static final String PAUSE = 'Pause'
@@ -1543,7 +1506,7 @@ Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
     }
     // Actuators and presets
     // TODO: Use data stored about bed to decide left/right and head/foot.
-    [sRIGHT, sLEFT].each { side ->
+    SIDES.each { side ->
       String sideLower = side.toLowerCase()
       if (fuzionHasFeature('articulationEnableFlag')) {
         [sHEAD, sFOOT].each { actuator ->
@@ -1555,11 +1518,15 @@ Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
       }
       response[side]['bedPreset'] = processBamKeyResponse(
               makeBamKeyHttpRequest(bedId, 'GetCurrentPreset', [side]))[0]
-      // TODO - fuzion: asyncsleepiq doesn't seem to have the preset timer functionality so not sure what to use for that.
+      // For some reason, the new Fuzion beds do not maintain any position preset timer information so there's no way to obtain it.
+      // In fact, if you set a timer and then log out of the app (on a mobile device), all knowledge of that timer is lost.  So we just set
+      // time to 0 and preset to n/a.
+      response[side]['positionTimer'] = 0
+      response[side]['positionPresetTimer'] = 'n/a for fuzion'
     }
   } else {
     Map status = httpRequest("/rest/bed/${bedId}/foundation/status")
-    [sRIGHT, sLEFT].each { side ->
+    SIDES.each { side ->
       // Positions are in hex so convert to a decimal
       if (status.containsKey("fs${side}HeadPosition")) response[side]['headPosition'] = convertHexToNumber((String) status["fs${side}HeadPosition"])
       if (status.containsKey("fs${side}FootPosition")) response[side]['footPosition'] = convertHexToNumber((String) status["fs${side}FootPosition"])
@@ -1582,7 +1549,7 @@ Map getFootWarmingStatus(String bedId) {
     // like the old API
     // TODO: check features before making call - rapidSleepSettingEnableFlag
     List<String> values = []
-    [sRIGHT, sLEFT].each { side -> 
+    SIDES.each { side -> 
       // TODO: Probably need to see if the bed has both sides before calling both of these
       values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFootWarming', [side.toLowerCase()]))
       response["footWarmingStatus${side}"] = values[1] // the old API only had temp vs. an on/off value so just use that
@@ -1696,12 +1663,12 @@ void setFootWarmingState(Map params, String devId) {
     error('Missing param values, temp and timer are required')
     return
   }
-  if (!VALID_WARMING_TIMES.contains(ptimer)) {
-    error('Invalid warming time %s, valid values are %s', ptimer, VALID_WARMING_TIMES)
+  if (!VALID_HEAT_TIMES.contains(ptimer)) {
+    error('Invalid warming time %s, valid values are %s', ptimer, VALID_HEAT_TIMES)
     return
   }
-  if (!VALID_WARMING_TEMPS.keySet().contains(ptemp)) {
-    error('Invalid warming temp %s, valid values are %s', ptemp, VALID_WARMING_TEMPS.keySet())
+  if (!VALID_HEAT_TEMPS.keySet().contains(ptemp)) {
+    error('Invalid warming temp %s, valid values are %s', ptemp, VALID_HEAT_TEMPS.keySet())
     return
   }
   String side = getBedDeviceSide(device)
@@ -1709,7 +1676,7 @@ void setFootWarmingState(Map params, String devId) {
   if (isFuzion(bedId)) {
     // TODO: Check feature flag (rapidSleepSettingEnableFlag)?
     addBamKeyRequestToQueue(bedId, 'SetFootWarming',
-            [side.toLowerCase(), VALID_WARMING_TEMPS.get(ptemp), ptimer.toString()], 0, sREFRESHCHILDDEVICES)
+            [side.toLowerCase(), VALID_HEAT_TEMPS.get(ptemp), ptimer.toString()], 0, sREFRESHCHILDDEVICES)
   } else {
     Map body = [
             ("footWarmingTemp${side}".toString()) : ptemp,
@@ -1929,7 +1896,7 @@ String getPrivacyMode(String bedId, Boolean lazy = false) {
   if (isFuzion(bedId)) {
     Boolean paused = processBamKeyResponse(
             makeBamKeyHttpRequest(bedId, 'GetSleepiqPrivacyState'))[0].equals('paused')
-    res = ['pauseMode': paused ? 'on' : 'off'] // what goes here?
+    res = ['pauseMode': paused ? sON : sOff]
   } else {
     res = httpRequest("/rest/bed/${bedId}/pauseMode")
   }
@@ -1973,7 +1940,7 @@ Map getSleepNumberFavorite(String bedId, Boolean lazy = false) {
   debug 'Getting Sleep Number Favorites'
   Map res = [:]
   if (isFuzion(bedId)) {
-    [sRIGHT, sLEFT].each { side ->
+    SIDES.each { side ->
       String val = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFavoriteSleepNumber', [side.toLowerCase()]))[0]
       res["sleepNumberFavorite${side}"] = val
     }
@@ -2077,7 +2044,7 @@ void setFoundationMassage(Integer ifootspeed, Integer iheadspeed, Integer itimer
 @Field volatile static Map<String, Map> outletMapFLD = [:]
 
 /**
- * get oulet state cached
+ * get outlet state cached
  */
 Map getOutletState(String bedId, Integer outlet) {
   if (isFuzion(bedId)) {
@@ -2168,6 +2135,7 @@ void setOutletState(String bedId, Integer outletId, String ioutletState, Integer
 
 @CompileStatic
 Map getUnderbedLightState(String bedId) {
+  // TODO - fuzion: does this work?
   httpRequest("/rest/bed/${bedId}/foundation/underbedLight", this.&get)
 }
 
@@ -2984,74 +2952,8 @@ Long now() {
   return (Long) this.delegate.now()
 }
 
-/*------------------ Shared constants ------------------*/
-
-@Field static final Boolean IS_BETA = true
-@Field static final String appVersion = '3.3.0'  // public version
-@Field static final String NAMESPACE = 'rvrolyk'
-@Field static final String DRIVER_PREFIX = 'Sleep Number Bed'
-@Field static final String APP_PREFIX = 'Sleep Number Controller'
-@Field static final String BETA_SUFFIX = ' Beta'
-static String getAPP_NAME() { APP_PREFIX + (IS_BETA ? BETA_SUFFIX : sBLK) }
-static String getDRIVER_NAME() { DRIVER_PREFIX + (IS_BETA ? BETA_SUFFIX : sBLK) }
-
 /*------------------ Logging helpers ------------------*/
 
-@Field static final String PURPLE = 'purple'
-@Field static final String BLUE = '#0299b1'
-@Field static final String GRAY = 'gray'
-@Field static final String ORANGE = 'orange'
-@Field static final String RED = 'red'
-
-@Field static final String sLTH = '<'
-@Field static final String sGTH = '>'
-
-@CompileStatic
-private static String logPrefix(String msg, String color = null) {
-  String myMsg = msg.replaceAll(sLTH, '&lt;').replaceAll(sGTH, '&gt;')
-  StringBuilder sb = new StringBuilder('<span ')
-          .append("style='color:").append(GRAY).append(";'>")
-          .append('[v').append(appVersion).append('] ')
-          .append('</span>')
-          .append("<span style='color:").append(color).append(";'>")
-          .append(myMsg)
-          .append('</span>')
-  return sb.toString()
-}
-
-private void logTrace(String msg) {
-  log.trace logPrefix(msg, GRAY)
-}
-
-private void logDebug(String msg) {
-  log.debug logPrefix(msg, PURPLE)
-}
-
-private void logInfo(String msg) {
-  log.info logPrefix(msg, BLUE)
-}
-
-private void logWarn(String msg) {
-  log.warn logPrefix(msg, ORANGE)
-}
-
-private void logError(String msg, Exception ex = null) {
-  log.error logPrefix(msg, RED)
-  String a,b; a = sNL; b = sNL
-  try {
-    if (ex) {
-      a = getExceptionMessageWithLine(ex)
-      if (devdbg()) b = getStackTrace(ex)
-    }
-  } catch (ignored) {}
-  if (a || b) {
-    log.error logPrefix(a+' \n'+b, RED)
-  }
-}
-
-@Field static final String sBLK = ''
-@Field static final String sSPACE = ' '
-@Field static final String sCLRORG = 'orange'
 @Field static final String sLINEBR = '<br>'
 
 @CompileStatic
@@ -3078,8 +2980,6 @@ private getState(String nm) { return state.get(nm) }
 private void setState(String nm, v) { state.put(nm, v) }
 
 String gtAid() { return app.getId() }
-
-
 
 /*------------------ In-memory timers ------------------*/
 
@@ -3221,7 +3121,7 @@ static String dumpListDesc(List data,Integer level, List<Boolean> lastLevel, Str
       String lineStrt
       lineStrt = doLineStrt(level,lastLevel)
       lineStrt += cnt == i1 && sz > i1 ? sSPCST : (cnt < sz ? sSPCSM:sSPCSE)
-      str+=spanStr(html, lineStrt + lbl + ": ${par} (${objType(par)})".toString() )
+      str += spanStr(html, lineStrt + lbl + ": ${par} (${objType(par)})".toString() )
     }
     cnt += i1
   }
@@ -3283,7 +3183,7 @@ static String dumpMapDesc(Map data, Integer level, List<Boolean> lastLevel, Inte
 }
 
 @CompileStatic
-static String objType(obj) { return span(myObj(obj), sCLRORG) }
+static String objType(obj) { return span(myObj(obj), ORANGE) }
 
 @CompileStatic
 static String getMapDescStr(Map data, Boolean reorder = true) {
