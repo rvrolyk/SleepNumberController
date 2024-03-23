@@ -1079,6 +1079,7 @@ void processBedData(Map responseData) {
           }
         }
         // So far, the presence of "Warming" in the bed status indicates a foot warmer.
+        // TODO: check this for fuzion
         if (!bedFailures[bedId]
             && !footwarmingStatus[bedId]
             && ((List<String>)bedInfoBed?.components)?.contains('Warming')
@@ -1097,9 +1098,9 @@ void processBedData(Map responseData) {
         // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
         if (!bedFailures[bedId] && deviceTypes.contains(sUNDERBEDLIGHT)) {
           determineUnderbedLightSetup(bedId)
-          bedInfo = (Map)getState('bedInfo')
-          bedInfoBed =  bedInfo ? (Map)bedInfo[bedId1] : null
-          if (!outletData[bedId][i3]) {
+          bedInfo = (Map) getState('bedInfo')
+          bedInfoBed =  bedInfo ? (Map)bedInfo[bedId] : null
+          if (!outletData[bedId][i3] && !isFuzion(bedId)) {
             outletData[bedId][i3] = getOutletState(bedId, i3)
             if (!outletData[bedId][i3]) {
               bedFailures[bedId] = true
@@ -1126,7 +1127,7 @@ void processBedData(Map responseData) {
               }
             }
           } else {
-            outletData[bedId1][i4] = outletData[bedId1][i3]
+            outletData[bedId][i4] = outletData[bedId][i3]
           }
         }
 
@@ -1134,7 +1135,7 @@ void processBedData(Map responseData) {
         if (!bedFailures[bedId] && deviceTypes.contains(sOUTLET)) {
           determineOutletSetup(bedId)
           //bedInfo = (Map)gtSt('bedInfo')
-          //bedInfoBed =  bedInfo ? (Map)bedInfo[bedId1] : null
+          //bedInfoBed =  bedInfo ? (Map)bedInfo[bedId] : null
           if (!outletData[bedId][i1]) {
             outletData[bedId][i1] = getOutletState(bedId, i1)
             if (!outletData[bedId][i1]) {
@@ -1159,8 +1160,13 @@ void processBedData(Map responseData) {
           Map outletDataBedOut = outletData[bedId][outletNumber]
           String bstate = underbedLightData[bedId]?.enableAuto ? 'Auto' :
               outletDataBedOut?.setting == i1 ? sSTON : sSTOFF
-          String timer = bstate == 'Auto' ? 'Not set' :
+          String timer 
+          if (isFuzion(bedId)) {
+            timer = bstate == 'Auto' ? 'Not set' : underbedLightData[bedId]?.fuzionTimer ?: 'Forever'
+          } else {
+            timer = bstate == 'Auto' ? 'Not set' :
               outletDataBedOut?.timer ?: 'Forever'
+          }
           def brightness = underbedLightData[bedId]?."fs${bedSideStr}UnderbedLightPWM"
           statusMap << [
             underbedLightState: bstate,
@@ -1187,7 +1193,7 @@ void processBedData(Map responseData) {
             positionTimer: foundationStatus[bedId][bedSideStr]["positionTimer"]
           ]
         } else if (!loggedError[bedId]) {
-          //debug("Not updating foundation state, %s", (bedFailures.get(bedId) ? "error making requests" : "no data"))
+           if (devdbg()) debug("Not updating foundation state, %s", (bedFailures.get(bedId) ? "error making requests" : "no data"))
         }
         if (footwarmingStatus[bedId]) {
           statusMap << [
@@ -1195,7 +1201,7 @@ void processBedData(Map responseData) {
             footWarmingTimer: footwarmingStatus[bedId]."footWarmingTimer${bedSideStr}",
           ]
         } else if (!loggedError[bedId]) {
-          //debug("Not updating footwarming state, %s", (bedFailures.get(bedId) ? "error making requests" : "no data"))
+           if (devdbg()) debug("Not updating footwarming state, %s", (bedFailures.get(bedId) ? "error making requests" : "no data"))
         }
         if (!sleepNumberFavorites[bedId]) {
           sleepNumberFavorites[bedId] = getSleepNumberFavorite(bedId, true)
@@ -1228,7 +1234,6 @@ void processBedData(Map responseData) {
     }
   }
   if (bedFailures.size() && state.status == 'Online') {
-    if (devdbg()) debug('Bed failures %s', bedFailures)
     state.status = 'Bed / device mismatch'
   }
   updateLabel()
@@ -1292,6 +1297,7 @@ List<String> getSystemConfiguration(String bedId, String accountId) {
       this.&put, createBamKeyArgs('GetSystemConfiguration', [])))  
   // Decompose features into just active ones
   List<String> activeFeatures = [FEATURE_NAMES, features].transpose().grep{ ((List<List<String>>)it)[1] == "yes" }.collect({ ((List<List<String>>)it)[0] as String })
+  if (devdbg()) debug('active features for %s are %s', bedId, activeFeatures)
   return activeFeatures
 }
 
@@ -2020,8 +2026,8 @@ void setOutletState(String bedId, Integer outletId, String ioutletState, Integer
     return
   }
 
-  if (timer && !VALID_LIGHT_TIMES.contains(timer)) {
-    error('Invalid underbed light timer %s.  Valid values are %s', timer, VALID_LIGHT_TIMES)
+  if (timer && !VALID_LIGHT_TIMES.keySet().contains(timer)) {
+    error('Invalid underbed light timer %s.  Valid values are %s', timer, VALID_LIGHT_TIMES.keySet())
     return
   }
 
@@ -2087,10 +2093,11 @@ Map getFoundationSystem(String bedId) {
 }
 
 /**
- * get underbed brightness
+ * Get underbed brightness
  * rest calls
  *     calls getFoundationSystem (C)
  *     may call getOutletState * 2 (C)
+ * For fuzion beds, this also includes timer info
  */
 Map getUnderbedLightBrightness(String bedId) {
   Map brightness = [:]
@@ -2099,10 +2106,15 @@ Map getUnderbedLightBrightness(String bedId) {
       info 'This bed does not have underbed lighting'
       return brightness
      }
-    // The second value in the list is the level as a lower-cased string
-    String level = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetUnderbedLightSettings', []))[1]
+    List<String> results = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetUnderbedLightSettings', []))
+    // The first value in the list is the level as a lower-cased string
+    String level = results[0]
     Integer iBrightness = UNDERBED_LIGHT_BRIGHTNESS.get(level.capitalize())
     if (iBrightness) brightness.fsRightUnderbedLightPWM = brightness.fsLeftUnderbedLightPWM = iBrightness
+    if (results[1]) {
+      String timer = VALID_LIGHT_TIMES.get(results[1] as Integer)
+      brightness.fuzionTimer = timer
+    }
   } else {
     determineUnderbedLightSetup(bedId)
     brightness = getFoundationSystem(bedId)
@@ -2112,6 +2124,7 @@ Map getUnderbedLightBrightness(String bedId) {
       brightness.fsLeftUnderbedLightPWM = brightness.fsRightUnderbedLightPWM
     }
   }
+  if (devdbg()) debug('UnderbedLightBrightness Response data from SleepNumber: %s', brightness)
   return brightness
 }
 
@@ -2126,7 +2139,7 @@ void determineUnderbedLightSetup(String bedId) {
   if (isFuzion(bedId) && fuzionHasFeature('underbedLightEnableFlag')) {
     // for now, I don't think fuzion beds have outlets in the same way old beds do
     // this means we can use the feature flag for lights to infer a single outlet
-    debug('fuzion bed has single outlet as underbedLightEnableFlag feature exists for %s', bedId)
+    debug('fuzion bed has single outlet, underbedLightEnableFlag feature exists for %s', bedId)
     bdinfo[bedId].underbedoutlets = [
       [bedId: bedId, outlet: 3]
     ]
