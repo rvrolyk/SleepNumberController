@@ -110,7 +110,7 @@ private void logError(String msg, Exception ex = null) {
 
 @Field static final String sHEAD = 'head'
 @Field static final String sFOOT = 'foot'
-@Field static final String sFOOTWMR = 'foot warmer'
+@Field static final String sFOOTWMR = 'footwarmer'
 @Field static final String sOUTLET = 'outlet'
 @Field static final String sUNDERBEDLIGHT = 'underbedlight'
 
@@ -128,7 +128,7 @@ private void logError(String msg, Exception ex = null) {
 @Field static final Map<String, Integer> UNDERBED_LIGHT_TIMES = ['Forever': 0, '15m': 15, '30m': 30, '45m': 45, '1h': 60, '2h': 120, '3h': 180]
 @Field static final ArrayList<Integer> VALID_LIGHT_TIMES = [15, 30, 45, 60, 120, 180]
 @Field static final Map<String, Integer> UNDERBED_LIGHT_BRIGHTNESS = ['Low': 1, 'Medium': 30, 'High': 100]
-@Field static final ArrayList<Integer> VALID_LIGHT_BRIGHTNESS = [1, 30, 100]
+@Field static final Map<Integer, String> VALID_LIGHT_BRIGHTNESS = [1: 'low', 30: 'medium', 100: 'high']
 @Field static final ArrayList<String> OUTLET_STATES = ['On', 'Off']
 @Field static final ArrayList<Integer> VALID_SPEEDS = [0, 1, 2, 3]
 
@@ -138,20 +138,24 @@ private void logError(String msg, Exception ex = null) {
 /*
  Fuzion TODOs
 
+
         Outlets / Lighting
         ---------------------
 
         getUnderbedLightState
-        getUnderbedLightBrightness
-        - uses getOutletState to determine if there are 1 or 2 lights
         setUnderbedLightState (uses setOutletState but has own call as well for brightness)
+        getUnderbedLightBrightness
+          - uses getOutletState to determine if there are 1 or 2 lights
         setOutletState
 
         all lighting can be handled by:
-        'SetUnderbedLightSettings': 'UBLS',
-        'SetUnderbedLightAutoSettings': 'UBAS',
-        'GetUnderbedLightSettings': 'UBLG',
-        'GetUnderbedLightAutoSettings': 'UBAG',
+        'SetUnderbedLightSettings': 'UBLS',  => arg = level (string: high, medium, low, off), timer (int: 0, ...)
+             - note: app calls auto settings when this is set to off 
+                     calls auto false/low when set to low
+        'SetUnderbedLightAutoSettings': 'UBAS', => arg = boolean (on/off), level (string)
+              - note: app calls UBLS first to set off/0
+        'GetUnderbedLightSettings': 'UBLG', => returns [level, timer]
+        'GetUnderbedLightAutoSettings': 'UBAG', => returns [boolean (on/off), level]
 
 
         instead of reading outlets, we can look at feature flag underbedLightEnableFlag

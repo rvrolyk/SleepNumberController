@@ -374,14 +374,11 @@ static String getBedDeviceSide(ChildDeviceWrapper bed) {
   return (String)((Map) bed.getState())[sSIDE]
 }
 
-static String getBedDeviceType(ChildDeviceWrapper bed) {
-  return (String)((Map) bed.getState())[sTYP]
-}
-
 /**
  * rest calls
- *     getBeds() (C)
- *  @return   recreates state.bedInfo
+ *     getBeds()
+ *     if new API: getSystemConfiguration() 
+ *  @return   recreates state.bedInfo and, if new API, also sets state.systemConfiguration
  */
 @CompileStatic
 void initializeBedInfo() {
@@ -409,11 +406,13 @@ void initializeBedInfo() {
       stateBedInfo[id].components = components
       // Store the type as well as a boolean indicating if it's old or new
       stateBedInfo[id].bedType = bed[sGEN]
-      // Only know one 'generation' that is the new API for now
-      stateBedInfo[id].newApi = bed[sGEN] == 'fuzion'
       // Store the account id which is needed for bamkey API
       stateBedInfo[id].accountId = bed[sACCT_ID]
-
+      // Only know one 'generation' that is the new API for now
+      if (bed[sGEN] == 'fuzion') {
+        stateBedInfo[id].newApi = bed[sGEN] == 'fuzion'
+        setState('systemConfiguration', getSystemConfiguration(id, (String) bed[sACCT_ID]))
+      }
     }
   }
   if (!stateBedInfo) {
@@ -423,19 +422,13 @@ void initializeBedInfo() {
 }
 
 /**
- * Gets all bed child devices even if they're in a virtual container.
- * Will not return the virtual container(s) or children of a parent
- * device
+ * Gets all bed child devices.
+ * Will not return the children of a parent device
  */
 List<ChildDeviceWrapper> getBedDevices() {
   List<ChildDeviceWrapper> children = []
-  // If any child is a virtual container, iterate that too
   for (ChildDeviceWrapper child in (List<ChildDeviceWrapper>)getChildDevices()) {
-    if ((Boolean)child.hasAttribute('containerSize')) {
-      children.addAll((List)child.childList())
-    } else {
-      children.add(child)
-    }
+    children.add(child)
   }
   return children
 }
@@ -451,11 +444,10 @@ List<Map> getBedDeviceData() {
   for (ChildDeviceWrapper device in devices) {
     String side = getBedDeviceSide(device)
     String bedId = getBedDeviceId(device)
-    String type = getBedDeviceType(device) ?: 'Parent'
 
     output << [
       (sNM): (String) device.label,
-      (sTYP): type,
+      (sTYP): 'Parent',
       (sSIDE): side,
       (sDEVICEID): device.id,
       (sBEDID): bedId,
@@ -580,11 +572,7 @@ void configureVariableRefreshInterval() {
   if (getSettingB('variableRefreshModes')) {
     night = ((List) gtSetting('nightMode')).contains(location.mode)
   } else {
-    // Gather presence == present child devices
-    List<ChildDeviceWrapper> presentChildren = getBedDevices().findAll { ChildDeviceWrapper it ->
-      String t = getBedDeviceType(it)
-      (!t || t == sPRESENCE) && (Boolean) it.isPresent()
-    }
+    List presentChildren = getBedDevices().findAll { (Boolean) it.isPresent() }
     Date now = new Date()
     if (getSettingStr('dayStart') == null || getSettingStr('nightStart') == null) {
       error('Either dayStart(%s) and/or nightStart(%s) was null', getSettingStr('dayStart'), getSettingStr('nightStart'))
@@ -625,7 +613,6 @@ void configureVariableRefreshInterval() {
 Map findBedPage() {
   Map responseData = getBedData()
   List<ChildDeviceWrapper> devices = getBedDevices()
-  List childDevices = []
   List<Map> beds = responseData ? (List<Map>)responseData.beds : []
   dynamicPage(name: 'findBedPage') {
     if (beds.size() > iZ) {
@@ -642,26 +629,9 @@ Map findBedPage() {
                 debug "bedId's don't match, skipping"
                 continue
               }
-              String dt = getBedDeviceType(dev)
               String ds = getBedDeviceSide(dev)
-              if (!dt || dt == 'presence') {
-                childDevices << ds
-                sidesSeen << ds
-                addBedSelectLink(ds, bdId, (String)dev.label, 'modify')
-              }
-            }
-            if (childDevices.size() < i2) {
-              input 'createNewChildDevices', sBOOL, (sTIT): 'Create new child device types', defaultValue: false, submitOnChange: true
-              if (getSettingB('createNewChildDevices')) {
-                if (!childDevices.contains(l)) {
-                  addBedSelectLink(l, bdId)
-                }
-                if (!childDevices.contains(r)) {
-                  addBedSelectLink(r, bdId)
-                }
-              }
-            } else {
-              app.removeSetting('createNewChildDevices')
+              sidesSeen << ds
+              addBedSelectLink(ds, bdId, (String)dev.label, 'modify')
             }
           }
           if (!sidesSeen.contains(l)) {
@@ -722,11 +692,9 @@ Map selectBedPage(Map iparams) {
     String side; side = (String)params[sSIDE]
     section {
       paragraph """<b>Instructions</b>
-Enter a name, then choose whether or not to use child devices or a virtual container for the devices and then choose the types of devices to create.
+Enter a name, then choose whether or not to use child devices and then choose the types of devices to create.
 Note that if using child devices, the parent device will contain all the special commands along with bed specific status while the children are simple
-switches or dimmers.  Otherwise, all devices are the same on Hubitat, the only difference is how they behave to dim and on/off commands.  This is so that they may be used with external assistants such as Google Assistant or Amazon Alexa.  If you don't care about such use cases (and only want RM control or just presence), you can just use the presence type.
-<br>
-See <a href="https://community.hubitat.com/t/release-virtual-container-driver/4440" target = _blank>this post</a> for virtual container.
+switches or dimmers.
 """
         paragraph """<b>Device information</b>
 Bed ID: ${bdId}
@@ -746,41 +714,36 @@ Side: ${side}
           (sDESC): 'What prefix do you want for the devices?', submitOnChange: true,
           required: true
       newName = getSettingStr(varName)
-      input 'useChildDevices', sBOOL, (sTIT): 'Use child devices? (only recommended if  you have underbed lights or bed outlets)', defaultValue: true,
+      input 'useChildDevices', sBOOL, (sTIT): 'Use child devices? (recommended for direct device control of bed features)', defaultValue: false,
          submitOnChange: true
       ucd = getSettingB('useChildDevices')
-      if (!ucd) {
-        input 'useContainer', sBOOL, (sTIT): 'Use virtual container?', defaultValue: false,
-           submitOnChange: true
-      }
       side = side.toLowerCase()
-      paragraph 'A presence type device exposes on/off as switching to a preset level (on) and flat (off).  Dimming will change the Sleep Number.'
-      if (ucd) {
+      paragraph '<br>A presence type device exposes on/off as switching to a preset level (on) and flat (off).  Dimming will change the Sleep Number.'
+      if (!ucd) {
+        paragraph 'All other features are accessible via the device page and custom commands'
+      } else {
         paragraph 'This is the parent device when child devices are used'
         app.updateSetting 'createPresence', [(sVL): 'true', (sTYP): sBOOL]
         settings.createPresence = true
-      } else {
-        input 'createPresence', sBOOL,
-            (sTIT): "Create presence device for ${side} side?",
-            defaultValue: true, submitOnChange: true
-      }
-      paragraph 'A head type device exposes on/off as switching to a preset level (on) and  flat (off).  Dimming will change the head position (0 is flat, 100 is fully raised).'
-      input 'createHeadControl', sBOOL,
-         (sTIT): "Create device to control the head of the ${side} side?",
-         defaultValue: true, submitOnChange: true
-      paragraph 'A foot type device exposes on/off as switching to a preset level (on) and  flat (off).  Dimming will change the foot position (0 is flat, 100 is fully raised).'
-      input 'createFootControl', sBOOL,
-         (sTIT): "Create device to control the foot of the ${side} side?",
-         defaultValue: true, submitOnChange: true
-      if (((List<String>) ((Map) state.bedInfo[bdId]).components).contains('Warming')) {
-        paragraph 'A foot type device exposes on/off as switching the foot warming on or off.  Dimming will change the heat levels (1: low, 2: medium, 3: high).'
-        input 'createFootWarmer', sBOOL,
-           (sTIT): "Create device to control the foot warmer of the ${side} side?",
-           defaultValue: true, submitOnChange: true
-      }
-      determineUnderbedLightSetup(bdId)
-      determineOutletSetup(bdId)
-      if (ucd) {
+
+        paragraph 'A head type device exposes on/off as switching to a preset level (on) and  flat (off).  Dimming will change the head position (0 is flat, 100 is fully raised).'
+        input 'createHeadControl', sBOOL,
+          (sTIT): "Create device to control the head of the ${side} side?",
+          defaultValue: false, submitOnChange: true
+        paragraph 'A foot type device exposes on/off as switching to a preset level (on) and  flat (off).  Dimming will change the foot position (0 is flat, 100 is fully raised).'
+        input 'createFootControl', sBOOL,
+          (sTIT): "Create device to control the foot of the ${side} side?",
+          defaultValue: false, submitOnChange: true
+        if (((List<String>) ((Map) state.bedInfo[bdId]).components).contains('Warming')) {
+          // TODO: Make sure this works w/ fuzion
+          paragraph 'A foot type device exposes on/off as switching the foot warming on or off.  Dimming will change the heat levels (1: low, 2: medium, 3: high).'
+          input 'createFootWarmer', sBOOL,
+            (sTIT): "Create device to control the foot warmer of the ${side} side?",
+            defaultValue: false, submitOnChange: true
+        }
+        determineUnderbedLightSetup(bdId)
+        determineOutletSetup(bdId)
+
         if (((List) ((Map)state.bedInfo[bdId]).underbedoutlets).size() > iZ) {
           paragraph 'Underbed lighting creates a dimmer allowing the light to be turned on or off at different levels with timer based on parent device preference.'
           input 'createUnderbedLighting', sBOOL,
@@ -795,45 +758,46 @@ Side: ${side}
         }
       }
     }
-    if (!ucd || !getSettingB('createUnderbedLighting')) app.removeSetting('createUnderbedLighting')
-    if (!ucd || !getSettingB('createOutlet')) app.removeSetting('createOutlet')
+    if (!ucd) {
+      List<String> ucdOnlySettings = ['createHeadControl', 'createFootControl',  'createFootWarmer', 'createUnderbedLighting', 'createOutlet']
+      ucdOnlySettings.each { 
+        app.removeSetting(it) 
+      }
+    }
 
     section {
       StringBuilder msg; msg = new StringBuilder('Will create the following devices')
       String containerName; containerName = sBLK
       List<String> types = []
       if (ucd) {
-        app.updateSetting 'useContainer', [(sVL): 'false', (sTYP): sBOOL]
-        settings.useContainer = false
         msg.append(' with each side as a primary device and each type as a child device of the side')
-      } else if (getSettingB('useContainer')) {
-        containerName = "${newName} Container"
-        msg.append(" in virtual container '").append(containerName).append("'")
       }
       msg.append(':<ol>')
-      if (getSettingB('createPresence')) {
+      if (getSettingB('createPresence') || !ucd) {
         msg.append('<li>').append(createDeviceLabel(newName, sPRESENCE)).append('</li>')
         types.add(sPRESENCE)
       }
-      if (getSettingB('createHeadControl')) {
-        msg.append('<li>').append(createDeviceLabel(newName, sHEAD)).append('</li>')
-        types.add(sHEAD)
-      }
-      if (getSettingB('createFootControl')) {
-        msg.append('<li>').append(createDeviceLabel(newName, sFOOT)).append('</li>')
-        types.add(sFOOT)
-      }
-      if (getSettingB('createFootWarmer')) {
-        msg.append('<li>').append(createDeviceLabel(newName, sFOOTWMR)).append('</li>')
-        types.add(sFOOTWMR)
-      }
-      if (getSettingB('createUnderbedLighting') && ucd) {
-        msg.append('<li>').append(createDeviceLabel(newName, sUNDERBEDLIGHT)).append('</li>')
-        types.add(sUNDERBEDLIGHT)
-      }
-      if (getSettingB('createOutlet') && ucd) {
-        msg.append('<li>').append(createDeviceLabel(newName, sOUTLET)).append('</li>')
-        types.add(sOUTLET)
+      if (ucd) {
+        if (getSettingB('createHeadControl')) {
+          msg.append('<li>').append(createDeviceLabel(newName, sHEAD)).append('</li>')
+          types.add(sHEAD)
+        }
+        if (getSettingB('createFootControl')) {
+          msg.append('<li>').append(createDeviceLabel(newName, sFOOT)).append('</li>')
+          types.add(sFOOT)
+        }
+        if (getSettingB('createFootWarmer')) {
+          msg.append('<li>').append(createDeviceLabel(newName, sFOOTWMR)).append('</li>')
+          types.add(sFOOTWMR)
+        }
+        if (getSettingB('createUnderbedLighting') && ucd) {
+          msg.append('<li>').append(createDeviceLabel(newName, sUNDERBEDLIGHT)).append('</li>')
+          types.add(sUNDERBEDLIGHT)
+        }
+        if (getSettingB('createOutlet') && ucd) {
+          msg.append('<li>').append(createDeviceLabel(newName, sOUTLET)).append('</li>')
+          types.add(sOUTLET)
+        }
       }
       msg.append('</ol>')
       paragraph msg.toString()
@@ -844,8 +808,6 @@ Side: ${side}
         (sBEDID): bdId,
         (sSIDE): params[sSIDE],
         useChildDevices: ucd,
-        useContainer: getSettingB('useContainer'),
-        containerName: containerName,
         types: types
       ]
     }
@@ -874,10 +836,6 @@ static String createDeviceLabel(String name, String type) {
 Map createBedPage(Map iparams) {
   Map params; params = iparams
   if (params) state.createBedP = params else params = state.createBedP
-  ChildDeviceWrapper container; container = null
-  if ((Boolean) params.useContainer) {
-    container = createContainer((String) params[sBEDID], (String) params.containerName, (String) params[sSIDE])
-  }
   List<ChildDeviceWrapper> existingDevices = getBedDevices()
   List<ChildDeviceWrapper> devices = []
   // TODO: Consider allowing more than one identical device for debug purposes.
@@ -886,70 +844,45 @@ Map createBedPage(Map iparams) {
   String varName = "${bedId}.${params[sSIDE]}".toString()
   String newName; newName = getSettingStr(varName)
 
-  if ((Boolean) params.useChildDevices) {
-    // Bed Ids seem to always be negative so convert to positive for the device
-    // id for better formatting.
-    String deviceId = "sleepnumber.${bedId}.${params[sSIDE]}".toString() + (IS_BETA ? 'beta' : sBLK)
-    String label = createDeviceLabel(newName, sPRESENCE)
-    ChildDeviceWrapper parent; parent = existingDevices.find{ (String) it.deviceNetworkId == deviceId }
-    if (parent) {
-      info('Parent device %s already exists', deviceId)
-    } else {
-      debug('Creating parent device %s', deviceId)
-      parent = addChildDevice(NAMESPACE, DRIVER_NAME, deviceId, null, [label: label])
-      parent.setStatus(params.presence)
-      parent.setBedId(params[sBEDID])
-      parent.setSide(params[sSIDE])
-      devices.add(parent)
-    }
-    // If we are using child devices then we create a presence device and
-    // all others are children of it.
-    for (String type in (List<String>)params.types) {
-      if (type != sPRESENCE) {
-        String childId = deviceId + '-' + type.replaceAll(sSPACE, sBLK)
-        String driverType; driverType = sNL
-        //noinspection GroovyFallthrough
-        switch (type) {
-          case sOUTLET:
-            driverType = 'Switch'
-            break
-          case sHEAD:
-          case sFOOT:
-          case sFOOTWMR:
-          case sUNDERBEDLIGHT:
-            driverType = 'Dimmer'
-        }
-        ChildDeviceWrapper newDevice = parent.createChildDevice(childId, "Generic Component ${driverType}",
-          createDeviceLabel(newName, type))
-        if (newDevice) {
-          devices.add(newDevice)
-        }
-      }
-    }
+
+  // Bed Ids seem to always be negative so convert to positive for the device
+  // id for better formatting.
+  String deviceId = "sleepnumber.${bedId}.${params[sSIDE]}".toString() + (IS_BETA ? 'beta' : sBLK)
+  String label = createDeviceLabel(newName, sPRESENCE)
+  ChildDeviceWrapper parent; parent = existingDevices.find{ (String) it.deviceNetworkId == deviceId }
+  if (parent) {
+    info('Parent device %s already exists', deviceId)
   } else {
-    for (String type in (List<String>)params.types) {
-      String deviceId = "sleepnumber.${params[sBEDID]}.${params[sSIDE]}.${type.replaceAll(' ', '_')}".toString()
-      if (existingDevices.find{ it.data.vcId == deviceId }) {
-        info('Not creating device %s, it already exists', deviceId)
-      } else {
-        String label = createDeviceLabel(newName, type)
-        ChildDeviceWrapper device
-        if (container) {
-          debug('Creating new child device %s with label %s in container %s', deviceId, label, params.containerName)
-          container.appCreateDevice(label, DRIVER_NAME, NAMESPACE, deviceId)
-          // #appCreateDevice doesn't return the device so find it
-          device = container.childList().find({it.data.vcId == deviceId})
-        } else {
-          device = addChildDevice(NAMESPACE, DRIVER_NAME, deviceId, null, [label: label])
-        }
-        device.setStatus(params.presence)
-        device.setBedId(params[sBEDID])
-        device.setSide(params[sSIDE])
-        device.setType(type)
-        devices.add(device)
+    debug('Creating parent device %s', deviceId)
+    parent = addChildDevice(NAMESPACE, DRIVER_NAME, deviceId, null, [label: label])
+    parent.setStatus(params.presence)
+    parent.setBedId(params[sBEDID])
+    parent.setSide(params[sSIDE])
+    devices.add(parent)
+  }
+  for (String type in (List<String>)params.types) {
+    if (type != sPRESENCE) {
+      String childId = deviceId + '-' + type.replaceAll(sSPACE, sBLK)
+      String driverType; driverType = sNL
+      //noinspection GroovyFallthrough
+      switch (type) {
+        case sOUTLET:
+          driverType = 'Switch'
+          break
+        case sHEAD:
+        case sFOOT:
+        case sFOOTWMR:
+        case sUNDERBEDLIGHT:
+          driverType = 'Dimmer'
+      }
+      ChildDeviceWrapper newDevice = parent.createChildDevice(childId, "Generic Component ${driverType}",
+        createDeviceLabel(newName, type))
+      if (newDevice) {
+        devices.add(newDevice)
       }
     }
   }
+
   // Reset the bed info since we added more.
   checkBedInfo()
   dynamicPage((sNM): 'selectDevicePage') {
@@ -957,8 +890,6 @@ Map createBedPage(Map iparams) {
       StringBuilder header; header = new StringBuilder('Created new devices')
       if ((Boolean) params.useChildDevices) {
         header.append(' using child devices')
-      } else if ((Boolean) params.useContainer) {
-        header.append(' in container ').append(params.containerName)
       }
       header.append(':')
       paragraph(header.toString())
@@ -966,11 +897,6 @@ Map createBedPage(Map iparams) {
       for (ChildDeviceWrapper device in devices) {
         displayInfo.append('<li>')
         displayInfo.append((String)device.label)
-        if (!(Boolean) params.useChildDevices) {
-          displayInfo.append('<br>Bed ID: ').append(getBedDeviceId(device))
-          displayInfo.append('<br>Side: ').append(getBedDeviceSide(device))
-          displayInfo.append('<br>Type: ').append(getBedDeviceType(device))
-        }
         displayInfo.append('</li>')
       }
       displayInfo.append('</ol>')
@@ -1056,25 +982,6 @@ Map diagnosticsPage(Map iparams) {
       }
     }
   }
-}
-
-/**
- * Creates a virtual container with the given name and side
- */
-ChildDeviceWrapper createContainer(String bedId, String containerName, String side) {
-  ChildDeviceWrapper container
-  container = ((List<ChildDeviceWrapper>) getChildDevices()).find{ (String) it.typeName == 'Virtual Container' &&  (String) it.label == containerName}
-  if (!container) {
-    debug('Creating container %s', containerName)
-    try {
-      container = addChildDevice('stephack', 'Virtual Container', "${app.id}.${bedId}.${side}", null,
-          [(sNM): containerName, label: containerName, completedSetup: true])
-    } catch (e) {
-      logError('Container device creation failed with error = ', e)
-      return null
-    }
-  }
-  return container
 }
 
 @CompileStatic
@@ -1374,6 +1281,20 @@ Map getBeds(Boolean lazy = false) {
   return res
 }
 
+/**
+ * Tries to get list of features by calling bamKey: GetSystemConfiguration.
+ * Only applicable for new API beds
+ */
+@CompileStatic
+List<String> getSystemConfiguration(String bedId, String accountId) {
+  debug 'Getting system configuration to determine features'
+  List<String> features = processBamKeyResponse(httpRequest(createBamKeyUrl(bedId, accountId),
+      this.&put, createBamKeyArgs('GetSystemConfiguration', [])))  
+  // Decompose features into just active ones
+  List<String> activeFeatures = [FEATURE_NAMES, features].transpose().grep{ ((List<List<String>>)it)[1] == "yes" }.collect({ ((List<List<String>>)it)[0] as String })
+  return activeFeatures
+}
+
 @Field volatile static Map<String, Map> familyMapFLD = [:]
 
 @CompileStatic
@@ -1487,7 +1408,6 @@ private parseMyResp(aa,String mediaType = sNL) {
 }
 
 Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
-  //  ACCP - args: <side> => returns time?  TODO: What did I mean by this??
   debug('Getting Foundation Status for %s', bedId)
   Map<String, Map<String, Object>> response = [:]
   // TODO: Not all beds have right/left.  Need to store which ones this has so we can use
@@ -1495,15 +1415,6 @@ Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
   response[sRIGHT] = [:]
   response[sLEFT] = [:]
   if (isFuzion(bedId)) {
-    if (!getState('systemConfiguration')) {
-      debug("Getting system configuration to determine features")
-      // call GetSystemConfiguration synchronously to get the list of supported features
-      List<String> features = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetSystemConfiguration'))
-      // Decompose features into just active ones and add that to state so we don't have to continue looking them up
-      // as they shouldn't change
-      List<String> activeFeatures = [FEATURE_NAMES, features].transpose().grep{ it[1] == "yes" }.collect({ it[0] as String })
-      setState('systemConfiguration', activeFeatures)
-    }
     // Actuators and presets
     // TODO: Use data stored about bed to decide left/right and head/foot.
     SIDES.each { side ->
@@ -1522,7 +1433,7 @@ Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
       // In fact, if you set a timer and then log out of the app (on a mobile device), all knowledge of that timer is lost.  So we just set
       // time to 0 and preset to n/a.
       response[side]['positionTimer'] = 0
-      response[side]['positionPresetTimer'] = 'n/a for fuzion'
+      response[side]['positionPresetTimer'] = 'n/a'
     }
   } else {
     Map status = httpRequest("/rest/bed/${bedId}/foundation/status")
@@ -1552,8 +1463,8 @@ Map getFootWarmingStatus(String bedId) {
     SIDES.each { side -> 
       // TODO: Probably need to see if the bed has both sides before calling both of these
       values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFootWarming', [side.toLowerCase()]))
-      response["footWarmingStatus${side}"] = values[1] // the old API only had temp vs. an on/off value so just use that
-      response["footWarmingTimer${side}"] = values[2]
+      response["footWarmingStatus${side}"] = values[0]
+      response["footWarmingTimer${side}"] = values[1]
     }
   } else {
     response = httpRequest("/rest/bed/${bedId}/foundation/footwarming")
@@ -2048,7 +1959,7 @@ void setFoundationMassage(Integer ifootspeed, Integer iheadspeed, Integer itimer
  */
 Map getOutletState(String bedId, Integer outlet) {
   if (isFuzion(bedId)) {
-    warn "new API not supported yet"
+    debug "getOutletState shouldn't be called for fuzion beds"
     return [:]
   }	
   String val = 'lastOutletUpdDt' + outlet.toString()
@@ -2071,6 +1982,11 @@ Map getOutletState(String bedId, Integer outlet) {
 }
 
 void setOutletState(String outletState, String devId) {
+  String bedId = getBedDeviceId(device)
+  if (isFuzion(bedId)) {
+    info 'setting outlet state unsupported on fuzion beds'
+    return
+  }
   ChildDeviceWrapper device = findBedDevice(devId)
   if (!device) {
     return
@@ -2080,7 +1996,7 @@ void setOutletState(String outletState, String devId) {
     return
   }
   Integer outletNum = getBedDeviceSide(device) == sLEFT ? i1 : i2
-  setOutletState(getBedDeviceId(device), outletNum, outletState)
+  setOutletState(bedId, outletNum, outletState)
 }
 
 /**
@@ -2094,8 +2010,7 @@ void setOutletState(String outletState, String devId) {
 void setOutletState(String bedId, Integer outletId, String ioutletState, Integer itimer = null,
                     Boolean refresh = true) {
   if (isFuzion(bedId)) {
-    // TODO - fuzion: Add this
-    warn "new API not supported yet"
+    info 'setting outlet state unsupported on fuzion beds'
     return
   }
   String outletState; outletState = ioutletState
@@ -2135,8 +2050,20 @@ void setOutletState(String bedId, Integer outletId, String ioutletState, Integer
 
 @CompileStatic
 Map getUnderbedLightState(String bedId) {
-  // TODO - fuzion: does this work?
-  httpRequest("/rest/bed/${bedId}/foundation/underbedLight", this.&get)
+  Map res = [:]
+  if (isFuzion(bedId)) {
+    if (!fuzionHasFeature('underbedLightEnableFlag')) {
+      info 'This bed does not have underbed lighting'
+      return res
+    }
+    // The first value from auto settings is a boolean on/off which is all the non-fuzion api returns here
+    String auto = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetUnderbedLightAutoSettings', []))[0]
+    if (auto == 'on') res = ['enableAuto': true]
+  } else {
+    res = httpRequest("/rest/bed/${bedId}/foundation/underbedLight", this.&get)
+  }
+  if (devdbg()) debug('Response data from SleepNumber: %s', res)
+  return res
 }
 
 @Field volatile static Map<String, Map> foundationSystemMapFLD = [:]
@@ -2160,22 +2087,30 @@ Map getFoundationSystem(String bedId) {
 }
 
 /**
- * get underbed brigntness
+ * get underbed brightness
  * rest calls
  *     calls getFoundationSystem (C)
  *     may call getOutletState * 2 (C)
  */
 Map getUnderbedLightBrightness(String bedId) {
+  Map brightness = [:]
   if (isFuzion(bedId)) {
-    warn "new API not supported yet"
-    return [:]
-  }
-  determineUnderbedLightSetup(bedId)
-  Map brightness = getFoundationSystem(bedId)
-  if (brightness && ((List) ((Map) state.bedInfo[bedId]).underbedoutlets).size() == i1) {
-    // Strangely if there's only one light then the `right` side is the set value
-    // so just set them both the same.
-    brightness.fsLeftUnderbedLightPWM = brightness.fsRightUnderbedLightPWM
+     if (!fuzionHasFeature('underbedLightEnableFlag')) {
+      info 'This bed does not have underbed lighting'
+      return brightness
+     }
+    // The second value in the list is the level as a lower-cased string
+    String level = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetUnderbedLightSettings', []))[1]
+    Integer iBrightness = UNDERBED_LIGHT_BRIGHTNESS.get(level.capitalize())
+    if (iBrightness) brightness.fsRightUnderbedLightPWM = brightness.fsLeftUnderbedLightPWM = iBrightness
+  } else {
+    determineUnderbedLightSetup(bedId)
+    brightness = getFoundationSystem(bedId)
+    if (brightness && ((List) ((Map) state.bedInfo[bedId]).underbedoutlets).size() == i1) {
+      // Strangely if there's only one light then the `right` side is the set value
+      // so just set them both the same.
+      brightness.fsLeftUnderbedLightPWM = brightness.fsRightUnderbedLightPWM
+    }
   }
   return brightness
 }
@@ -2188,20 +2123,29 @@ Map getUnderbedLightBrightness(String bedId) {
  */
 void determineUnderbedLightSetup(String bedId) {
   Map<String,Map> bdinfo = (Map<String,Map>) state.bedInfo
-  if (bdinfo[bedId].underbedoutlets == null) {
-    debug('Determining underbed lighting outlets for %s', bedId)
-    // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
-    // Determine if this bed has 1 or 2 underbed lighting outlets and store for future use.
-    Map outlet3 = getOutletState(bedId, i3)
-    Map outlet4 = getOutletState(bedId, i4)
-    List outlets = []
-    if (outlet3) {
-      outlets << i3
+  if (isFuzion(bedId) && fuzionHasFeature('underbedLightEnableFlag')) {
+    // for now, I don't think fuzion beds have outlets in the same way old beds do
+    // this means we can use the feature flag for lights to infer a single outlet
+    debug('fuzion bed has single outlet as underbedLightEnableFlag feature exists for %s', bedId)
+    bdinfo[bedId].underbedoutlets = [
+      [bedId: bedId, outlet: 3]
+    ]
+  } else {
+    if (bdinfo[bedId].underbedoutlets == null) {
+      debug('Determining underbed lighting outlets for %s', bedId)
+      // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
+      // Determine if this bed has 1 or 2 underbed lighting outlets and store for future use.
+      Map outlet3 = getOutletState(bedId, i3) // { bedId: xx, outlet: num, timer: null, setting: num }
+      Map outlet4 = getOutletState(bedId, i4)
+      List outlets = []
+      if (outlet3) {
+        outlets << i3
+      }
+      if (outlet4) {
+        outlets << i4
+      }
+      bdinfo[bedId].underbedoutlets = outlets
     }
-    if (outlet4) {
-      outlets << i4
-    }
-    bdinfo[bedId].underbedoutlets = outlets
     state.bedInfo = bdinfo
   }
 }
@@ -2219,11 +2163,6 @@ void determineUnderbedLightSetup(String bedId) {
 void setUnderbedLightState(Map params, String devId) {
   ChildDeviceWrapper device = findBedDevice(devId)
   if (!device) {
-    return
-  }
-  if (isFuzion(getBedDeviceId(device))) {
-    // TODO - fuzion: Add this
-    warn "new API not supported yet"
     return
   }
 
@@ -2245,46 +2184,62 @@ void setUnderbedLightState(Map params, String devId) {
     ps = sON
   }
 
-  if (pb && !VALID_LIGHT_BRIGHTNESS.contains(pb)) {
-    error('Invalid underbed light brightness %s. Valid values are %s', pb, VALID_LIGHT_BRIGHTNESS)
+  if (pb && !VALID_LIGHT_BRIGHTNESS.keySet().contains(pb)) {
+    error('Invalid underbed light brightness %s. Valid values are %s', pb, VALID_LIGHT_BRIGHTNESS.keySet())
     return
   }
-
-  // First set the light state.
-  Map body; body = [
-    enableAuto: ps == 'auto'
-  ]
-  String id = getBedDeviceId(device)
-  httpRequestQueue(2, path: "/rest/bed/${id}/foundation/underbedLight", body: body)
-
-  determineUnderbedLightSetup(id)
-  Integer rightBrightness, leftBrightness
-  rightBrightness = pb
-  leftBrightness = pb
-  Integer outletNum; outletNum = i3
-  if (((List) ((Map) state.bedInfo[id]).underbedoutlets).size() > i1) {
-    // Two outlets so set the side corresponding to the device rather than
-    // defaulting to 3 (which should be a single light)
-    if (getBedDeviceSide(device) == sLEFT) {
-      outletNum = i3
-      rightBrightness = null
-      leftBrightness = pb
-    } else {
-      outletNum = i4
-      rightBrightness = pb
-      leftBrightness = null
+  String bedId = getBedDeviceId(device)
+  if (isFuzion(bedId)) {
+    if (!fuzionHasFeature('underbedLightEnableFlag')) {
+      info 'This bed does not have underbed lighting'
+      return
     }
-  }
-  // If brightness was given then set it.
-  if (pb) {
-    body = [
-      rightUnderbedLightPWM: rightBrightness,
-      leftUnderbedLightPWM: leftBrightness
+    // If state is auto then to do what the app does, we first set regular light state to off/0
+    // Otherwise if state is on/off, we set auto to false/low
+    if (ps == 'auto') {
+      addBamKeyRequestToQueue(bedId, 'SetUnderbedLightSettings', [sOFF, iZ])
+      addBamKeyRequestToQueue(bedId, 'SetUnderbedLightAutoSettings', [ps, VALID_LIGHT_BRIGHTNESS.get(pb)],
+          2, sREFRESHCHILDDEVICES)
+    } else {
+     addBamKeyRequestToQueue(bedId, 'SetUnderbedLightAutoSettings', ['false', 'low'])
+     addBamKeyRequestToQueue(bedId, 'SetUnderbedLightSettings', [ps, pt],
+          2, sREFRESHCHILDDEVICES)
+    }
+  } else {
+    // First set the light state.
+    Map body; body = [
+      enableAuto: ps == 'auto'
     ]
-    httpRequestQueue(2, path: "/rest/bed/${id}/foundation/system", body: body)
+    httpRequestQueue(2, path: "/rest/bed/${bedId}/foundation/underbedLight", body: body)
+    determineUnderbedLightSetup(bedId)
+    Integer rightBrightness, leftBrightness
+    rightBrightness = pb
+    leftBrightness = pb
+    Integer outletNum; outletNum = i3
+    if (((List) ((Map) state.bedInfo[bedId]).underbedoutlets).size() > i1) {
+      // Two outlets so set the side corresponding to the device rather than
+      // defaulting to 3 (which should be a single light)
+      if (getBedDeviceSide(device) == sLEFT) {
+        outletNum = i3
+        rightBrightness = null
+        leftBrightness = pb
+      } else {
+        outletNum = i4
+        rightBrightness = pb
+        leftBrightness = null
+      }
+    }
+    // If brightness was given then set it.
+    if (pb) {
+      body = [
+        rightUnderbedLightPWM: rightBrightness,
+        leftUnderbedLightPWM: leftBrightness
+      ]
+      httpRequestQueue(2, path: "/rest/bed/${bedId}/foundation/system", body: body)
+    }
+    setOutletState(bedId, outletNum,
+            ps == 'auto' ? sOFF : ps, pt, true)
   }
-  setOutletState(id, outletNum,
-          ps == 'auto' ? sOFF : ps, pt, true)
 }
 
 /**
@@ -2294,22 +2249,26 @@ void setUnderbedLightState(Map params, String devId) {
  *  @return   fills in state.bedInfo.outlets
  */
 void determineOutletSetup(String bedId) {
+  if (isFuzion(bedId)) {
+    // do nothing, fuzion beds don't have outlets
+  } else {
   Map<String,Map> bdinfo = (Map<String,Map>) state.bedInfo
-  if (bdinfo[bedId].outlets == null) {
-    debug('Determining outlets for %s', bedId)
-    // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
-    // Determine if this bed has 1 or 2 outlets and store for future use.
-    Map outlet1 = getOutletState(bedId, i1)
-    Map outlet2 = getOutletState(bedId, i2)
-    List outlets = []
-    if (outlet1) {
-      outlets << i1
+    if (bdinfo[bedId].outlets == null) {
+      debug('Determining outlets for %s', bedId)
+      // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
+      // Determine if this bed has 1 or 2 outlets and store for future use.
+      Map outlet1 = getOutletState(bedId, i1)
+      Map outlet2 = getOutletState(bedId, i2)
+      List outlets = []
+      if (outlet1) {
+        outlets << i1
+      }
+      if (outlet2) {
+        outlets << i2
+      }
+      bdinfo[bedId].outlets = outlets
+      state.bedInfo = bdinfo
     }
-    if (outlet2) {
-      outlets << i2
-    }
-    bdinfo[bedId].outlets = outlets
-    state.bedInfo = bdinfo
   }
 }
 
