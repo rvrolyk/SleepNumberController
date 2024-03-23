@@ -735,7 +735,6 @@ Side: ${side}
           (sTIT): "Create device to control the foot of the ${side} side?",
           defaultValue: false, submitOnChange: true
         if (((List<String>) ((Map) state.bedInfo[bdId]).components).contains('Warming')) {
-          // TODO: Make sure this works w/ fuzion
           paragraph 'A foot type device exposes on/off as switching the foot warming on or off.  Dimming will change the heat levels (1: low, 2: medium, 3: high).'
           input 'createFootWarmer', sBOOL,
             (sTIT): "Create device to control the foot warmer of the ${side} side?",
@@ -2249,26 +2248,27 @@ void setUnderbedLightState(Map params, String devId) {
  *  @return   fills in state.bedInfo.outlets
  */
 void determineOutletSetup(String bedId) {
-  if (isFuzion(bedId)) {
-    // do nothing, fuzion beds don't have outlets
-  } else {
   Map<String,Map> bdinfo = (Map<String,Map>) state.bedInfo
-    if (bdinfo[bedId].outlets == null) {
-      debug('Determining outlets for %s', bedId)
-      // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
-      // Determine if this bed has 1 or 2 outlets and store for future use.
-      Map outlet1 = getOutletState(bedId, i1)
-      Map outlet2 = getOutletState(bedId, i2)
-      List outlets = []
-      if (outlet1) {
-        outlets << i1
-      }
-      if (outlet2) {
-        outlets << i2
-      }
-      bdinfo[bedId].outlets = outlets
-      state.bedInfo = bdinfo
+  if (bdinfo[bedId].outlets == null) {
+    if (isFuzion(bedId)) {
+      // do nothing, fuzion beds don't have outlets
+      bdinfo[bedId].outlets = []
+    } else {
+        debug('Determining outlets for %s', bedId)
+        // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
+        // Determine if this bed has 1 or 2 outlets and store for future use.
+        Map outlet1 = getOutletState(bedId, i1)
+        Map outlet2 = getOutletState(bedId, i2)
+        List outlets = []
+        if (outlet1) {
+          outlets << i1
+        }
+        if (outlet2) {
+          outlets << i2
+        }
+        bdinfo[bedId].outlets = outlets
     }
+    state.bedInfo = bdinfo
   }
 }
 
