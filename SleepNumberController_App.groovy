@@ -1228,6 +1228,7 @@ void processBedData(Map responseData) {
     }
   }
   if (bedFailures.size() && state.status == 'Online') {
+    if (devdbg()) debug('Bed failures %s', bedFailures)
     state.status = 'Bed / device mismatch'
   }
   updateLabel()
