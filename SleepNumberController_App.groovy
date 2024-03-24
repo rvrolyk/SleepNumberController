@@ -2647,6 +2647,7 @@ private Map makeBamKeyHttpRequest(String bedId, String key, List<String> bamKeyA
   Map res = httpRequest(createBamKeyUrl(bedId, state.bedInfo[bedId].accountId as String),
       this.&put, createBamKeyArgs(key, bamKeyArgs))
   if (devdbg()) debug('BamKey response: %s', res)
+  return res
 }
 
 /**
