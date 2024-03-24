@@ -1162,6 +1162,8 @@ void processBedData(Map responseData) {
               outletDataBedOut?.setting == i1 ? sSTON : sSTOFF
           String timer 
           if (isFuzion(bedId)) {
+            // Fuzion beds store the timer under a general 'state' call vs. outlets so
+            // we obtained the state from the light data vs. outlet data. 
             timer = bstate == 'Auto' ? 'Not set' : underbedLightData[bedId]?.fuzionTimer ?: 'Forever'
           } else {
             timer = bstate == 'Auto' ? 'Not set' :
@@ -1432,6 +1434,8 @@ Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
                     makeBamKeyHttpRequest(bedId, 'GetActuatorPosition', [sideLower, actuator]))[0]
           }
         }
+      } else {
+        debug('Bed %s does not have articulation, not getting positions', bedId)
       }
       response[side]['bedPreset'] = processBamKeyResponse(
               makeBamKeyHttpRequest(bedId, 'GetCurrentPreset', [side]))[0]
@@ -1472,8 +1476,8 @@ Map getFootWarmingStatus(String bedId) {
     SIDES.each { side -> 
       // TODO: Probably need to see if the bed has both sides before calling both of these
       values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFootWarming', [side.toLowerCase()]))
-      // The first value is the setting as a lower-cased string. Since the old API used numbers, we need to convert
-      response["footWarmingStatus${side}"] = HEAT_TEMPS.get(values[0].toLowerCase())
+      // The first value is the setting as a lower-cased string. Since the old API used numbers, we need to convert the string
+      response["footWarmingStatus${side}"] = HEAT_TEMPS.get(values[0].capitalize())
       response["footWarmingTimer${side}"] = values[1]
     }
   } else {
@@ -1599,7 +1603,10 @@ void setFootWarmingState(Map params, String devId) {
   String side = getBedDeviceSide(device)
   String bedId = getBedDeviceId(device)
   if (isFuzion(bedId)) {
-    // TODO: Check feature flag (rapidSleepSettingEnableFlag)?
+    if (!fuzionHasFeature('rapidSleepSettingEnableFlag')) {
+      info('Bed %s does not have foot warming', bedId)
+      return
+    }
     addBamKeyRequestToQueue(bedId, 'SetFootWarming',
             [side.toLowerCase(), VALID_HEAT_TEMPS.get(ptemp), ptimer.toString()], 0, sREFRESHCHILDDEVICES)
   } else {
@@ -1991,7 +1998,7 @@ Map getOutletState(String bedId, Integer outlet) {
         this.&get, null, [outletId: outlet])
   if (devdbg()) debug('Response data from SleepNumber: %s', res)
   if (res) {
-    outletMapFLD[idx]=res
+    outletMapFLD[idx] = res
     updTsVal(val)
   }
   return res
@@ -2074,7 +2081,7 @@ Map getUnderbedLightState(String bedId) {
     }
     // The first value from auto settings is a boolean on/off which is all the non-fuzion api returns here
     String auto = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetUnderbedLightAutoSettings', []))[0]
-    if (auto == 'on') res = ['enableAuto': true]
+    res = ['enableAuto': auto == 'on'] 
   } else {
     res = httpRequest("/rest/bed/${bedId}/foundation/underbedLight", this.&get)
   }
