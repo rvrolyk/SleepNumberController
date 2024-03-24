@@ -400,7 +400,7 @@ void initializeBedInfo() {
           // foundation status endpoints so don't lump this with a base type directly.
           components << 'Integrated Base'
         } else {
-          components << (String)component[sTYP]
+          components << (String) component[sTYP]
         }
       }
       stateBedInfo[id].components = components
@@ -1079,11 +1079,11 @@ void processBedData(Map responseData) {
           }
         }
         // So far, the presence of "Warming" in the bed status indicates a foot warmer.
-        // TODO: check this for fuzion
+        // Fuzion seems to have warming as well so we don't bother chcking the feature flag.
         if (!bedFailures[bedId]
             && !footwarmingStatus[bedId]
             && ((List<String>)bedInfoBed?.components)?.contains('Warming')
-            && (deviceTypes.contains(sFOOTWMR) || deviceTypes.contains('footwarmer'))
+            && (deviceTypes.contains(sFOOTWMR))
           ) {
           // Only try to update the warming state if the bed actually has it
           // and there's a device for it.
@@ -1206,7 +1206,7 @@ void processBedData(Map responseData) {
         if (!sleepNumberFavorites[bedId]) {
           sleepNumberFavorites[bedId] = getSleepNumberFavorite(bedId, true)
         }
-        Integer favorite = ((Map)sleepNumberFavorites[bedId]).get("sleepNumberFavorite" + bedSideStr, -1) as Integer
+        Integer favorite = ((Map) sleepNumberFavorites[bedId]).get("sleepNumberFavorite" + bedSideStr, -1) as Integer
         if (favorite >= iZ) {
           statusMap << [
             sleepNumberFavorite: favorite
@@ -1462,14 +1462,18 @@ Map getFootWarmingStatus(String bedId) {
   debug('Getting Foot Warming Status for %s', bedId)
   Map response = [:]
   if (isFuzion(bedId)) {
+    if (!fuzionHasFeature('rapidSleepSettingEnableFlag')) {
+      info('Bed %s does not have foot warming', bedId)
+      return response
+     }
     // The new API doesn't have an overall status so we have to call for left and right and then build a response
     // like the old API
-    // TODO: check features before making call - rapidSleepSettingEnableFlag
     List<String> values = []
     SIDES.each { side -> 
       // TODO: Probably need to see if the bed has both sides before calling both of these
       values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFootWarming', [side.toLowerCase()]))
-      response["footWarmingStatus${side}"] = values[0]
+      // The first value is the setting as a lower-cased string. Since the old API used numbers, we need to convert
+      response["footWarmingStatus${side}"] = HEAT_TEMPS.get(values[0].toLowerCase())
       response["footWarmingTimer${side}"] = values[1]
     }
   } else {
@@ -1543,6 +1547,10 @@ void setFoundationAdjustment(Map params, String devId) {
   // The timing appears to be linear which means it's 0.35 seconds per level adjusted for the head and 0.18
   // for the foot.
   Integer currentPosition = actu == 'H' ? device.currentValue('headPosition') : device.currentValue('footPosition')
+  if (currentPosition == null) {
+    debug('Unable to determine current position for actuator %s, using 0', actu)
+    currentPosition = 0
+  }
   Integer positionDelta = Math.abs(pos - currentPosition)
   Float movementDuration = actu == 'H' ? 0.35 : 0.18
   Integer waitTime = Math.round(movementDuration * positionDelta).toInteger() + i1
@@ -1806,14 +1814,15 @@ String getPrivacyMode(String bedId, Boolean lazy = false) {
       addHttpR("/rest/bed/${bedId}/pauseMode" + sCACHE)
     }
     debug "Getting CACHED Privacy Mode for ${bedId} ${ devdbg() ? privacyMapFLD[bedId] : sBLK}"
-    return (String)privacyMapFLD[bedId].pauseMode
+    return (String) privacyMapFLD[bedId].pauseMode
   }
   debug('Getting Privacy Mode for %s', bedId)
   Map res
   if (isFuzion(bedId)) {
+    // fuzion pause modes are active or paused
     Boolean paused = processBamKeyResponse(
             makeBamKeyHttpRequest(bedId, 'GetSleepiqPrivacyState'))[0].equals('paused')
-    res = ['pauseMode': paused ? sON : sOff]
+    res = ['pauseMode': paused ? sON : sOFF]
   } else {
     res = httpRequest("/rest/bed/${bedId}/pauseMode")
   }
@@ -1858,6 +1867,7 @@ Map getSleepNumberFavorite(String bedId, Boolean lazy = false) {
   Map res = [:]
   if (isFuzion(bedId)) {
     SIDES.each { side ->
+      if (devdbg()) debug 'getting favorite for %s', side
       String val = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFavoriteSleepNumber', [side.toLowerCase()]))[0]
       res["sleepNumberFavorite${side}"] = val
     }
@@ -2634,8 +2644,9 @@ private Boolean fuzionHasFeature(String feature) {
 }
 
 private Map makeBamKeyHttpRequest(String bedId, String key, List<String> bamKeyArgs = []) {
-  return httpRequest(createBamKeyUrl(bedId, state.bedInfo[bedId].accountId as String),
+  Map res = httpRequest(createBamKeyUrl(bedId, state.bedInfo[bedId].accountId as String),
       this.&put, createBamKeyArgs(key, bamKeyArgs))
+  if (devdb()) debug('BamKey response: %s', res)
 }
 
 /**
