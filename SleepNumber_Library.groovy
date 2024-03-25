@@ -6,7 +6,7 @@ import groovy.transform.Field
 
 library(
    author: 'rvrolyk',
-   name: 'SleepNumberLibraryBeta',
+   name: 'SleepNumberLibrary',
    namespace: 'rvrolyk',
    description: 'Library for Sleep Number'
 )
