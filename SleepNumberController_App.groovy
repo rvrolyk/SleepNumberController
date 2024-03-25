@@ -36,39 +36,23 @@ import java.time.*
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.Semaphore
+import java.util.regex.Pattern
 import org.json.JSONObject
 import java.text.SimpleDateFormat
+
+#include rvrolyk.SleepNumberLibrary
 
 @Field static ConcurrentLinkedQueue requestQueue = new ConcurrentLinkedQueue()
 @Field static Semaphore mutex = new Semaphore(1)
 @Field volatile static Long lastLockTime = 0L
 @Field static Long lastErrorLogTime = 0L
 
-@Field static final String sNL = (String)null
-@Field static final String sSTON = 'On'
-@Field static final String sSTOFF = 'Off'
-@Field static final String sRIGHT = 'Right'
-@Field static final String sLEFT = 'Left'
-
-@Field static final String sNUM = 'number'
-@Field static final String sTXT = 'text'
-@Field static final String sENUM = 'enum'
-@Field static final String sBOOL = 'bool'
-@Field static final String sON = 'on'
-@Field static final String sOFF = 'off'
-@Field static final String sSWITCH = 'switch'
-@Field static final String sPRESENCE = 'presence'
-@Field static final String sNM = 'name'
-@Field static final String sVL = 'value'
-@Field static final String sTYP = 'type'
+@Field static final String sPAUSED = 'paused'
+@Field static final String sACTIVE = 'active'
+@Field static final String sGEN = 'generation'
+@Field static final String sACCT_ID = 'accountId'
 @Field static final String sTIT = 'title'
 @Field static final String sDESC = 'description'
-
-@Field static final String sHEAD = 'head'
-@Field static final String sFOOT = 'foot'
-@Field static final String sFOOTWMR = 'foot warmer'
-@Field static final String sOUTLET = 'outlet'
-@Field static final String sUNDERBEDLIGHT = 'underbedlight'
 
 @Field static final String sSIDE = 'side'
 @Field static final String sBEDID = 'bedId'
@@ -80,30 +64,58 @@ import java.text.SimpleDateFormat
 @Field static final String sLASTFAMILYDATA = 'lastFamilyDataUpdDt'
 @Field static final String sLASTBEDDATA = 'lastBedDataUpdDt'
 
-@Field static final Integer iZ = 0
-@Field static final Integer i1 = 1
-@Field static final Integer i2 = 2
-@Field static final Integer i3 = 3
-@Field static final Integer i4 = 4
-@Field static final Integer i20 = 20
-
 @Field static final String API_HOST = 'prod-api.sleepiq.sleepnumber.com'
 static String getAPI_URL() { 'https://' + API_HOST }
 @Field static final String LOGIN_HOST = 'l06it26kuh.execute-api.us-east-1.amazonaws.com'
 static String getLOGIN_URL() { 'https://' + LOGIN_HOST }
 @Field static final String LOGIN_CLIENT_ID = 'jpapgmsdvsh9rikn4ujkodala'
 @Field static final String USER_AGENT = 'SleepIQ/1669639706 CFNetwork/1399 Darwin/22.1.0'
-@Field static final String SN_APP_VERSION = '4.4.1'
-
-@Field static final ArrayList<String> VALID_ACTUATORS = ['H', 'F']
-@Field static final ArrayList<Integer> VALID_SPEEDS = [0, 1, 2, 3]
-@Field static final ArrayList<Integer> VALID_WARMING_TIMES = [30, 60, 120, 180, 240, 300, 360]
-@Field static final ArrayList<Integer> VALID_WARMING_TEMPS = [0, 31, 57, 72]
-@Field static final ArrayList<Integer> VALID_PRESET_TIMES = [0, 15, 30, 45, 60, 120, 180]
-@Field static final ArrayList<Integer> VALID_PRESETS = [1, 2, 3, 4, 5, 6]
-@Field static final ArrayList<Integer> VALID_LIGHT_TIMES = [15, 30, 45, 60, 120, 180]
-@Field static final ArrayList<Integer> VALID_LIGHT_BRIGHTNESS = [1, 30, 100]
+@Field static final String SN_APP_VERSION = '4.8.40'
 @Field static final Map<String, String> LOG_LEVELS = ['0': 'Off', '1': 'Debug', '2': 'Info', '3': 'Warn']
+
+@Field static final Map<String, String> BAM_KEY = [
+  'HaltAllActuators': 'ACHA', // used to stop movement - not per side
+  'GetSystemConfiguration': 'SYCG',
+  'SetSleepiqPrivacyState': 'SPRS',
+  'GetSleepiqPrivacyState': 'SPRG',
+  'InterruptSleepNumberAdjustment': 'PSNI',
+  'StartSleepNumberAdjustment': 'PSNS',
+  'GetSleepNumberControls': 'SNCG',
+  'SetFavoriteSleepNumber': 'SNFS',
+  'GetFavoriteSleepNumber': 'SNFG',
+  'SetUnderbedLightSettings': 'UBLS',
+  'SetUnderbedLightAutoSettings': 'UBAS',
+  'GetUnderbedLightSettings': 'UBLG',
+  'GetUnderbedLightAutoSettings': 'UBAG',
+  'GetActuatorPosition': 'ACTG',
+  'SetActuatorTargetPosition': 'ACTS',
+  'SetTargetPresetWithoutTimer': 'ASTP',
+  'SetTargetPresetWithTimer': 'ACSP',
+  'GetCurrentPreset': 'AGCP',
+  'SetResponsiveAirState': 'LRAS',
+  'GetResponsiveAirState': 'LRAG',
+  'SetFootWarming': 'FWTS',
+  'GetFootWarming': 'FWTG',
+]
+
+@Field static List<String> FEATURE_NAMES = [
+        'bedType', // seems to always be 'dual'?  Maybe on some beds it's single?
+        'pressureControlEnabledFlag',
+        'articulationEnableFlag',
+        'underbedLightEnableFlag',
+        'rapidSleepSettingEnableFlag',
+        'thermalControlEnabledFlag',
+        'rightHeadActuator',
+        'rightFootActuator',
+        'leftHeadActuator',
+        'leftFootActuator',
+        'flatPreset',
+        'favoritePreset',
+        'snorePreset',
+        'zeroGravityPreset',
+        'watchTvPreset',
+        'readPreset',
+]
 
 @Field static final String PAUSE = 'Pause'
 @Field static final String RESUME = 'Resume'
@@ -362,14 +374,11 @@ static String getBedDeviceSide(ChildDeviceWrapper bed) {
   return (String)((Map) bed.getState())[sSIDE]
 }
 
-static String getBedDeviceType(ChildDeviceWrapper bed) {
-  return (String)((Map) bed.getState())[sTYP]
-}
-
 /**
  * rest calls
- *     getBeds() (C)
- *  @return   recreates state.bedInfo
+ *     getBeds()
+ *     if new API: getSystemConfiguration() 
+ *  @return   recreates state.bedInfo and, if new API, also sets state.systemConfiguration
  */
 @CompileStatic
 void initializeBedInfo() {
@@ -391,32 +400,35 @@ void initializeBedInfo() {
           // foundation status endpoints so don't lump this with a base type directly.
           components << 'Integrated Base'
         } else {
-          components << (String)component[sTYP]
+          components << (String) component[sTYP]
         }
       }
       stateBedInfo[id].components = components
+      // Store the type as well as a boolean indicating if it's old or new
+      stateBedInfo[id].bedType = bed[sGEN]
+      // Store the account id which is needed for bamkey API
+      stateBedInfo[id].accountId = bed[sACCT_ID]
+      // Only know one 'generation' that is the new API for now
+      if (bed[sGEN] == 'fuzion') {
+        stateBedInfo[id].newApi = bed[sGEN] == 'fuzion'
+        setState('systemConfiguration', getSystemConfiguration(id, (String) bed[sACCT_ID]))
+      }
     }
   }
   if (!stateBedInfo) {
     warn 'No bed state set up'
   }
-  setState('bedInfo',stateBedInfo)
+  setState('bedInfo', stateBedInfo)
 }
 
 /**
- * Gets all bed child devices even if they're in a virtual container.
- * Will not return the virtual container(s) or children of a parent
- * device
+ * Gets all bed child devices.
+ * Will not return the children of a parent device
  */
 List<ChildDeviceWrapper> getBedDevices() {
   List<ChildDeviceWrapper> children = []
-  // If any child is a virtual container, iterate that too
   for (ChildDeviceWrapper child in (List<ChildDeviceWrapper>)getChildDevices()) {
-    if ((Boolean)child.hasAttribute('containerSize')) {
-      children.addAll((List)child.childList())
-    } else {
-      children.add(child)
-    }
+    children.add(child)
   }
   return children
 }
@@ -432,11 +444,10 @@ List<Map> getBedDeviceData() {
   for (ChildDeviceWrapper device in devices) {
     String side = getBedDeviceSide(device)
     String bedId = getBedDeviceId(device)
-    String type = getBedDeviceType(device) ?: 'Parent'
 
     output << [
       (sNM): (String) device.label,
-      (sTYP): type,
+      (sTYP): 'Parent',
       (sSIDE): side,
       (sDEVICEID): device.id,
       (sBEDID): bedId,
@@ -561,17 +572,18 @@ void configureVariableRefreshInterval() {
   if (getSettingB('variableRefreshModes')) {
     night = ((List) gtSetting('nightMode')).contains(location.mode)
   } else {
-    // Gather presence == present child devices
-    List<ChildDeviceWrapper> presentChildren = getBedDevices().findAll { ChildDeviceWrapper it ->
-      String t = getBedDeviceType(it)
-      (!t || t == sPRESENCE) && (Boolean) it.isPresent()
-    }
+    List presentChildren = getBedDevices().findAll { (Boolean) it.isPresent() }
     Date now = new Date()
-    if (wtimeOfDayIsBetween(wtoDateTime(getSettingStr('dayStart')), wtoDateTime(getSettingStr('nightStart')), now)) {
-      if (presentChildren.size() > iZ) return // if someone is still in bed, don't change anything
+    if (getSettingStr('dayStart') == null || getSettingStr('nightStart') == null) {
+      error('Either dayStart(%s) and/or nightStart(%s) was null', getSettingStr('dayStart'), getSettingStr('nightStart'))
       night = false
     } else {
-      night = true
+      if (wtimeOfDayIsBetween(wtoDateTime(getSettingStr('dayStart')), wtoDateTime(getSettingStr('nightStart')), now)) {
+        if (presentChildren.size() > iZ) return // if someone is still in bed, don't change anything
+        night = false
+      } else {
+        night = true
+      }
     }
   }
 
@@ -601,7 +613,6 @@ void configureVariableRefreshInterval() {
 Map findBedPage() {
   Map responseData = getBedData()
   List<ChildDeviceWrapper> devices = getBedDevices()
-  List childDevices = []
   List<Map> beds = responseData ? (List<Map>)responseData.beds : []
   dynamicPage(name: 'findBedPage') {
     if (beds.size() > iZ) {
@@ -618,26 +629,9 @@ Map findBedPage() {
                 debug "bedId's don't match, skipping"
                 continue
               }
-              String dt = getBedDeviceType(dev)
               String ds = getBedDeviceSide(dev)
-              if (!dt || dt == 'presence') {
-                childDevices << ds
-                sidesSeen << ds
-                addBedSelectLink(ds, bdId, (String)dev.label, 'modify')
-              }
-            }
-            if (childDevices.size() < i2) {
-              input 'createNewChildDevices', sBOOL, (sTIT): 'Create new child device types', defaultValue: false, submitOnChange: true
-              if (getSettingB('createNewChildDevices')) {
-                if (!childDevices.contains(l)) {
-                  addBedSelectLink(l, bdId)
-                }
-                if (!childDevices.contains(r)) {
-                  addBedSelectLink(r, bdId)
-                }
-              }
-            } else {
-              app.removeSetting('createNewChildDevices')
+              sidesSeen << ds
+              addBedSelectLink(ds, bdId, (String)dev.label, 'modify')
             }
           }
           if (!sidesSeen.contains(l)) {
@@ -698,11 +692,9 @@ Map selectBedPage(Map iparams) {
     String side; side = (String)params[sSIDE]
     section {
       paragraph """<b>Instructions</b>
-Enter a name, then choose whether or not to use child devices or a virtual container for the devices and then choose the types of devices to create.
+Enter a name, then choose whether or not to use child devices and then choose the types of devices to create.
 Note that if using child devices, the parent device will contain all the special commands along with bed specific status while the children are simple
-switches or dimmers.  Otherwise, all devices are the same on Hubitat, the only difference is how they behave to dim and on/off commands.  This is so that they may be used with external assistants such as Google Assistant or Amazon Alexa.  If you don't care about such use cases (and only want RM control or just presence), you can just use the presence type.
-<br>
-See <a href="https://community.hubitat.com/t/release-virtual-container-driver/4440" target = _blank>this post</a> for virtual container.
+switches or dimmers.
 """
         paragraph """<b>Device information</b>
 Bed ID: ${bdId}
@@ -722,41 +714,35 @@ Side: ${side}
           (sDESC): 'What prefix do you want for the devices?', submitOnChange: true,
           required: true
       newName = getSettingStr(varName)
-      input 'useChildDevices', sBOOL, (sTIT): 'Use child devices? (only recommended if  you have underbed lights or bed outlets)', defaultValue: true,
+      input 'useChildDevices', sBOOL, (sTIT): 'Use child devices? (recommended for direct device control of bed features)', defaultValue: false,
          submitOnChange: true
       ucd = getSettingB('useChildDevices')
-      if (!ucd) {
-        input 'useContainer', sBOOL, (sTIT): 'Use virtual container?', defaultValue: false,
-           submitOnChange: true
-      }
       side = side.toLowerCase()
-      paragraph 'A presence type device exposes on/off as switching to a preset level (on) and flat (off).  Dimming will change the Sleep Number.'
-      if (ucd) {
+      paragraph '<br>A presence type device exposes on/off as switching to a preset level (on) and flat (off).  Dimming will change the Sleep Number.'
+      if (!ucd) {
+        paragraph 'All other features are accessible via the device page and custom commands'
+      } else {
         paragraph 'This is the parent device when child devices are used'
         app.updateSetting 'createPresence', [(sVL): 'true', (sTYP): sBOOL]
         settings.createPresence = true
-      } else {
-        input 'createPresence', sBOOL,
-            (sTIT): "Create presence device for ${side} side?",
-            defaultValue: true, submitOnChange: true
-      }
-      paragraph 'A head type device exposes on/off as switching to a preset level (on) and  flat (off).  Dimming will change the head position (0 is flat, 100 is fully raised).'
-      input 'createHeadControl', sBOOL,
-         (sTIT): "Create device to control the head of the ${side} side?",
-         defaultValue: true, submitOnChange: true
-      paragraph 'A foot type device exposes on/off as switching to a preset level (on) and  flat (off).  Dimming will change the foot position (0 is flat, 100 is fully raised).'
-      input 'createFootControl', sBOOL,
-         (sTIT): "Create device to control the foot of the ${side} side?",
-         defaultValue: true, submitOnChange: true
-      if (((List<String>) ((Map) state.bedInfo[bdId]).components).contains('Warming')) {
-        paragraph 'A foot type device exposes on/off as switching the foot warming on or off.  Dimming will change the heat levels (1: low, 2: medium, 3: high).'
-        input 'createFootWarmer', sBOOL,
-           (sTIT): "Create device to control the foot warmer of the ${side} side?",
-           defaultValue: true, submitOnChange: true
-      }
-      determineUnderbedLightSetup(bdId)
-      determineOutletSetup(bdId)
-      if (ucd) {
+
+        paragraph 'A head type device exposes on/off as switching to a preset level (on) and  flat (off).  Dimming will change the head position (0 is flat, 100 is fully raised).'
+        input 'createHeadControl', sBOOL,
+          (sTIT): "Create device to control the head of the ${side} side?",
+          defaultValue: false, submitOnChange: true
+        paragraph 'A foot type device exposes on/off as switching to a preset level (on) and  flat (off).  Dimming will change the foot position (0 is flat, 100 is fully raised).'
+        input 'createFootControl', sBOOL,
+          (sTIT): "Create device to control the foot of the ${side} side?",
+          defaultValue: false, submitOnChange: true
+        if (((List<String>) ((Map) state.bedInfo[bdId]).components).contains('Warming')) {
+          paragraph 'A foot type device exposes on/off as switching the foot warming on or off.  Dimming will change the heat levels (1: low, 2: medium, 3: high).'
+          input 'createFootWarmer', sBOOL,
+            (sTIT): "Create device to control the foot warmer of the ${side} side?",
+            defaultValue: false, submitOnChange: true
+        }
+        determineUnderbedLightSetup(bdId)
+        determineOutletSetup(bdId)
+
         if (((List) ((Map)state.bedInfo[bdId]).underbedoutlets).size() > iZ) {
           paragraph 'Underbed lighting creates a dimmer allowing the light to be turned on or off at different levels with timer based on parent device preference.'
           input 'createUnderbedLighting', sBOOL,
@@ -771,45 +757,46 @@ Side: ${side}
         }
       }
     }
-    if (!ucd || !getSettingB('createUnderbedLighting')) app.removeSetting('createUnderbedLighting')
-    if (!ucd || !getSettingB('createOutlet')) app.removeSetting('createOutlet')
+    if (!ucd) {
+      List<String> ucdOnlySettings = ['createHeadControl', 'createFootControl',  'createFootWarmer', 'createUnderbedLighting', 'createOutlet']
+      ucdOnlySettings.each { 
+        app.removeSetting(it) 
+      }
+    }
 
     section {
       StringBuilder msg; msg = new StringBuilder('Will create the following devices')
       String containerName; containerName = sBLK
       List<String> types = []
       if (ucd) {
-        app.updateSetting 'useContainer', [(sVL): 'false', (sTYP): sBOOL]
-        settings.useContainer = false
         msg.append(' with each side as a primary device and each type as a child device of the side')
-      } else if (getSettingB('useContainer')) {
-        containerName = "${newName} Container"
-        msg.append(" in virtual container '").append(containerName).append("'")
       }
       msg.append(':<ol>')
-      if (getSettingB('createPresence')) {
+      if (getSettingB('createPresence') || !ucd) {
         msg.append('<li>').append(createDeviceLabel(newName, sPRESENCE)).append('</li>')
         types.add(sPRESENCE)
       }
-      if (getSettingB('createHeadControl')) {
-        msg.append('<li>').append(createDeviceLabel(newName, sHEAD)).append('</li>')
-        types.add(sHEAD)
-      }
-      if (getSettingB('createFootControl')) {
-        msg.append('<li>').append(createDeviceLabel(newName, sFOOT)).append('</li>')
-        types.add(sFOOT)
-      }
-      if (getSettingB('createFootWarmer')) {
-        msg.append('<li>').append(createDeviceLabel(newName, sFOOTWMR)).append('</li>')
-        types.add(sFOOTWMR)
-      }
-      if (getSettingB('createUnderbedLighting') && ucd) {
-        msg.append('<li>').append(createDeviceLabel(newName, sUNDERBEDLIGHT)).append('</li>')
-        types.add(sUNDERBEDLIGHT)
-      }
-      if (getSettingB('createOutlet') && ucd) {
-        msg.append('<li>').append(createDeviceLabel(newName, sOUTLET)).append('</li>')
-        types.add(sOUTLET)
+      if (ucd) {
+        if (getSettingB('createHeadControl')) {
+          msg.append('<li>').append(createDeviceLabel(newName, sHEAD)).append('</li>')
+          types.add(sHEAD)
+        }
+        if (getSettingB('createFootControl')) {
+          msg.append('<li>').append(createDeviceLabel(newName, sFOOT)).append('</li>')
+          types.add(sFOOT)
+        }
+        if (getSettingB('createFootWarmer')) {
+          msg.append('<li>').append(createDeviceLabel(newName, sFOOTWMR)).append('</li>')
+          types.add(sFOOTWMR)
+        }
+        if (getSettingB('createUnderbedLighting') && ucd) {
+          msg.append('<li>').append(createDeviceLabel(newName, sUNDERBEDLIGHT)).append('</li>')
+          types.add(sUNDERBEDLIGHT)
+        }
+        if (getSettingB('createOutlet') && ucd) {
+          msg.append('<li>').append(createDeviceLabel(newName, sOUTLET)).append('</li>')
+          types.add(sOUTLET)
+        }
       }
       msg.append('</ol>')
       paragraph msg.toString()
@@ -820,8 +807,6 @@ Side: ${side}
         (sBEDID): bdId,
         (sSIDE): params[sSIDE],
         useChildDevices: ucd,
-        useContainer: getSettingB('useContainer'),
-        containerName: containerName,
         types: types
       ]
     }
@@ -850,10 +835,6 @@ static String createDeviceLabel(String name, String type) {
 Map createBedPage(Map iparams) {
   Map params; params = iparams
   if (params) state.createBedP = params else params = state.createBedP
-  ChildDeviceWrapper container; container = null
-  if ((Boolean) params.useContainer) {
-    container = createContainer((String) params[sBEDID], (String) params.containerName, (String) params[sSIDE])
-  }
   List<ChildDeviceWrapper> existingDevices = getBedDevices()
   List<ChildDeviceWrapper> devices = []
   // TODO: Consider allowing more than one identical device for debug purposes.
@@ -862,70 +843,45 @@ Map createBedPage(Map iparams) {
   String varName = "${bedId}.${params[sSIDE]}".toString()
   String newName; newName = getSettingStr(varName)
 
-  if ((Boolean) params.useChildDevices) {
-    // Bed Ids seem to always be negative so convert to positive for the device
-    // id for better formatting.
-    String deviceId = "sleepnumber.${bedId}.${params[sSIDE]}".toString()
-    String label = createDeviceLabel(newName, sPRESENCE)
-    ChildDeviceWrapper parent; parent = existingDevices.find{ (String) it.deviceNetworkId == deviceId }
-    if (parent) {
-      info('Parent device %s already exists', deviceId)
-    } else {
-      debug('Creating parent device %s', deviceId)
-      parent = addChildDevice(NAMESPACE, DRIVER_NAME, deviceId, null, [label: label])
-      parent.setStatus(params.presence)
-      parent.setBedId(params[sBEDID])
-      parent.setSide(params[sSIDE])
-      devices.add(parent)
-    }
-    // If we are using child devices then we create a presence device and
-    // all others are children of it.
-    for (String type in (List<String>)params.types) {
-      if (type != sPRESENCE) {
-        String childId = deviceId + '-' + type.replaceAll(sSPACE, sBLK)
-        String driverType; driverType = sNL
-        //noinspection GroovyFallthrough
-        switch (type) {
-          case sOUTLET:
-            driverType = 'Switch'
-            break
-          case sHEAD:
-          case sFOOT:
-          case sFOOTWMR:
-          case sUNDERBEDLIGHT:
-            driverType = 'Dimmer'
-        }
-        ChildDeviceWrapper newDevice = parent.createChildDevice(childId, "Generic Component ${driverType}",
-          createDeviceLabel(newName, type))
-        if (newDevice) {
-          devices.add(newDevice)
-        }
-      }
-    }
+
+  // Bed Ids seem to always be negative so convert to positive for the device
+  // id for better formatting.
+  String deviceId = "sleepnumber.${bedId}.${params[sSIDE]}".toString() + (IS_BETA ? 'beta' : sBLK)
+  String label = createDeviceLabel(newName, sPRESENCE)
+  ChildDeviceWrapper parent; parent = existingDevices.find{ (String) it.deviceNetworkId == deviceId }
+  if (parent) {
+    info('Parent device %s already exists', deviceId)
   } else {
-    for (String type in (List<String>)params.types) {
-      String deviceId = "sleepnumber.${params[sBEDID]}.${params[sSIDE]}.${type.replaceAll(' ', '_')}".toString()
-      if (existingDevices.find{ it.data.vcId == deviceId }) {
-        info('Not creating device %s, it already exists', deviceId)
-      } else {
-        String label = createDeviceLabel(newName, type)
-        ChildDeviceWrapper device
-        if (container) {
-          debug('Creating new child device %s with label %s in container %s', deviceId, label, params.containerName)
-          container.appCreateDevice(label, DRIVER_NAME, NAMESPACE, deviceId)
-          // #appCreateDevice doesn't return the device so find it
-          device = container.childList().find({it.data.vcId == deviceId})
-        } else {
-          device = addChildDevice(NAMESPACE, DRIVER_NAME, deviceId, null, [label: label])
-        }
-        device.setStatus(params.presence)
-        device.setBedId(params[sBEDID])
-        device.setSide(params[sSIDE])
-        device.setType(type)
-        devices.add(device)
+    debug('Creating parent device %s', deviceId)
+    parent = addChildDevice(NAMESPACE, DRIVER_NAME, deviceId, null, [label: label])
+    parent.setStatus(params.presence)
+    parent.setBedId(params[sBEDID])
+    parent.setSide(params[sSIDE])
+    devices.add(parent)
+  }
+  for (String type in (List<String>)params.types) {
+    if (type != sPRESENCE) {
+      String childId = deviceId + '-' + type.replaceAll(sSPACE, sBLK)
+      String driverType; driverType = sNL
+      //noinspection GroovyFallthrough
+      switch (type) {
+        case sOUTLET:
+          driverType = 'Switch'
+          break
+        case sHEAD:
+        case sFOOT:
+        case sFOOTWMR:
+        case sUNDERBEDLIGHT:
+          driverType = 'Dimmer'
+      }
+      ChildDeviceWrapper newDevice = parent.createChildDevice(childId, "Generic Component ${driverType}",
+        createDeviceLabel(newName, type))
+      if (newDevice) {
+        devices.add(newDevice)
       }
     }
   }
+
   // Reset the bed info since we added more.
   checkBedInfo()
   dynamicPage((sNM): 'selectDevicePage') {
@@ -933,8 +889,6 @@ Map createBedPage(Map iparams) {
       StringBuilder header; header = new StringBuilder('Created new devices')
       if ((Boolean) params.useChildDevices) {
         header.append(' using child devices')
-      } else if ((Boolean) params.useContainer) {
-        header.append(' in container ').append(params.containerName)
       }
       header.append(':')
       paragraph(header.toString())
@@ -942,11 +896,6 @@ Map createBedPage(Map iparams) {
       for (ChildDeviceWrapper device in devices) {
         displayInfo.append('<li>')
         displayInfo.append((String)device.label)
-        if (!(Boolean) params.useChildDevices) {
-          displayInfo.append('<br>Bed ID: ').append(getBedDeviceId(device))
-          displayInfo.append('<br>Side: ').append(getBedDeviceSide(device))
-          displayInfo.append('<br>Type: ').append(getBedDeviceType(device))
-        }
         displayInfo.append('</li>')
       }
       displayInfo.append('</ol>')
@@ -1034,25 +983,6 @@ Map diagnosticsPage(Map iparams) {
   }
 }
 
-/**
- * Creates a virtual container with the given name and side
- */
-ChildDeviceWrapper createContainer(String bedId, String containerName, String side) {
-  ChildDeviceWrapper container
-  container = ((List<ChildDeviceWrapper>) getChildDevices()).find{ (String) it.typeName == 'Virtual Container' &&  (String) it.label == containerName}
-  if (!container) {
-    debug('Creating container %s', containerName)
-    try {
-      container = addChildDevice('stephack', 'Virtual Container', "${app.id}.${bedId}.${side}", null,
-          [(sNM): containerName, label: containerName, completedSetup: true])
-    } catch (e) {
-      logError('Container device creation failed with error = ', e)
-      return null
-    }
-  }
-  return container
-}
-
 @CompileStatic
 Map getBedData(Boolean async = false) {
   Boolean lazy = async
@@ -1074,8 +1004,6 @@ Map getBedData(Boolean async = false) {
   getAsyncFamilyStatus()
   return null
 }
-
-
 
 /**
  * Updates the bed devices with the given data.
@@ -1106,7 +1034,6 @@ void processBedData(Map responseData) {
   Map<String, List> outletData = [:]
   Map<String, Map> underbedLightData = [:]
   Map<String, Object> responsiveAir = [:]
-
 
   for (ChildDeviceWrapper device in getBedDevices()) {
     String bedId = getBedDeviceId(device)
@@ -1146,16 +1073,17 @@ void processBedData(Map responseData) {
             && !foundationStatus[bedId]
             && (deviceTypes.contains(sHEAD) || deviceTypes.contains(sFOOT))
           ) {
-          foundationStatus[bedId] = getFoundationStatus(bedId, bedSideStr)
+          foundationStatus[bedId] = getFoundationStatus(bedId)
           if (!foundationStatus[bedId]) {
             bedFailures[bedId] = true
           }
         }
         // So far, the presence of "Warming" in the bed status indicates a foot warmer.
+        // Fuzion seems to have warming as well so we don't bother chcking the feature flag.
         if (!bedFailures[bedId]
             && !footwarmingStatus[bedId]
             && ((List<String>)bedInfoBed?.components)?.contains('Warming')
-            && (deviceTypes.contains(sFOOTWMR) || deviceTypes.contains('footwarmer'))
+            && (deviceTypes.contains(sFOOTWMR))
           ) {
           // Only try to update the warming state if the bed actually has it
           // and there's a device for it.
@@ -1170,9 +1098,9 @@ void processBedData(Map responseData) {
         // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
         if (!bedFailures[bedId] && deviceTypes.contains(sUNDERBEDLIGHT)) {
           determineUnderbedLightSetup(bedId)
-          bedInfo = (Map)getState('bedInfo')
-          bedInfoBed =  bedInfo ? (Map)bedInfo[bedId1] : null
-          if (!outletData[bedId][i3]) {
+          bedInfo = (Map) getState('bedInfo')
+          bedInfoBed =  bedInfo ? (Map)bedInfo[bedId] : null
+          if (!outletData[bedId][i3] && !isFuzion(bedId)) {
             outletData[bedId][i3] = getOutletState(bedId, i3)
             if (!outletData[bedId][i3]) {
               bedFailures[bedId] = true
@@ -1199,7 +1127,7 @@ void processBedData(Map responseData) {
               }
             }
           } else {
-            outletData[bedId1][i4] = outletData[bedId1][i3]
+            outletData[bedId][i4] = outletData[bedId][i3]
           }
         }
 
@@ -1207,7 +1135,7 @@ void processBedData(Map responseData) {
         if (!bedFailures[bedId] && deviceTypes.contains(sOUTLET)) {
           determineOutletSetup(bedId)
           //bedInfo = (Map)gtSt('bedInfo')
-          //bedInfoBed =  bedInfo ? (Map)bedInfo[bedId1] : null
+          //bedInfoBed =  bedInfo ? (Map)bedInfo[bedId] : null
           if (!outletData[bedId][i1]) {
             outletData[bedId][i1] = getOutletState(bedId, i1)
             if (!outletData[bedId][i1]) {
@@ -1232,9 +1160,28 @@ void processBedData(Map responseData) {
           Map outletDataBedOut = outletData[bedId][outletNumber]
           String bstate = underbedLightData[bedId]?.enableAuto ? 'Auto' :
               outletDataBedOut?.setting == i1 ? sSTON : sSTOFF
-          String timer = bstate == 'Auto' ? 'Not set' :
+          String timer
+          Integer brightness 
+          if (isFuzion(bedId)) {
+            // Fuzion beds store the timer under a general 'state' call vs. outlets so
+            // we obtained the state from the light data vs. outlet data. 
+            timer = bstate == 'Auto' ? 'Not set' : underbedLightData[bedId]?.fuzionTimer ?: 'Forever'
+            // Fuzion beds may have brightness from the auto state if they are set to auto because in those cases
+            // the manual mode is set to off
+            if (bstate == 'Auto') {
+              brightness = underbedLightData[bedId]?.autoBrightness
+            } else {
+              brightness = underbedLightData[bedId]?."fs${bedSideStr}UnderbedLightPWM"
+              // If the state is not auto then the light is on if the brightness is greater than 0
+              if (brightness > 0) {
+                bstate = 'On'
+              }
+            }
+          } else {
+            timer = bstate == 'Auto' ? 'Not set' :
               outletDataBedOut?.timer ?: 'Forever'
-          def brightness = underbedLightData[bedId]?."fs${bedSideStr}UnderbedLightPWM"
+            brightness = underbedLightData[bedId]?."fs${bedSideStr}UnderbedLightPWM"
+          }
           statusMap << [
             underbedLightState: bstate,
             underbedLightTimer: timer,
@@ -1252,21 +1199,15 @@ void processBedData(Map responseData) {
         // Check for valid foundation status and footwarming status data before trying to use it
         // as it's possible the HTTP calls failed.
         if (foundationStatus[bedId]) {
-	        // Positions are in hex so convert to a decimal
-          Integer headPosition = convertHexToNumber((String)foundationStatus[bedId]."fs${bedSideStr}HeadPosition")
-          Integer footPosition = convertHexToNumber((String)foundationStatus[bedId]."fs${bedSideStr}FootPosition")
-          String bedPreset = foundationStatus[bedId]."fsCurrentPositionPreset${bedSideStr}"
-          // There's also a MSB timer but not sure when that gets set.  Least significant bit seems used for all valid times.
-          Integer positionTimer = convertHexToNumber((String)foundationStatus[bedId]."fs${bedSideStr}PositionTimerLSB")
-          statusMap << [
-            headPosition: headPosition,
-            footPosition:  footPosition,
-            positionPreset: bedPreset,
-            positionPresetTimer: foundationStatus[bedId]."fsTimerPositionPreset${bedSideStr}",
-            positionTimer: positionTimer
+         statusMap << [
+            headPosition: foundationStatus[bedId][bedSideStr]["headPosition"],
+            footPosition:  foundationStatus[bedId][bedSideStr]["footPosition"],
+            positionPreset: foundationStatus[bedId][bedSideStr]["bedPreset"],
+            positionPresetTimer: foundationStatus[bedId][bedSideStr]["positionPresetTimer"],
+            positionTimer: foundationStatus[bedId][bedSideStr]["positionTimer"]
           ]
         } else if (!loggedError[bedId]) {
-          //debug("Not updating foundation state, %s", (bedFailures.get(bedId) ? "error making requests" : "no data"))
+           if (devdbg()) debug("Not updating foundation state, %s", (bedFailures.get(bedId) ? "error making requests" : "no data"))
         }
         if (footwarmingStatus[bedId]) {
           statusMap << [
@@ -1274,12 +1215,12 @@ void processBedData(Map responseData) {
             footWarmingTimer: footwarmingStatus[bedId]."footWarmingTimer${bedSideStr}",
           ]
         } else if (!loggedError[bedId]) {
-          //debug("Not updating footwarming state, %s", (bedFailures.get(bedId) ? "error making requests" : "no data"))
+           if (devdbg()) debug("Not updating footwarming state, %s", (bedFailures.get(bedId) ? "error making requests" : "no data"))
         }
         if (!sleepNumberFavorites[bedId]) {
           sleepNumberFavorites[bedId] = getSleepNumberFavorite(bedId, true)
         }
-        Integer favorite = ((Map)sleepNumberFavorites[bedId]).get("sleepNumberFavorite" + bedSideStr, -1)
+        Integer favorite = ((Map) sleepNumberFavorites[bedId]).get("sleepNumberFavorite" + bedSideStr, -1) as Integer
         if (favorite >= iZ) {
           statusMap << [
             sleepNumberFavorite: favorite
@@ -1359,6 +1300,21 @@ Map getBeds(Boolean lazy = false) {
   return res
 }
 
+/**
+ * Tries to get list of features by calling bamKey: GetSystemConfiguration.
+ * Only applicable for new API beds
+ */
+@CompileStatic
+List<String> getSystemConfiguration(String bedId, String accountId) {
+  debug 'Getting system configuration to determine features'
+  List<String> features = processBamKeyResponse(httpRequest(createBamKeyUrl(bedId, accountId),
+      this.&put, createBamKeyArgs('GetSystemConfiguration', [])))  
+  // Decompose features into just active ones
+  List<String> activeFeatures = [FEATURE_NAMES, features].transpose().grep{ ((List<List<String>>)it)[1] == "yes" }.collect({ ((List<List<String>>)it)[0] as String })
+  if (devdbg()) debug('active features for %s are %s', bedId, activeFeatures)
+  return activeFeatures
+}
+
 @Field volatile static Map<String, Map> familyMapFLD = [:]
 
 @CompileStatic
@@ -1373,7 +1329,6 @@ Map getFamilyStatus() {
   }
   return res
 }
-
 
 void getAsyncFamilyStatus(Boolean alreadyTriedRequest = false) {
   debug 'Getting family status async'
@@ -1406,7 +1361,7 @@ void getAsyncFamilyStatus(Boolean alreadyTriedRequest = false) {
 
 void finishGetAsyncFamilyStatus(resp, Map callbackData) {
   unschedule('timeoutFamily')
-  Integer rCode; rCode = (Integer) resp.status
+  Integer rCode; rCode = resp.status ? (Integer) resp.status : 0
   if (resp.hasError()) {
     debug "retrying family async request as synchronous $rCode"
     getBedData()
@@ -1418,7 +1373,7 @@ void finishGetAsyncFamilyStatus(resp, Map callbackData) {
   def data; data = resp.data
   Map ndata
   if (data != null && !(data instanceof Map) && !(data instanceof List)) {
-    ndata = (Map) parseMyResp(data,mediaType)
+    ndata = (Map) parseMyResp(data, mediaType)
   } else {
     ndata = data as Map
   }
@@ -1463,7 +1418,7 @@ private parseMyResp(aa,String mediaType = sNL) {
       } else if (expectJson || (mediaType in ['application/octet-stream'] && a.size() % i4 == iZ) ) { // HE can return data Base64
         String dec = new String(a.decodeBase64())
         if (dec != sNL) {
-          def t0 = parseMyResp(dec,sBLK)
+          def t0 = parseMyResp(dec, sBLK)
           ret = t0 == null ? dec : t0
         }
       }
@@ -1472,24 +1427,90 @@ private parseMyResp(aa,String mediaType = sNL) {
   return ret
 }
 
-
-
-@CompileStatic
-Map getFoundationStatus(String bedId, String currentSide) {
-  debug('Getting Foundation Status for %s / %s', bedId, currentSide)
-  return httpRequest("/rest/bed/${bedId}/foundation/status")
+Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
+  debug('Getting Foundation Status for %s', bedId)
+  Map<String, Map<String, Object>> response = [:]
+  // TODO: Not all beds have right/left.  Need to store which ones this has so we can use
+  // that data later.
+  response[sRIGHT] = [:]
+  response[sLEFT] = [:]
+  if (isFuzion(bedId)) {
+    // Actuators and presets
+    // TODO: Use data stored about bed to decide left/right and head/foot.
+    SIDES.each { side ->
+      String sideLower = side.toLowerCase()
+      if (fuzionHasFeature('articulationEnableFlag')) {
+        [sHEAD, sFOOT].each { actuator ->
+          if (fuzionHasFeature("${sideLower}${actuator.capitalize()}Actuator")) {
+            response[side]["${actuator}Position"] = processBamKeyResponse(
+                    makeBamKeyHttpRequest(bedId, 'GetActuatorPosition', [sideLower, actuator]))[0]
+          }
+        }
+      } else {
+        debug('Bed %s does not have articulation, not getting positions', bedId)
+      }
+      response[side]['bedPreset'] = processBamKeyResponse(
+              makeBamKeyHttpRequest(bedId, 'GetCurrentPreset', [side.toLowerCase()]))[0]
+      // For some reason, the new Fuzion beds do not maintain any position preset timer information so there's no way to obtain it.
+      // In fact, if you set a timer and then log out of the app (on a mobile device), all knowledge of that timer is lost.  So we just set
+      // time to 0 and preset to n/a.
+      response[side]['positionTimer'] = 0
+      response[side]['positionPresetTimer'] = 'n/a'
+    }
+  } else {
+    Map status = httpRequest("/rest/bed/${bedId}/foundation/status")
+    SIDES.each { side ->
+      // Positions are in hex so convert to a decimal
+      if (status["fs${side}HeadPosition"] != null) response[side]['headPosition'] = convertHexToNumber((String) status["fs${side}HeadPosition"])
+      if (status["fs${side}FootPosition"] != null) response[side]['footPosition'] = convertHexToNumber((String) status["fs${side}FootPosition"])
+      if (status["fsCurrentPositionPreset${side}"] != null) response[side]['bedPreset'] = status["fsCurrentPositionPreset${side}"]
+      // Time remaining to activate preset
+      // There's also a MSB timer but not sure when that gets set.  Least significant bit seems used for all valid times.
+      if (status["fs${side}PositionTimerLSB"] != null) response[side]['positionTimer'] = convertHexToNumber((String) status["fs${side}PositionTimerLSB"])
+      // The preset that will be activated after timer expires
+      if (status["fsTimerPositionPreset${side}"] != null) response[side]['positionPresetTimer'] = status["fsTimerPositionPreset${side}"]
+    }
+  }
+  return response
 }
 
-@CompileStatic
 Map getFootWarmingStatus(String bedId) {
   debug('Getting Foot Warming Status for %s', bedId)
-  return httpRequest("/rest/bed/${bedId}/foundation/footwarming")
+  Map response = [:]
+  if (isFuzion(bedId)) {
+    if (!fuzionHasFeature('rapidSleepSettingEnableFlag')) {
+      info('Bed %s does not have foot warming', bedId)
+      return response
+     }
+    // The new API doesn't have an overall status so we have to call for left and right and then build a response
+    // like the old API
+    List<String> values = []
+    SIDES.each { side -> 
+      // TODO: Probably need to see if the bed has both sides before calling both of these
+      values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFootWarming', [side.toLowerCase()]))
+      // The first value is the setting as a lower-cased string. Since the old API used numbers, we need to convert the string
+      response["footWarmingStatus${side}"] = HEAT_TEMPS.get(values[0].capitalize())
+      response["footWarmingTimer${side}"] = values[1]
+    }
+  } else {
+    response = httpRequest("/rest/bed/${bedId}/foundation/footwarming")
+  }
+  return response
 }
 
-@CompileStatic
 Map getResponsiveAirStatus(String bedId) {
   debug('Getting responsive air status for %s', bedId)
-  return httpRequest("/rest/bed/${bedId}/responsiveAir")
+  Map response = [:]
+  if (isFuzion(bedId)) {
+    // New API is responsive air state per side w/ value of true or false so synthezise the old response
+   [sRIGHT.toLowerCase(), sLEFT.toLowerCase()].each { side -> 
+     List<String> values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetResponsiveAirState', [side]))
+     response["${side}SideEnabled"] = values[0].equals('1') ? 'true' : 'false'
+   }
+  } else {
+    response = httpRequest("/rest/bed/${bedId}/responsiveAir")
+  }
+  return response
 }
 
 void setResponsiveAirState(Boolean st, String devId) {
@@ -1497,23 +1518,27 @@ void setResponsiveAirState(Boolean st, String devId) {
   if (!device) {
     return
   }
-  //determineResponsiveAirSetup(bedId)
-  Map body = [:]
-  String side = getBedDeviceSide(device)
+  String bedId = getBedDeviceId(device)
+  String side = getBedDeviceSide(device).toLowerCase()
   debug('Setting responsive air state %s to %s', side, st)
-  if (side.toLowerCase() == 'right') {
-    body << [
-            rightSideEnabled: st
-    ]
-  } else {
-    body << [
-            leftSideEnabled: st
-    ]
-  }
-  httpRequestQueue(0, path: "/rest/bed/${getBedDeviceId(device)}/responsiveAir",
-          body: body, runAfter: sREFRESHCHILDDEVICES)
-}
 
+  if (isFuzion(getBedDeviceId(device))) {
+    addBamKeyRequestToQueue(bedId, 'SetResponsiveAirState', [side, st ? '1' : '0'], 0, sREFRESHCHILDDEVICES)
+  } else {
+    Map body = [:]
+    if (side == 'right') {
+      body << [
+              rightSideEnabled: st
+      ]
+    } else {
+      body << [
+              leftSideEnabled: st
+      ]
+    }
+    httpRequestQueue(0, path: "/rest/bed/${bedId}/responsiveAir",
+            body: body, runAfter: sREFRESHCHILDDEVICES)
+  }
+}
 
 /**
  * Params must be a Map containing keys actuator and position.
@@ -1530,25 +1555,38 @@ void setFoundationAdjustment(Map params, String devId) {
     error('Missing param values, actuator and position are required')
     return
   }
-  if (!VALID_ACTUATORS.contains(actu)) {
-    error('Invalid actuator %s, valid values are %s', actu, VALID_ACTUATORS)
+  if (!VALID_ACTUATORS.keySet().contains(actu)) {
+    error('Invalid actuator %s, valid values are %s', actu, VALID_ACTUATORS.keySet())
     return
   }
-  Map body = [
-    speed: iZ, // 1 == slow, 0 = fast
-    actuator: actu,
-    (sSIDE): getBedDeviceSide(device)[iZ],
-    position: pos // 0-100
-  ]
   // It takes ~35 seconds for a FlexFit3 head to go from 0-100 (or back) and about 18 seconds for the foot.
   // The timing appears to be linear which means it's 0.35 seconds per level adjusted for the head and 0.18
   // for the foot.
   Integer currentPosition = actu == 'H' ? device.currentValue('headPosition') : device.currentValue('footPosition')
+  if (currentPosition == null) {
+    debug('Unable to determine current position for actuator %s, using 0', actu)
+    currentPosition = 0
+  }
   Integer positionDelta = Math.abs(pos - currentPosition)
   Float movementDuration = actu == 'H' ? 0.35 : 0.18
   Integer waitTime = Math.round(movementDuration * positionDelta).toInteger() + i1
-  httpRequestQueue(waitTime, path: "/rest/bed/${getBedDeviceId(device)}/foundation/adjustment/micro",
-      body: body, runAfter: sREFRESHCHILDDEVICES)
+
+  String bedId = getBedDeviceId(device)
+  String side = getBedDeviceSide(device)
+  if (isFuzion(bedId)) {
+    addBamKeyRequestToQueue(bedId, 'SetActuatorTargetPosition',
+            [side.toLowerCase(), VALID_ACTUATORS.get(actu).toLowerCase(), pos.toString()],
+            waitTime, sREFRESHCHILDDEVICES)
+  } else {
+    Map body = [
+            speed   : iZ, // 1 == slow, 0 = fast
+            actuator: actu,
+            (sSIDE) : side[iZ],
+            position: pos // 0-100
+    ]
+    httpRequestQueue(waitTime, path: "/rest/bed/${bedId}/foundation/adjustment/micro",
+            body: body, runAfter: sREFRESHCHILDDEVICES)
+  }
 }
 
 /**
@@ -1560,27 +1598,37 @@ void setFootWarmingState(Map params, String devId) {
   if (!device) {
     return
   }
-  Integer ptemp = (Integer)params?.temp
-  Integer ptimer = (Integer)params?.timer
+  Integer ptemp = (Integer) params?.temp
+  Integer ptimer = (Integer) params?.timer
   if (ptemp == null || ptimer == null) {
     error('Missing param values, temp and timer are required')
     return
   }
-  if (!VALID_WARMING_TIMES.contains(ptimer)) {
-    error('Invalid warming time %s, valid values are %s', ptimer, VALID_WARMING_TIMES)
+  if (!VALID_HEAT_TIMES.contains(ptimer)) {
+    error('Invalid warming time %s, valid values are %s', ptimer, VALID_HEAT_TIMES)
     return
   }
-  if (!VALID_WARMING_TEMPS.contains(ptemp)) {
-    error('Invalid warming temp %s, valid values are %s', ptemp, VALID_WARMING_TEMPS)
+  if (!VALID_HEAT_TEMPS.keySet().contains(ptemp)) {
+    error('Invalid warming temp %s, valid values are %s', ptemp, VALID_HEAT_TEMPS.keySet())
     return
   }
-  String sid = getBedDeviceSide(device)
-  Map body = [
-          ("footWarmingTemp${sid}".toString()): ptemp,
-          ("footWarmingTimer${sid}".toString()): ptimer
-  ]
-  httpRequestQueue(0, path: "/rest/bed/${getBedDeviceId(device)}/foundation/footwarming",
-      body: body, runAfter: sREFRESHCHILDDEVICES)
+  String side = getBedDeviceSide(device)
+  String bedId = getBedDeviceId(device)
+  if (isFuzion(bedId)) {
+    if (!fuzionHasFeature('rapidSleepSettingEnableFlag')) {
+      info('Bed %s does not have foot warming', bedId)
+      return
+    }
+    addBamKeyRequestToQueue(bedId, 'SetFootWarming',
+            [side.toLowerCase(), VALID_HEAT_TEMPS.get(ptemp), ptimer.toString()], 0, sREFRESHCHILDDEVICES)
+  } else {
+    Map body = [
+            ("footWarmingTemp${side}".toString()) : ptemp,
+            ("footWarmingTimer${side}".toString()): ptimer
+    ]
+    httpRequestQueue(0, path: "/rest/bed/${getBedDeviceId(device)}/foundation/footwarming",
+            body: body, runAfter: sREFRESHCHILDDEVICES)
+  }
 }
 
 /**
@@ -1599,21 +1647,29 @@ void setFoundationTimer(Map params, String devId) {
     error('Missing param values, preset and timer are required')
     return
   }
-  if (!VALID_PRESETS.contains(ppreset)) {
-    error('Invalid preset %s, valid values are %s', ppreset, VALID_PRESETS)
+  if (!VALID_PRESETS.keySet().contains(ppreset)) {
+    error('Invalid preset %s, valid values are %s', ppreset, VALID_PRESETS.keySet())
     return
   }
   if (!VALID_PRESET_TIMES.contains(ptimer)) {
     error('Invalid timer %s, valid values are %s', ptimer, VALID_PRESET_TIMES)
     return
   }
-  Map body = [
-    (sSIDE): getBedDeviceSide(device)[iZ],
-    positionPreset: ppreset,
-    positionTimer: ptimer
-  ]
-  httpRequestQueue(5, path: "/rest/bed/${getBedDeviceId(device)}/foundation/adjustment",
-          body: body, runAfter: sREFRESHCHILDDEVICES)
+  String bedId = getBedDeviceId(device)
+  String side = getBedDeviceSide(device)
+  if (isFuzion(bedId)) {
+    addBamKeyRequestToQueue(bedId, 'SetTargetPresetWithTimer',
+            [side.toLowerCase(), VALID_PRESETS.get(preset), ptimer.toString()],
+            5, sREFRESHCHILDDEVICES)
+  } else {
+    Map body = [
+            (sSIDE)       : side[iZ],
+            positionPreset: ppreset,
+            positionTimer : ptimer
+    ]
+    httpRequestQueue(5, path: "/rest/bed/${bedId}/foundation/adjustment",
+            body: body, runAfter: sREFRESHCHILDDEVICES)
+  }
 }
 
 /**
@@ -1624,20 +1680,28 @@ void setFoundationPreset(Integer preset, String devId) {
   if (!device) {
     return
   }
-  if (!VALID_PRESETS.contains(preset)) {
-    error('Invalid preset %s, valid values are %s', preset, VALID_PRESETS)
+  if (!VALID_PRESETS.keySet().contains(preset)) {
+    error('Invalid preset %s, valid values are %s', preset, VALID_PRESETS.keySet())
     return
   }
-  Map body = [
-    speed: iZ,
-    preset : preset,
-    (sSIDE): getBedDeviceSide(device)[iZ]
-  ]
   // It takes ~35 seconds for a FlexFit3 head to go from 0-100 (or back) and about 18 seconds for the foot.
   // Rather than attempt to derive the preset relative to the current state so we can compute
   // the time (as we do for adjustment), we just use the maximum.
-  httpRequestQueue(35, path: "/rest/bed/${getBedDeviceId(device)}/foundation/preset",
-      body: body, runAfter: sREFRESHCHILDDEVICES)
+  Integer duration = 35
+  String bedId = getBedDeviceId(device)
+  String side = getBedDeviceSide(device)
+  if (isFuzion(bedId)) {
+    addBamKeyRequestToQueue(bedId, 'SetTargetPresetWithoutTimer', [side.toLowerCase(),
+               VALID_PRESETS.get(preset)], duration, sREFRESHCHILDDEVICES)
+  } else {
+    Map body = [
+            speed  : iZ,
+            preset : preset,
+            (sSIDE): side[iZ]
+    ]
+    httpRequestQueue(duration, path: "/rest/bed/${bedId}/foundation/preset",
+            body: body, runAfter: sREFRESHCHILDDEVICES)
+  }
 }
 
 void stopFoundationMovement(Map ignored, String devId) {
@@ -1645,94 +1709,22 @@ void stopFoundationMovement(Map ignored, String devId) {
   if (!device) {
     return
   }
-  Map body = [
-    massageMotion: iZ,
-    headMotion: i1,
-    footMotion: i1,
-    (sSIDE): getBedDeviceSide(device)[iZ]
-  ]
   remTsVal(sLASTFAMILYDATA)
-  httpRequestQueue(5, path: "/rest/bed/${getBedDeviceId(device)}/foundation/motion",
-          body: body, runAfter: sREFRESHCHILDDEVICES)
-}
-
-/**
- * The side is derived from the specified device
- * Note the number is actual an Integer but the Hubitat driver->app call
- * changes Number to BigDecimal.
- */
-void setSleepNumber(BigDecimal number, String devId) {
-  ChildDeviceWrapper device = findBedDevice(devId)
-  if (!device) {
-    return
+  String bedId = getBedDeviceId(device)
+  if (isFuzion(bedId)) {
+    // Apparently Fuzion beds just stop *all* actuators when a user presses stop in the app.
+    // So no side is provided in the arguments for this call.
+    addBamKeyRequestToQueue(bedId, 'HaltAllActuators', [], 5, sREFRESHCHILDDEVICES)
+   } else {
+    Map body = [
+            massageMotion: iZ,
+            headMotion   : i1,
+            footMotion   : i1,
+            (sSIDE)      : getBedDeviceSide(device)[iZ]
+    ]
+    httpRequestQueue(5, path: "/rest/bed/${bedId}/foundation/motion",
+            body: body, runAfter: sREFRESHCHILDDEVICES)
   }
-
-  String id = getBedDeviceId(device)
-  Map body = [
-    (sBEDID): id,
-    sleepNumber: number,
-    (sSIDE): getBedDeviceSide(device)[iZ]
-  ]
-  // Not sure how long it takes to inflate or deflate so just wait 20s
-  httpRequestQueue(20, path: "/rest/bed/${id}/sleepNumber",
-      body: body, runAfter: sREFRESHCHILDDEVICES)
-}
-
-@Field volatile static Map<String, Map> privacyMapFLD = [:]
-
-/**
- * Privacy mode cached
- */
-@CompileStatic
-String getPrivacyMode(String bedId, Boolean lazy = false) {
-  Integer lastUpd = getLastTsValSecs('lastPrivacyDataUpdDt')
-  if (privacyMapFLD[bedId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
-    addHttpR("/rest/bed/${bedId}/pauseMode" + sCACHE)
-    debug "Getting CACHED Privacy Mode for ${bedId} ${ devdbg() ? privacyMapFLD[bedId] : sBLK}"
-    return (String)privacyMapFLD[bedId].pauseMode
-  }
-  debug('Getting Privacy Mode for %s', bedId)
-  Map res = httpRequest("/rest/bed/${bedId}/pauseMode")
-  if (devdbg()) debug('Response data from SleepNumber: %s', res)
-  if (res) {
-    privacyMapFLD[bedId]=res
-    updTsVal('lastPrivacyDataUpdDt')
-  }
-  return (String) res?.pauseMode
-}
-
-void setPrivacyMode(Boolean mode, String devId) {
-  ChildDeviceWrapper device = findBedDevice(devId)
-  if (!device) {
-    return
-  }
-  String pauseMode = mode ? sON : sOFF
-  // Cloud request
-  remTsVal('lastPrivacyDataUpdDt')
-  remTsVal(sLASTFAMILYDATA)
-  remTsVal('lastSleeperDataUpdDt')
-  httpRequestQueue(2, path: "/rest/bed/${getBedDeviceId(device)}/pauseMode",
-          query: [mode: pauseMode], runAfter: sREFRESHCHILDDEVICES)
-}
-
-@Field volatile static Map<String, Map> sleepNumMapFLD = [:]
-
-@CompileStatic
-Map getSleepNumberFavorite(String bedId, Boolean lazy = false) {
-  Integer lastUpd = getLastTsValSecs('lastSleepFavoriteUpdDt')
-  if (sleepNumMapFLD[bedId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
-    addHttpR("/rest/bed/${bedId}/sleepNumberFavorite" + sCACHE)
-    debug "Getting CACHED Sleep Number Favorites ${ devdbg() ? sleepNumMapFLD[bedId] : sBLK}"
-    return sleepNumMapFLD[bedId]
-  }
-  debug 'Getting Sleep Number Favorites'
-  Map res = httpRequest("/rest/bed/${bedId}/sleepNumberFavorite")
-  if (devdbg()) debug('Response data from SleepNumber: %s', res)
-  if (res) {
-    sleepNumMapFLD[bedId] = res
-    updTsVal('lastSleepFavoriteUpdDt')
-  }
-  return res
 }
 
 // set sleep number to current favorite
@@ -1767,6 +1759,7 @@ void updateSleepNumberFavorite(BigDecimal number, String devId) {
   if (!device) {
     return
   }
+  // favorite setting 0-100 (rounds to nearest multiple of 5)
   Integer dfavorite = (Math.round(number / 5) * 5).toInteger()
   Integer favorite = device.currentValue('sleepNumberFavorite')
   String sid = getBedDeviceSide(device)
@@ -1777,16 +1770,19 @@ void updateSleepNumberFavorite(BigDecimal number, String devId) {
       debug 'Already at favorite'
       return
     }
-    // side "R" or "L"
-    // setting 0-100 (rounds to nearest multiple of 5)
-    String id = getBedDeviceId(device)
-    Map body = [
-      (sBEDID): id,
-      sleepNumberFavorite: dfavorite,
-      (sSIDE): sid[iZ]
-    ]
-
-    httpRequestQueue(2, path: "/rest/bed/${id}/sleepNumberFavorite", body: body /*, runAfter: sREFRESHCHILDDEVICES*/)
+    String bedId = getBedDeviceId(device)
+    if (isFuzion(bedId)) {
+      addBamKeyRequestToQueue(bedId, 'SetFavoriteSleepNumber',
+              [sid.toLowerCase(), dfavorite.toString()])
+    } else {
+      // side "R" or "L"
+      Map body = [
+              (sBEDID)           : bedId,
+              sleepNumberFavorite: dfavorite,
+              (sSIDE)            : sid[iZ]
+      ]
+      httpRequestQueue(0, path: "/rest/bed/${bedId}/sleepNumberFavorite", body: body)
+    }
     remTsVal('lastSleepFavoriteUpdDt')
     setSleepNumber(dfavorite, devId)
   } else {
@@ -1794,6 +1790,117 @@ void updateSleepNumberFavorite(BigDecimal number, String devId) {
   }
   remTsVal('lastSleepFavoriteUpdDt')
 }
+
+/**
+ * The side is derived from the specified device
+ * Note the number is actual an Integer but the Hubitat driver->app call
+ * changes Number to BigDecimal.
+ */
+void setSleepNumber(BigDecimal number, String devId) {
+  ChildDeviceWrapper device = findBedDevice(devId)
+  if (!device) {
+    return
+  }
+  String bedId = getBedDeviceId(device)
+  String side = getBedDeviceSide(device)
+  // Not sure how long it takes to inflate or deflate so just wait 20s
+  Integer duration = 20
+  if (isFuzion(bedId)) {
+    addBamKeyRequestToQueue(bedId, 'StartSleepNumberAdjustment', [side.toLowerCase(), number.toString()],
+            duration, sREFRESHCHILDDEVICES)
+  } else {
+    Map body = [
+            (sBEDID)   : bedId,
+            sleepNumber: number,
+            (sSIDE)    : side[iZ]
+    ]
+    httpRequestQueue(duration, path: "/rest/bed/${bedId}/sleepNumber",
+            body: body, runAfter: sREFRESHCHILDDEVICES)
+  }
+}
+
+@Field volatile static Map<String, Map> privacyMapFLD = [:]
+
+/**
+ * Privacy mode cached
+ */
+String getPrivacyMode(String bedId, Boolean lazy = false) {
+  Integer lastUpd = getLastTsValSecs('lastPrivacyDataUpdDt')
+  if (privacyMapFLD[bedId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
+    if (isFuzion(bedId)) {
+      addHttpR(createBamKeyUrl(bedId, state.bedInfo[bedId].accountId) + " GetSleepiqPrivacyState" + sCACHE)
+    } else {
+      addHttpR("/rest/bed/${bedId}/pauseMode" + sCACHE)
+    }
+    debug "Getting CACHED Privacy Mode for ${bedId} ${ devdbg() ? privacyMapFLD[bedId] : sBLK}"
+    return (String) privacyMapFLD[bedId].pauseMode
+  }
+  debug('Getting Privacy Mode for %s', bedId)
+  Map res
+  if (isFuzion(bedId)) {
+    // fuzion pause modes are active or paused
+    Boolean paused = processBamKeyResponse(
+            makeBamKeyHttpRequest(bedId, 'GetSleepiqPrivacyState'))[0].equals('paused')
+    res = ['pauseMode': paused ? sON : sOFF]
+  } else {
+    res = httpRequest("/rest/bed/${bedId}/pauseMode")
+  }
+  if (devdbg()) debug('Response data from SleepNumber: %s', res)
+  if (res) {
+    privacyMapFLD[bedId] = res
+    updTsVal('lastPrivacyDataUpdDt')
+  }
+  return (String) res?.pauseMode
+}
+
+void setPrivacyMode(Boolean mode, String devId) {
+  ChildDeviceWrapper device = findBedDevice(devId)
+  if (!device) {
+    return
+  }
+  String bedId = getBedDeviceId(device)
+  // Cloud request
+  remTsVal('lastPrivacyDataUpdDt')
+  remTsVal(sLASTFAMILYDATA)
+  remTsVal('lastSleeperDataUpdDt')
+  if (isFuzion(bedId)) {
+    String pauseMode = mode ? sPAUSED : sACTIVE
+    addBamKeyRequestToQueue(bedId, 'SetSleepiqPrivacyState', [pauseMode], 2, sREFRESHCHILDDEVICES)
+  } else {
+    String pauseMode = mode ? sON : sOFF
+    httpRequestQueue(2, path: "/rest/bed/${bedId}/pauseMode",
+            query: [mode: pauseMode], runAfter: sREFRESHCHILDDEVICES)
+  }
+}
+
+@Field volatile static Map<String, Map> sleepNumMapFLD = [:]
+
+Map getSleepNumberFavorite(String bedId, Boolean lazy = false) {	
+  Integer lastUpd = getLastTsValSecs('lastSleepFavoriteUpdDt')
+  if (sleepNumMapFLD[bedId] && ((!lazy && lastUpd < 7200) || (lazy && lastUpd <= 14400))) {
+    addHttpR("/rest/bed/${bedId}/sleepNumberFavorite" + sCACHE)
+    debug "Getting CACHED Sleep Number Favorites ${ devdbg() ? sleepNumMapFLD[bedId] : sBLK}"
+    return sleepNumMapFLD[bedId]
+  }
+  debug 'Getting Sleep Number Favorites'
+  Map res = [:]
+  if (isFuzion(bedId)) {
+    SIDES.each { side ->
+      if (devdbg()) debug 'getting favorite for %s', side
+      String val = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetFavoriteSleepNumber', [side.toLowerCase()]))[0]
+      res["sleepNumberFavorite${side}"] = val
+    }
+  } else {
+    res = httpRequest("/rest/bed/${bedId}/sleepNumberFavorite")
+  }
+  if (devdbg()) debug('Response data from SleepNumber: %s', res)
+  if (res) {
+    sleepNumMapFLD[bedId] = res
+    updTsVal('lastSleepFavoriteUpdDt')
+  }
+  return res
+}
+
 //RIGHT_NIGHT_STAND = 1
 //LEFT_NIGHT_STAND = 2
 //RIGHT_NIGHT_LIGHT = 3
@@ -1848,6 +1955,11 @@ void updateSleepNumberFavorite(BigDecimal number, String devId) {
 void setFoundationMassage(Integer ifootspeed, Integer iheadspeed, Integer itimer = iZ, Integer mode = iZ, String devId) {
   ChildDeviceWrapper device = findBedDevice(devId)
   if (!device) return
+  if (isFuzion(getBedDeviceId(device))) {
+    // TODO - fuzion: Need to find a bed that supports this as I don't have any API samples
+    warn "new API not supported yet"
+    return
+  }
 
   Integer footspeed, headspeed
   footspeed = ifootspeed ?: iZ
@@ -1878,10 +1990,13 @@ void setFoundationMassage(Integer ifootspeed, Integer iheadspeed, Integer itimer
 @Field volatile static Map<String, Map> outletMapFLD = [:]
 
 /**
- * get oulet state cached
+ * get outlet state cached
  */
-@CompileStatic
 Map getOutletState(String bedId, Integer outlet) {
+  if (isFuzion(bedId)) {
+    debug "getOutletState shouldn't be called for fuzion beds"
+    return [:]
+  }	
   String val = 'lastOutletUpdDt' + outlet.toString()
   String idx = bedId+'_'+outlet.toString()
   Integer lastUpd = getLastTsValSecs(val)
@@ -1895,13 +2010,18 @@ Map getOutletState(String bedId, Integer outlet) {
         this.&get, null, [outletId: outlet])
   if (devdbg()) debug('Response data from SleepNumber: %s', res)
   if (res) {
-    outletMapFLD[idx]=res
+    outletMapFLD[idx] = res
     updTsVal(val)
   }
   return res
 }
 
 void setOutletState(String outletState, String devId) {
+  String bedId = getBedDeviceId(device)
+  if (isFuzion(bedId)) {
+    info 'setting outlet state unsupported on fuzion beds'
+    return
+  }
   ChildDeviceWrapper device = findBedDevice(devId)
   if (!device) {
     return
@@ -1911,7 +2031,7 @@ void setOutletState(String outletState, String devId) {
     return
   }
   Integer outletNum = getBedDeviceSide(device) == sLEFT ? i1 : i2
-  setOutletState(getBedDeviceId(device), outletNum, outletState)
+  setOutletState(bedId, outletNum, outletState)
 }
 
 /**
@@ -1922,9 +2042,12 @@ void setOutletState(String outletState, String devId) {
  * @param timer: optional indicating a valid minute duration (for outlets 3 and 4 only)
  * @param refresh: boolean indicating whether or not to skip refreshing state, refreshes by default
  */
-@CompileStatic
 void setOutletState(String bedId, Integer outletId, String ioutletState, Integer itimer = null,
                     Boolean refresh = true) {
+  if (isFuzion(bedId)) {
+    info 'setting outlet state unsupported on fuzion beds'
+    return
+  }
   String outletState; outletState = ioutletState
   Integer timer; timer = itimer
   if (!bedId || !outletId || !outletState) {
@@ -1932,8 +2055,8 @@ void setOutletState(String bedId, Integer outletId, String ioutletState, Integer
     return
   }
 
-  if (timer && !VALID_LIGHT_TIMES.contains(timer)) {
-    error('Invalid underbed light timer %s.  Valid values are %s', timer, VALID_LIGHT_TIMES)
+  if (timer && !VALID_LIGHT_TIMES.keySet().contains(timer)) {
+    error('Invalid underbed light timer %s.  Valid values are %s', timer, VALID_LIGHT_TIMES.keySet())
     return
   }
 
@@ -1962,11 +2085,24 @@ void setOutletState(String bedId, Integer outletId, String ioutletState, Integer
 
 @CompileStatic
 Map getUnderbedLightState(String bedId) {
-  httpRequest("/rest/bed/${bedId}/foundation/underbedLight", this.&get)
+  Map res = [:]
+  if (isFuzion(bedId)) {
+    if (!fuzionHasFeature('underbedLightEnableFlag')) {
+      info('Bed %s does not have underbed lighting', bedId)
+      return res
+    }
+    // The first value from auto settings is a boolean
+    // The second is the auto brightness level
+    List<String> autoInfo = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetUnderbedLightAutoSettings', []))
+    res = ['enableAuto': autoInfo[0] == 'true', 'autoBrightness': UNDERBED_LIGHT_BRIGHTNESS.get(autoInfo[1].capitalize())]
+  } else {
+    res = httpRequest("/rest/bed/${bedId}/foundation/underbedLight", this.&get)
+  }
+  if (devdbg()) debug('Response data from SleepNumber: %s', res)
+  return res
 }
 
 @Field volatile static Map<String, Map> foundationSystemMapFLD = [:]
-
 
 @CompileStatic
 Map getFoundationSystem(String bedId) {
@@ -1987,19 +2123,42 @@ Map getFoundationSystem(String bedId) {
 }
 
 /**
- * get underbed brigntness
+ * Get underbed brightness
  * rest calls
  *     calls getFoundationSystem (C)
- *     may calls getOutletState * 2 (C)
+ *     may call getOutletState * 2 (C)
+ * For fuzion beds, this also includes timer info
+ * Fuzion beds also only represent brightness for the 'on' state in settings.  The auto brightness
+ * is represented in the `auto` call which we made when we called #getUnderbedLightState.
  */
 Map getUnderbedLightBrightness(String bedId) {
-  determineUnderbedLightSetup(bedId)
-  Map brightness = getFoundationSystem(bedId)
-  if (brightness && ((List) ((Map) state.bedInfo[bedId]).underbedoutlets).size() == i1) {
-    // Strangely if there's only one light then the `right` side is the set value
-    // so just set them both the same.
-    brightness.fsLeftUnderbedLightPWM = brightness.fsRightUnderbedLightPWM
+  Map brightness = [:]
+  if (isFuzion(bedId)) {
+     if (!fuzionHasFeature('underbedLightEnableFlag')) {
+      info('Bed %s does not have underbed lighting', bedId)
+      return brightness
+     }
+    List<String> results = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetUnderbedLightSettings', []))
+    // The first value in the list is the level as a lower-cased string
+    Integer iBrightness = UNDERBED_LIGHT_BRIGHTNESS.get(results[0].capitalize())
+    if (iBrightness != null) brightness.fsRightUnderbedLightPWM = brightness.fsLeftUnderbedLightPWM = iBrightness
+    if (results[1]) {
+      Integer timer = results[1] as Integer
+      // The second value is a timer and that's a real-time countdown so we can't convert to a preset value
+      // If the timer is 0 then it is really 'forever' so we can leave it unset.  If it was on and then expired, the
+      // state will be off/Forever which is fine.
+      brightness.fuzionTimer = timer > 0 ? timer : null
+    }
+  } else {
+    determineUnderbedLightSetup(bedId)
+    brightness = getFoundationSystem(bedId)
+    if (brightness && ((List) ((Map) state.bedInfo[bedId]).underbedoutlets).size() == i1) {
+      // Strangely if there's only one light then the `right` side is the set value
+      // so just set them both the same.
+      brightness.fsLeftUnderbedLightPWM = brightness.fsRightUnderbedLightPWM
+    }
   }
+  if (devdbg()) debug('UnderbedLightBrightness Response data from SleepNumber: %s', brightness)
   return brightness
 }
 
@@ -2011,20 +2170,29 @@ Map getUnderbedLightBrightness(String bedId) {
  */
 void determineUnderbedLightSetup(String bedId) {
   Map<String,Map> bdinfo = (Map<String,Map>) state.bedInfo
-  if (bdinfo[bedId].underbedoutlets == null) {
-    debug('Determining underbed lighting outlets for %s', bedId)
-    // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
-    // Determine if this bed has 1 or 2 underbed lighting outlets and store for future use.
-    Map outlet3 = getOutletState(bedId, i3)
-    Map outlet4 = getOutletState(bedId, i4)
-    List outlets = []
-    if (outlet3) {
-      outlets << i3
+  if (isFuzion(bedId) && fuzionHasFeature('underbedLightEnableFlag')) {
+    // for now, I don't think fuzion beds have outlets in the same way old beds do
+    // this means we can use the feature flag for lights to infer a single outlet
+    debug('fuzion bed has single outlet, underbedLightEnableFlag feature exists for %s', bedId)
+    bdinfo[bedId].underbedoutlets = [
+      [bedId: bedId, outlet: 3]
+    ]
+  } else {
+    if (bdinfo[bedId].underbedoutlets == null) {
+      debug('Determining underbed lighting outlets for %s', bedId)
+      // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
+      // Determine if this bed has 1 or 2 underbed lighting outlets and store for future use.
+      Map outlet3 = getOutletState(bedId, i3) // { bedId: xx, outlet: num, timer: null, setting: num }
+      Map outlet4 = getOutletState(bedId, i4)
+      List outlets = []
+      if (outlet3) {
+        outlets << i3
+      }
+      if (outlet4) {
+        outlets << i4
+      }
+      bdinfo[bedId].underbedoutlets = outlets
     }
-    if (outlet4) {
-      outlets << i4
-    }
-    bdinfo[bedId].underbedoutlets = outlets
     state.bedInfo = bdinfo
   }
 }
@@ -2055,54 +2223,72 @@ void setUnderbedLightState(Map params, String devId) {
   pt = (Integer) params.timer
   pb = (Integer) params.brightness
 
-  // A timer with a state of auto makes no sense, choose to honor state vs. timer.
+  // A timer with a state of auto makes no sense, choose to honor state vs. timer unless state is explicitly off.
   if (ps == 'auto') {
     pt = iZ
   }
-  if (pt) {
+  if (pt && ps != sOFF) {
     ps = sON
   }
 
-  if (pb && !VALID_LIGHT_BRIGHTNESS.contains(pb)) {
-    error('Invalid underbed light brightness %s. Valid values are %s', pb, VALID_LIGHT_BRIGHTNESS)
+  if (pb && !VALID_LIGHT_BRIGHTNESS.keySet().contains(pb)) {
+    error('Invalid underbed light brightness %s. Valid values are %s', pb, VALID_LIGHT_BRIGHTNESS.keySet())
     return
   }
-
-  // First set the light state.
-  Map body; body = [
-    enableAuto: ps == 'auto'
-  ]
-  String id = getBedDeviceId(device)
-  httpRequestQueue(2, path: "/rest/bed/${id}/foundation/underbedLight", body: body)
-
-  determineUnderbedLightSetup(id)
-  Integer rightBrightness, leftBrightness
-  rightBrightness = pb
-  leftBrightness = pb
-  Integer outletNum; outletNum = i3
-  if (((List) ((Map) state.bedInfo[id]).underbedoutlets).size() > i1) {
-    // Two outlets so set the side corresponding to the device rather than
-    // defaulting to 3 (which should be a single light)
-    if (getBedDeviceSide(device) == sLEFT) {
-      outletNum = i3
-      rightBrightness = null
-      leftBrightness = pb
-    } else {
-      outletNum = i4
-      rightBrightness = pb
-      leftBrightness = null
+  String bedId = getBedDeviceId(device)
+  if (isFuzion(bedId)) {
+    if (!fuzionHasFeature('underbedLightEnableFlag')) {
+      info 'This bed does not have underbed lighting'
+      return
     }
-  }
-  // If brightness was given then set it.
-  if (pb) {
+    // If state is auto then to do what the app does, we first set regular light state to off/0
+    // Otherwise if state is on/off, we set auto to false/low
+    if (ps == 'auto') {
+      addBamKeyRequestToQueue(bedId, 'SetUnderbedLightSettings', [sOFF, iZ])
+      addBamKeyRequestToQueue(bedId, 'SetUnderbedLightAutoSettings', ['true', VALID_LIGHT_BRIGHTNESS.get(pb)],
+          2, sREFRESHCHILDDEVICES)
+    } else {
+     addBamKeyRequestToQueue(bedId, 'SetUnderbedLightAutoSettings', ['false', 'low'])
+     String brightness = ps == sOFF ? sOFF : VALID_LIGHT_BRIGHTNESS.get(pb)
+     Integer timer = ps == sOFF ? iZ : pt
+     addBamKeyRequestToQueue(bedId, 'SetUnderbedLightSettings', [brightness, timer],
+          2, sREFRESHCHILDDEVICES)
+    }
+  } else {
+    determineUnderbedLightSetup(bedId)
+    Map body
+    Integer rightBrightness, leftBrightness
+    rightBrightness = leftBrightness = pb
+    // First set the brightness as auto defaults to last used.
+    Integer outletNum; outletNum = i3
+    if (((List) ((Map) state.bedInfo[bedId]).underbedoutlets).size() > i1) {
+      // Two outlets so set the side corresponding to the device rather than
+      // defaulting to 3 (which should be a single light)
+      if (getBedDeviceSide(device) == sLEFT) {
+        outletNum = i3
+        rightBrightness = null
+        leftBrightness = pb
+      } else {
+        outletNum = i4
+        rightBrightness = pb
+        leftBrightness = null
+      }
+    }
+    if (pb) {
+      body = [
+        rightUnderbedLightPWM: rightBrightness,
+        leftUnderbedLightPWM: leftBrightness
+      ]
+      httpRequestQueue(2, path: "/rest/bed/${bedId}/foundation/system", body: body)
+    }
+    // Now set the mode and timer
     body = [
-      rightUnderbedLightPWM: rightBrightness,
-      leftUnderbedLightPWM: leftBrightness
+      enableAuto: ps == 'auto'
     ]
-    httpRequestQueue(2, path: "/rest/bed/${id}/foundation/system", body: body)
+    httpRequestQueue(2, path: "/rest/bed/${bedId}/foundation/underbedLight", body: body)
+    setOutletState(bedId, outletNum,
+            ps == 'auto' ? sOFF : ps, pt, true)
   }
-  setOutletState(id, outletNum,
-          ps == 'auto' ? sOFF : ps, pt, true)
 }
 
 /**
@@ -2114,19 +2300,24 @@ void setUnderbedLightState(Map params, String devId) {
 void determineOutletSetup(String bedId) {
   Map<String,Map> bdinfo = (Map<String,Map>) state.bedInfo
   if (bdinfo[bedId].outlets == null) {
-    debug('Determining outlets for %s', bedId)
-    // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
-    // Determine if this bed has 1 or 2 outlets and store for future use.
-    Map outlet1 = getOutletState(bedId, i1)
-    Map outlet2 = getOutletState(bedId, i2)
-    List outlets = []
-    if (outlet1) {
-      outlets << i1
+    if (isFuzion(bedId)) {
+      // do nothing, fuzion beds don't have outlets
+      bdinfo[bedId].outlets = []
+    } else {
+        debug('Determining outlets for %s', bedId)
+        // RIGHT_NIGHT_STAND = 1 LEFT_NIGHT_STAND = 2 RIGHT_NIGHT_LIGHT = 3 LEFT_NIGHT_LIGHT = 4
+        // Determine if this bed has 1 or 2 outlets and store for future use.
+        Map outlet1 = getOutletState(bedId, i1)
+        Map outlet2 = getOutletState(bedId, i2)
+        List outlets = []
+        if (outlet1) {
+          outlets << i1
+        }
+        if (outlet2) {
+          outlets << i2
+        }
+        bdinfo[bedId].outlets = outlets
     }
-    if (outlet2) {
-      outlets << i2
-    }
-    bdinfo[bedId].outlets = outlets
     state.bedInfo = bdinfo
   }
 }
@@ -2466,7 +2657,56 @@ private void addHttpR(String path) {
   Map<String,Integer> cnts = httpCntsMapFLD[myId] ?: [:]
   cnts[path] = (cnts[path] ? cnts[path] : iZ) + i1
   httpCntsMapFLD[myId] = cnts
-  httpCntsMapFLD = httpCntsMapFLD
+  //httpCntsMapFLD = httpCntsMapFLD
+}
+
+private Boolean isFuzion(String bedId) {
+  return state.bedInfo[bedId].newApi
+}
+
+private Boolean fuzionHasFeature(String feature) {
+  List<String> currentConfiguration = getState('systemConfiguration') as List<String>
+  return currentConfiguration.contains(feature)
+}
+
+private Map makeBamKeyHttpRequest(String bedId, String key, List<String> bamKeyArgs = []) {
+  Map res = httpRequest(createBamKeyUrl(bedId, state.bedInfo[bedId].accountId as String),
+      this.&put, createBamKeyArgs(key, bamKeyArgs))
+  if (devdbg()) debug('BamKey response: %s', res)
+  return res
+}
+
+/**
+ * Creates a request for a Fuzion bed with the given key.
+ */
+private void addBamKeyRequestToQueue(String bedId, String key, List<String> bamKeyArgs = [],
+                                     Integer duration = 0, String runAfter = null) {
+  String accountId = state.bedInfo[bedId].accountId
+  if (accountId == null) {
+    error "No account id for bed ${bedId} available"
+    return
+  }
+  httpRequestQueue(duration, path: createBamKeyUrl(bedId, accountId),
+          body: createBamKeyArgs(key, bamKeyArgs), runAfter: runAfter)
+}
+
+@CompileStatic
+private String createBamKeyUrl(String bedId, String accountId) {
+  return "/rest/sn/v1/accounts/${accountId}/beds/${bedId}/bamkey"
+}
+
+@CompileStatic
+private Map<String, String> createBamKeyArgs(String key, String arg) {
+  return [
+          key: BAM_KEY[key],
+          args: arg,
+          sourceApplication: APP_PREFIX
+  ]
+}
+
+@CompileStatic
+private Map<String, String> createBamKeyArgs(String key, List<String> args) {
+  return createBamKeyArgs(key, args.join(" "))
 }
 
 @CompileStatic
@@ -2597,13 +2837,14 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
 
 @Field static final String sAPIERR = 'API Error'
 
-void ahttpRequestHandler(resp,Map callbackData) {
+void ahttpRequestHandler(resp, Map callbackData) {
   Map request = (Map) callbackData?.command
   unschedule('timeoutAreq')
   Integer rCode; rCode = (Integer) resp.status
   if (resp.hasError()) {
-    debug "retrying async request as synchronous $rCode"
-    httpRequest((String) request.path, this.&put, (Map) request.body, (Map) request.query, false, false, request)
+    debug "retrying async request as synchronous, code $rCode"
+    httpRequest((String) request.path, (Closure) request.method, (Map) request.body,
+            (Map) request.query, false, false, request)
   }
   finishAsyncReq(request, rCode)
 }
@@ -2705,74 +2946,25 @@ def put(Map params, Closure closure) {
   httpPut(params, closure)
 }
 
+@Field static final Pattern sBAM_PASS = Pattern.compile('PASS:')
+
+@CompileStatic
+List<String> processBamKeyResponse(Map response) {
+  if (response.keySet().isEmpty() || !response.containsKey('cdcResponse')) {
+    // Bad response so return an empty list instead.
+    warn("Response from bam key request seems invalid: ${response}")
+    return []
+  } else {
+    return ((String) response['cdcResponse']).replaceFirst(sBAM_PASS, '').tokenize()
+  }
+}
+
 Long now() {
   return (Long) this.delegate.now()
 }
 
-/*------------------ Shared constants ------------------*/
-
-@Field static final String appVersion = '3.3.2'  // public version
-@Field static final String NAMESPACE = 'rvrolyk'
-@Field static final String DRIVER_NAME = 'Sleep Number Bed'
-@Field static final String APP_NAME = 'Sleep Number Controller'
-
 /*------------------ Logging helpers ------------------*/
 
-@Field static final String PURPLE = 'purple'
-@Field static final String BLUE = '#0299b1'
-@Field static final String GRAY = 'gray'
-@Field static final String ORANGE = 'orange'
-@Field static final String RED = 'red'
-
-@Field static final String sLTH = '<'
-@Field static final String sGTH = '>'
-
-@CompileStatic
-private static String logPrefix(String msg, String color = null) {
-  String myMsg = msg.replaceAll(sLTH, '&lt;').replaceAll(sGTH, '&gt;')
-  StringBuilder sb = new StringBuilder('<span ')
-          .append("style='color:").append(GRAY).append(";'>")
-          .append('[v').append(appVersion).append('] ')
-          .append('</span>')
-          .append("<span style='color:").append(color).append(";'>")
-          .append(myMsg)
-          .append('</span>')
-  return sb.toString()
-}
-
-private void logTrace(String msg) {
-  log.trace logPrefix(msg, GRAY)
-}
-
-private void logDebug(String msg) {
-  log.debug logPrefix(msg, PURPLE)
-}
-
-private void logInfo(String msg) {
-  log.info logPrefix(msg, BLUE)
-}
-
-private void logWarn(String msg) {
-  log.warn logPrefix(msg, ORANGE)
-}
-
-private void logError(String msg, Exception ex = null) {
-  log.error logPrefix(msg, RED)
-  String a,b; a = sNL; b = sNL
-  try {
-    if (ex) {
-      a = getExceptionMessageWithLine(ex)
-      if (devdbg()) b = getStackTrace(ex)
-    }
-  } catch (ignored) {}
-  if (a || b) {
-    log.error logPrefix(a+' \n'+b, RED)
-  }
-}
-
-@Field static final String sBLK = ''
-@Field static final String sSPACE = ' '
-@Field static final String sCLRORG = 'orange'
 @Field static final String sLINEBR = '<br>'
 
 @CompileStatic
@@ -2800,8 +2992,6 @@ private void setState(String nm, v) { state.put(nm, v) }
 
 String gtAid() { return app.getId() }
 
-
-
 /*------------------ In-memory timers ------------------*/
 
 @Field volatile static Map<String, Map> tsDtMapFLD = [:]
@@ -2815,7 +3005,6 @@ private void updTsVal(String key, String dt = sNL) {
   Map data = tsDtMapFLD[appId] ?: [:]
   if (key) data[key]=val
   tsDtMapFLD[appId] = data
-  tsDtMapFLD = tsDtMapFLD
 }
 
 @CompileStatic
@@ -2835,7 +3024,6 @@ private void remTsVal(key) {
       //if (sKey in svdTSValsFLD) { remServerItem(sKey) }
     }
     tsDtMapFLD[appId] = data
-    tsDtMapFLD = tsDtMapFLD
   }
 }
 
@@ -2944,7 +3132,7 @@ static String dumpListDesc(List data,Integer level, List<Boolean> lastLevel, Str
       String lineStrt
       lineStrt = doLineStrt(level,lastLevel)
       lineStrt += cnt == i1 && sz > i1 ? sSPCST : (cnt < sz ? sSPCSM:sSPCSE)
-      str+=spanStr(html, lineStrt + lbl + ": ${par} (${objType(par)})".toString() )
+      str += spanStr(html, lineStrt + lbl + ": ${par} (${objType(par)})".toString() )
     }
     cnt += i1
   }
@@ -3006,7 +3194,7 @@ static String dumpMapDesc(Map data, Integer level, List<Boolean> lastLevel, Inte
 }
 
 @CompileStatic
-static String objType(obj) { return span(myObj(obj), sCLRORG) }
+static String objType(obj) { return span(myObj(obj), ORANGE) }
 
 @CompileStatic
 static String getMapDescStr(Map data, Boolean reorder = true) {

@@ -30,35 +30,18 @@ import com.hubitat.app.DeviceWrapper
 import groovy.transform.CompileStatic
 import groovy.transform.Field
 
-@Field static final String sNL = (String)null
+#include rvrolyk.SleepNumberLibrary
+
 @Field static final String sLOW = 'Low'
 @Field static final String sMED = 'Medium'
 @Field static final String sHIGH = 'High'
 @Field static final String sFLAT = 'Flat'
-@Field static final String sSTON = 'On'
-@Field static final String sSTOFF = 'Off'
 
-@Field static final String sNUM = 'number'
-@Field static final String sSTR = 'string'
-@Field static final String sDATE = 'date'
-@Field static final String sENUM = 'enum'
-@Field static final String sBOOL = 'bool'
-@Field static final String sON = 'on'
-@Field static final String sOFF = 'off'
 @Field static final String sPRESENT = 'present'
 @Field static final String sNPRESENT = 'not present'
-@Field static final String sSWITCH = 'switch'
 @Field static final String sLEVEL = 'level'
-@Field static final String sPRESENCE = 'presence'
-@Field static final String sNM = 'name'
-@Field static final String sVL = 'value'
-@Field static final String sTYP = 'type'
-
-@Field static final String sHEAD = 'head'
-@Field static final String sFOOT = 'foot'
-@Field static final String sFOOTWMR = 'foot warmer'
-@Field static final String sOUTLET = 'outlet'
-@Field static final String sUNDERBEDLIGHT = 'underbedlight'
+@Field static final String sSTR = 'string'
+@Field static final String sDATE = 'date'
 
 @Field static final String sHEADPOSITION = 'headPosition'
 @Field static final String sFOOTPOSITION = 'footPosition'
@@ -75,23 +58,9 @@ import groovy.transform.Field
 @Field static final String sUNDERBEDLBRIGHT = 'underbedLightBrightness'
 @Field static final String sOUTLETSTATE = 'outletState'
 
-@Field static final Integer iZ = 0
-@Field static final Integer i1 = 1
-
 @Field static final String DNI_SEPARATOR = '-'
 
 @Field static final ArrayList<String> TYPES = ['presence', 'head', 'foot', 'foot warmer']
-
-@Field static final ArrayList<String> SIDES = ['Right', 'Left']
-@Field static final Map<String, Integer> HEAT_TEMPS = [Off: 0, Low: 31, Medium: 57, High: 72]
-@Field static final Map<String, Integer> HEAT_TIMES = ['30m': 30, '1h': 60, '2h': 120, '3h': 180, '4h': 240, '5h': 300, '6h': 360]
-@Field static final Map<String, String> ACTUATOR_TYPES = [head: 'H', foot: 'F']
-@Field static final Map<String, Integer> PRESET_TIMES = ['Off': 0, '15m': 15, '30m': 30, '45m': 45, '1h': 60, '2h': 120, '3h': 180]
-@Field static final Map<String, Integer> PRESET_NAMES = [Favorite: 1, Flat: 4, ZeroG: 5, Snore: 6, WatchTV: 3, Read: 2]
-@Field static final ArrayList<String> UNDERBED_LIGHT_STATES = ['Auto', 'On', 'Off']
-@Field static final Map<String, Integer> UNDERBED_LIGHT_BRIGHTNESS = [Low: 1, Medium: 30, High: 100]
-@Field static final Map<String, Integer> UNDERBED_LIGHT_TIMES = ['Forever': 0, '15m': 15, '30m': 30, '45m': 45, '1h': 60, '2h': 120, '3h': 180]
-@Field static final ArrayList<String> OUTLET_STATES = ['On', 'Off']
 
 metadata {
   definition((sNM): DRIVER_NAME,
@@ -223,70 +192,23 @@ void poll() {
 // Required by Switch capability
 void on() {
   sendEvent ((sNM): sSWITCH, (sVL): sON)
-  if ((String) state.type == sFOOTWMR) {
-    debug "on(): foot warmer"
-    setFootWarmingState((String)settings.footWarmerLevel, (String)settings.footWarmerTimer)
-  } else {
-    debug "on(): set preset ${(String)settings.presetLevel}"
-    setBedPreset((String)settings.presetLevel)
-  }
+  debug "on(): set preset ${(String)settings.presetLevel}"
+  setBedPreset((String)settings.presetLevel)
 }
 
 // Required by Switch capability
 void off() {
   sendEvent ((sNM): sSWITCH, (sVL): sOFF)
-  if ((String) state.type == sFOOTWMR) {
-    debug "off(): foot warmer"
-    setFootWarmingState(sSTOFF)
-  } else {
-    debug "off(): set Flat"
-    setBedPreset(sFLAT)
-  }
+  debug "off(): set Flat"
+  setBedPreset(sFLAT)
 }
 
 // setLevel required by SwitchLevel capability
 // including one with duration (which we currently ignore).
 void setLevel(Number val, Number duration = iZ) {
-  if((String) state.type){
-    switch ((String) state.type) {
-      case sPRESENCE:
-        debug "setLevel(${val}): sleepNumber"
-        setSleepNumber(val)
-        break
-      case sHEAD:
-        debug "setLevel(${val}): head position"
-        setBedPosition(val)
-        break
-      case sFOOT:
-        debug "setLevel(${val}): foot position"
-        setBedPosition(val)
-        break
-      case sFOOTWMR:
-        String level; level = sNL
-        switch (val) {
-          case i1:
-            level = sLOW
-            break
-          case 2:
-            level = sMED
-            break
-          case 3:
-            level = sHIGH
-            break
-        }
-        if (!level) {
-          logError "Invalid level for warmer state.  Only 1, 2 or 3 is valid"
-          return
-        }
-        debug "setLevel(${val}): warmer level to ${level}"
-        setFootWarmingState(level)
-        break
-    }
-  } else {
-    debug "setLevel(${val}): sleepNumber"
-    setSleepNumber(val)
-    sendEvent ((sNM): sLEVEL, (sVL): val)
-  }
+  debug "setLevel(${val}): sleepNumber"
+  setSleepNumber(val)
+  sendEvent ((sNM): sLEVEL, (sVL): val)
 }
 
 // Required by PresenceSensor capability
@@ -296,7 +218,7 @@ Boolean isPresent() {
 
 void arrived() {
   debug "arrived()"
-  if (!isPresent() && isPresenceOrParent()) {
+  if (!isPresent()) {
     logInfo "${device.displayName} arrived"
     sendEvent ((sNM): sPRESENCE, (sVL): sPRESENT)
   }
@@ -304,7 +226,7 @@ void arrived() {
 
 void departed() {
   debug "departed()"
-  if (isPresent() && isPresenceOrParent()) {
+  if (isPresent()) {
     logInfo "${device.displayName} departed"
     sendEvent ((sNM): sPRESENCE, (sVL): sNPRESENT)
     if ((Boolean) settings.enableSleepData) {
@@ -351,13 +273,12 @@ void setSleepNumber(Number val) {
 
 void setBedPosition(Number val, String actuator = sNL) {
   debug "setBedPosition(${val})"
-  String type = actuator ?: ACTUATOR_TYPES[(String)state.type]
-  if (!type) {
+  if (!actuator) {
     logError "Cannot determine actuator"
     return
   }
   if (val >= iZ && val <= 100) {
-    sendToParent("setFoundationAdjustment", [actuator: type, position: val])
+    sendToParent("setFoundationAdjustment", [actuator: actuator, position: val])
   } else {
     logError "Invalid position, must be between 0 and 100"
   }
@@ -435,7 +356,7 @@ void setSleepNumberFavorite() {
 }
 
 void updateSleepNumberFavorite(Number val) {
-  debug "setSleepNumberFavorite(${val})"
+  debug "updateSleepNumberFavorite(${val})"
   if (val > iZ && val <= 100) {
     sendToParent("updateSleepNumberFavorite", val)
   } else {
@@ -477,10 +398,6 @@ void setResponsiveAirState(String state) {
 }
 
 void getSleepData() {
-  if (!isPresenceOrParent()) {
-    logError "Sleep data only available on presence (main) device, this is ${(String)state.type}"
-    return
-  }
   Map data = sendToParent("getSleepData")
   debug "sleep data ${data}"
 
@@ -553,11 +470,6 @@ static String convertSecondsToTimeString(Integer secondsToConvert) {
 // Method used by parent app to set bed state
 void setStatus(Map<String,Object> params) {
   debug "setStatus(${params})"
-  if ((String) state.type) {
-    setStatusOld(params)
-    return
-  }
-  // No type means we are using parent/child devices.
   List<String> validAttributes = device.supportedAttributes.collect{ (String) it.name }
   for (Map.Entry<String,Object>param in params) {
     String pk = param.key
@@ -566,7 +478,7 @@ void setStatus(Map<String,Object> params) {
       // Translate some of the values into something more meaningful for comparison
       // but leave the other values alone
       if (pk == sFOOTWRMTEMP) {
-        Map.Entry<String,Integer> aa = HEAT_TEMPS.find{ it.value == Integer.valueOf("${value}") }
+        Map.Entry<String, Integer> aa = HEAT_TEMPS.find{ it.value == Integer.valueOf("${value}") }
         value = aa ? aa.key : sNL
         if (value == sNL) {
           logError "Invalid foot warming temp ${param.value}"
@@ -652,7 +564,7 @@ void setStatus(Map<String,Object> params) {
           break
         case sUNDERBEDLBRIGHT:
           // We use 1, 2 or 3 for the dimmer value and this correlates to the array index.
-          Integer dimmerLevel = (UNDERBED_LIGHT_BRIGHTNESS.keySet() as ArrayList).indexOf(value) + i1
+          Integer dimmerLevel = (UNDERBED_LIGHT_BRIGHTNESS.keySet() as ArrayList).indexOf(value)
           // Note that we don't set the light to on with a dimmer change since
           // the brightness can be set with the light in auto.
           childDimmerLevel(sUNDERBEDLIGHT, dimmerLevel)
@@ -660,92 +572,6 @@ void setStatus(Map<String,Object> params) {
         case sUNDERBEDLTIMER:
           // Nothing to send to the child for this as genericComponentDimmer only answers to
           // switch and level events.
-          break
-      }
-      if (!defaultDone) {
-        // Send an event with the key name to catalog it and set the attribute.
-        sendEvent((sNM): pk, (sVL): value)
-      }
-    } else {
-      logError "Invalid status attribute ${pk}"
-    }
-  }
-}
-
-// Used to set individual device states.
-void setStatusOld(Map<String,Object> params) {
-  debug "setStatusOld(${params})"
-  List<String> validAttributes = device.supportedAttributes.collect{ (String) it.name }
-  for (Map.Entry<String,Object>param in params) {
-    String pk = param.key
-    if (pk in validAttributes) {
-      def value; value = param.value
-
-      // Translate heat temp to something more meaningful but leave the other values alone
-      if (pk == sFOOTWRMTEMP) {
-        Map.Entry<String,Integer> aa = HEAT_TEMPS.find{ it.value == Integer.valueOf("${value}") }
-        value = aa ? aa.key : sNL
-        if (value == sNL) {
-          logError "Invalid foot warming temp ${param.value}"
-          continue
-        }
-      }
-
-      def attributeValue = device."current${pk.capitalize()}"
-      if (attributeValue.toString() != value.toString()) {
-        debug "Setting ${pk} to ${value}, it was ${attributeValue}"
-      }
-      // If this is a head or foot device, we need to sync level with the relevant
-      // position, if it's presence, then we sync level with the sleep number value.
-      String stype = (String)state.type
-      Boolean defaultDone; defaultDone = false
-      switch (pk){
-        case sPRESENCE:
-          setPresence((Boolean)value)
-          defaultDone = true
-          break
-        case sSLEEPNUM:
-          if(stype == sPRESENCE) sendEvent((sNM): sLEVEL, (sVL): value)
-          break
-        case sHEADPOSITION:
-          if(stype == sHEAD) sendEvent((sNM): sLEVEL, (sVL): value)
-          break
-        case sFOOTPOSITION:
-          if(stype == sFOOT) sendEvent((sNM): sLEVEL, (sVL): value)
-          break
-        case sPOSITIONPRESET:
-          if (stype != sFOOTWMR) {
-            if (value == sFLAT) {
-              sendEvent((sNM): sSWITCH, (sVL): sOFF)
-            } else if (value == (String) settings.presetLevel) {
-              // On if the level is the desired preset.
-              // Note this means it's off even when raised if it doesn't match a preset which
-              // may not make sense given there is a level.  But since it can be "turned on"
-              // when not at preset level, the behavior (if not the indicator) seems logical.
-              sendEvent((sNM): sSWITCH, (sVL): sON)
-            }
-          }
-          break
-        case sFOOTWRMTEMP:
-          if (stype == sFOOTWMR) {
-            Integer level; level = iZ
-            switch (value) {
-              case sSTOFF:
-                level = iZ
-                break
-              case sLOW:
-                level = i1
-                break
-              case sMED:
-                level = 2
-                break
-              case sHIGH:
-                level = 3
-                break
-            }
-            sendEvent((sNM): sSWITCH, (sVL): level > iZ ? sON : sOFF)
-            if(level > iZ) sendEvent ((sNM): sLEVEL, (sVL): level)
-          }
           break
       }
       if (!defaultDone) {
@@ -784,38 +610,6 @@ void debug(String msg) {
 
 static String span(String str, String clr = sNL, String sz = sNL, Boolean bld = false, Boolean br = false) {
   return str ? "<span ${(clr || sz || bld) ? "style = '${clr ? "color: ${clr};" : sBLANK}${sz ? "font-size: ${sz};" : sBLANK}${bld ? "font-weight: bold;" : sBLANK}'" : sBLANK}>${str}</span>${br ? sLINEBR : sBLANK}" : sBLANK
-}
-
-//-----------------------------------------------------------------------------
-// Methods specific to old device support
-//-----------------------------------------------------------------------------
-
-void setType(String val) {
-  debug "setType(${val})"
-  if (!TYPES.contains(val)) {
-    logError "Invalid type ${val}, possible values are ${TYPES}"
-  }
-  String msg; msg = val.capitalize() + " - "
-  switch (val) {
-    case sPRESENCE:
-      msg += "on/off will switch between preset level (on) and flat (off).  Dimming changes the Sleep Number."
-      break
-    case sHEAD:
-      msg += "on/off will switch between preset level (on) and flat (off).  Dimming changes the head position (0 is flat, 100 is fully raised)."
-      break
-    case sFOOT:
-      msg += "on/off will switch between preset level (on) and flat (off).  Dimming changes the foot position (0 is flat, 100 is fully raised)."
-      break
-    case sFOOTWMR:
-      msg += "off switches foot warming off, on will set it to preferred value for preferred time. Dimming changes the heat levels (1: low, 2: medium, 3: high)."
-      break
-  }
-  state.typeInfo = msg
-  state.type = val
-}
-
-Boolean isPresenceOrParent() {
-  return !(String) state.type || (String) state.type == sPRESENCE
 }
 
 //-----------------------------------------------------------------------------
@@ -1027,61 +821,5 @@ void componentStopLevelChange(DeviceWrapper device) {
   logInfo "stopLevelChange not supported"
 }
 
-/*------------------ Shared constants ------------------*/
-
-@Field static final String appVersion = '3.3.0'  // public version
-@Field static final String NAMESPACE = 'rvrolyk'
-@Field static final String DRIVER_NAME = 'Sleep Number Bed'
-
-/*------------------ Logging helpers ------------------*/
-
-@Field static final String PURPLE = 'purple'
-@Field static final String BLUE = '#0299b1'
-@Field static final String GRAY = 'gray'
-@Field static final String ORANGE = 'orange'
-@Field static final String RED = 'red'
-
-@CompileStatic
-private static String logPrefix(String msg, String color = null) {
-  StringBuilder sb = new StringBuilder("<span ")
-          .append("style = 'color:").append(GRAY).append(";'>")
-          .append("[v").append(appVersion).append("] ")
-          .append("</span>")
-          .append("<span style = 'color:").append(color).append(";'>")
-          .append(msg)
-          .append("</span>")
-  return sb.toString()
-}
-
-private void logTrace(String msg) {
-  log.trace logPrefix(msg, GRAY)
-}
-
-private void logDebug(String msg) {
-  log.debug logPrefix(msg, PURPLE)
-}
-
-private void logInfo(String msg) {
-  log.info logPrefix(msg, BLUE)
-}
-
-private void logWarn(String msg) {
-  log.warn logPrefix(msg, ORANGE)
-}
-
-private void logError(String msg, Exception ex = null) {
-  log.error logPrefix(msg, RED)
-  String a; a = sNL
-  try {
-    if (ex) {
-      a = getExceptionMessageWithLine(ex)
-    }
-  } catch (ignored) {}
-  if (a) {
-    log.error logPrefix(a, RED)
-  }
-}
-
 // vim: tabstop=2 shiftwidth=2 expandtab
-
 

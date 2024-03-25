@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "3.3.2",
+  "version": "4.0.0",
   "minimumHEVersion": "2.2.2",
-  "releaseNotes": "fix bug setting sleep number and favorite",
-  "dateReleased": "2024-03-15",
+  "dateReleased": "2024-03-26",
+  "releaseNotes": "* Add support for beds using new API (Climate360, P6, etc)\n* Remove old virtual container support, only child devices are supported now",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",
   "payPalUrl": "https://www.paypal.com/paypalme/rvrolyk",
@@ -26,6 +26,15 @@
       "required": true,
       "oauth": false,
       "primary": true
+    }
+  ],
+  "bundles": [
+    {
+      "id": "eed5fb75-87e3-424e-9a04-3bba09074390",
+      "name": "Sleep Number Library",
+      "namespace": "rvrolyk",
+      "location": "https://raw.githubusercontent.com/rvrolyk/SleepNumberController/master/SleepNumber_Library.zip",
+      "required": true
     }
   ]
 }
