@@ -1111,7 +1111,7 @@ void processBedData(Map responseData) {
             if (!underbedLightData[bedId]) {
               bedFailures[bedId] = true
             } else {
-              Map brightnessData = getUnderbedLightBrightness(bedId, underbedLightData[bedId]?.enableAuto)
+              Map brightnessData = getUnderbedLightBrightness(bedId)
               if (!brightnessData) {
                 bedFailures[bedId] = true
               } else {
