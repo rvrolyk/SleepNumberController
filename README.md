@@ -77,11 +77,15 @@ apparently by design (per SleepNumber).  If you want to change an individual hea
 at a device level so it can easily be changed via Rule Machine if needed.  An example use case would be to refresh quicker
 when you're in bed (e.g, when presence is first detected) and then slower during the day.  I've found that a global refresh
 of 1 minute (the fastest the app allows) doesn't seem to cause any problems for me but if you experience issues, this allows
-you to have a slow refresh when you're not using the bed.  Also note that any command being sent will cause a refresh of all
-states.
+you to have a slow refresh when you're not using the bed.  Also note that any command being sent will cause a refresh of **all states**.
 
 * Set SleepNumber Favorite: sets the bed to the user's favorite SleepNumber value.
 
+* Set Underbed Light State: if lighting is present, this will set the state of that light including timer and brightness level.
+
+* Set Outlet State: if there are additional outlets (beyond the lighting) then this will set the state of those outlets (on/off).
+
+* Set Responsive Air State: if this is toggled on (in the driver) then this will set the responsive air state to on or off
 
 ## Sleep Data
 
