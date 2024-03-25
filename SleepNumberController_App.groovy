@@ -1172,6 +1172,10 @@ void processBedData(Map responseData) {
               brightness = underbedLightData[bedId]?.autoBrightness
             } else {
               brightness = underbedLightData[bedId]?."fs${bedSideStr}UnderbedLightPWM"
+              // If the state is not auto then the light is on if the brightness is greater than 0
+              if (brightness > 0) {
+                bstate = 'On'
+              }
             }
           } else {
             timer = bstate == 'Auto' ? 'Not set' :
@@ -1357,7 +1361,7 @@ void getAsyncFamilyStatus(Boolean alreadyTriedRequest = false) {
 
 void finishGetAsyncFamilyStatus(resp, Map callbackData) {
   unschedule('timeoutFamily')
-  Integer rCode; rCode = (Integer) resp.status
+  Integer rCode; rCode = resp.status ? (Integer) resp.status : 0
   if (resp.hasError()) {
     debug "retrying family async request as synchronous $rCode"
     getBedData()
@@ -1446,7 +1450,7 @@ Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
         debug('Bed %s does not have articulation, not getting positions', bedId)
       }
       response[side]['bedPreset'] = processBamKeyResponse(
-              makeBamKeyHttpRequest(bedId, 'GetCurrentPreset', [side]))[0]
+              makeBamKeyHttpRequest(bedId, 'GetCurrentPreset', [side.toLowerCase()]))[0]
       // For some reason, the new Fuzion beds do not maintain any position preset timer information so there's no way to obtain it.
       // In fact, if you set a timer and then log out of the app (on a mobile device), all knowledge of that timer is lost.  So we just set
       // time to 0 and preset to n/a.
@@ -1519,7 +1523,7 @@ void setResponsiveAirState(Boolean st, String devId) {
   debug('Setting responsive air state %s to %s', side, st)
 
   if (isFuzion(getBedDeviceId(device))) {
-    addBamKeyRequestToQueue(bedId, 'SetResponsiveAirState', [side, st ? "1" : "0"], 0, sREFRESHCHILDDEVICES)
+    addBamKeyRequestToQueue(bedId, 'SetResponsiveAirState', [side, st ? '1' : '0'], 0, sREFRESHCHILDDEVICES)
   } else {
     Map body = [:]
     if (side == 'right') {
@@ -1952,7 +1956,7 @@ void setFoundationMassage(Integer ifootspeed, Integer iheadspeed, Integer itimer
   ChildDeviceWrapper device = findBedDevice(devId)
   if (!device) return
   if (isFuzion(getBedDeviceId(device))) {
-    // TODO - fuzion: Add this
+    // TODO - fuzion: Need to find a bed that supports this as I don't have any API samples
     warn "new API not supported yet"
     return
   }
@@ -2084,7 +2088,7 @@ Map getUnderbedLightState(String bedId) {
   Map res = [:]
   if (isFuzion(bedId)) {
     if (!fuzionHasFeature('underbedLightEnableFlag')) {
-      info 'This bed does not have underbed lighting'
+      info('Bed %s does not have underbed lighting', bedId)
       return res
     }
     // The first value from auto settings is a boolean
@@ -2131,22 +2135,19 @@ Map getUnderbedLightBrightness(String bedId) {
   Map brightness = [:]
   if (isFuzion(bedId)) {
      if (!fuzionHasFeature('underbedLightEnableFlag')) {
-      info 'This bed does not have underbed lighting'
+      info('Bed %s does not have underbed lighting', bedId)
       return brightness
      }
     List<String> results = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetUnderbedLightSettings', []))
     // The first value in the list is the level as a lower-cased string
-    String level = results[0]
-    Integer iBrightness
-    if (level == sOFF) {
-      iBrightness = 0
-    } else {
-      iBrightness = UNDERBED_LIGHT_BRIGHTNESS.get(level.capitalize())
-    }
+    Integer iBrightness = UNDERBED_LIGHT_BRIGHTNESS.get(results[0].capitalize())
     if (iBrightness != null) brightness.fsRightUnderbedLightPWM = brightness.fsLeftUnderbedLightPWM = iBrightness
     if (results[1]) {
-      String timer = VALID_LIGHT_TIMES.get(results[1] as Integer)
-      brightness.fuzionTimer = timer // null will get converted to 'forever' in #setStatus
+      Integer timer = results[1] as Integer
+      // The second value is a timer and that's a real-time countdown so we can't convert to a preset value
+      // If the timer is 0 then it is really 'forever' so we can leave it unset.  If it was on and then expired, the
+      // state will be off/Forever which is fine.
+      brightness.fuzionTimer = timer > 0 ? timer : null
     }
   } else {
     determineUnderbedLightSetup(bedId)
@@ -2222,11 +2223,11 @@ void setUnderbedLightState(Map params, String devId) {
   pt = (Integer) params.timer
   pb = (Integer) params.brightness
 
-  // A timer with a state of auto makes no sense, choose to honor state vs. timer.
+  // A timer with a state of auto makes no sense, choose to honor state vs. timer unless state is explicitly off.
   if (ps == 'auto') {
     pt = iZ
   }
-  if (pt) {
+  if (pt && ps != sOFF) {
     ps = sON
   }
 
@@ -2248,7 +2249,9 @@ void setUnderbedLightState(Map params, String devId) {
           2, sREFRESHCHILDDEVICES)
     } else {
      addBamKeyRequestToQueue(bedId, 'SetUnderbedLightAutoSettings', ['false', 'low'])
-     addBamKeyRequestToQueue(bedId, 'SetUnderbedLightSettings', [VALID_LIGHT_BRIGHTNESS.get(pb), pt],
+     String brightness = ps == sOFF ? sOFF : VALID_LIGHT_BRIGHTNESS.get(pb)
+     Integer timer = ps == sOFF ? iZ : pt
+     addBamKeyRequestToQueue(bedId, 'SetUnderbedLightSettings', [brightness, timer],
           2, sREFRESHCHILDDEVICES)
     }
   } else {
@@ -2839,7 +2842,7 @@ void ahttpRequestHandler(resp, Map callbackData) {
   unschedule('timeoutAreq')
   Integer rCode; rCode = (Integer) resp.status
   if (resp.hasError()) {
-    debug "retrying async request as synchronous $rCode"
+    debug "retrying async request as synchronous, code $rCode"
     httpRequest((String) request.path, (Closure) request.method, (Map) request.body,
             (Map) request.query, false, false, request)
   }

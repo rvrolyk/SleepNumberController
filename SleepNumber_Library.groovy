@@ -128,38 +128,15 @@ private void logError(String msg, Exception ex = null) {
 @Field static final ArrayList<String> UNDERBED_LIGHT_STATES = ['Auto', 'On', 'Off']
 @Field static final Map<String, Integer> UNDERBED_LIGHT_TIMES = ['Forever': 0, '15m': 15, '30m': 30, '45m': 45, '1h': 60, '2h': 120, '3h': 180]
 @Field static final Map<Integer, String> VALID_LIGHT_TIMES = [15: '15m', 30: '30m', 45: '45m', 60: '1h', 120: '2h', 180: '3h']
-@Field static final Map<String, Integer> UNDERBED_LIGHT_BRIGHTNESS = ['Low': 1, 'Medium': 30, 'High': 100]
-@Field static final Map<Integer, String> VALID_LIGHT_BRIGHTNESS = [1: 'low', 30: 'medium', 100: 'high']
+@Field static final Map<String, Integer> UNDERBED_LIGHT_BRIGHTNESS = ['Off': 0, 'Low': 1, 'Medium': 30, 'High': 100]
+@Field static final Map<Integer, String> VALID_LIGHT_BRIGHTNESS = [0: 'off', 1: 'low', 30: 'medium', 100: 'high']
 @Field static final ArrayList<String> OUTLET_STATES = ['On', 'Off']
 @Field static final ArrayList<Integer> VALID_SPEEDS = [0, 1, 2, 3]
 
-// vim: tabstop=2 shiftwidth=2 expandtab:w
 
 
 /*
  Fuzion TODOs
-
-
-        Outlets / Lighting
-        ---------------------
-
-        getUnderbedLightState
-        setUnderbedLightState (uses setOutletState but has own call as well for brightness)
-        getUnderbedLightBrightness
-          - uses getOutletState to determine if there are 1 or 2 lights
-        setOutletState
-
-        all lighting can be handled by:
-        'SetUnderbedLightSettings': 'UBLS',  => arg = level (string: high, medium, low, off), timer (int: 0, ...)
-             - note: app calls auto settings when this is set to off 
-                     calls auto false/low when set to low
-        'SetUnderbedLightAutoSettings': 'UBAS', => arg = boolean, level (string)
-              - note: app calls UBLS first to set off/0
-        'GetUnderbedLightSettings': 'UBLG', => returns [level, timer]
-        'GetUnderbedLightAutoSettings': 'UBAG', => returns [boolean, level]
-
-
-        instead of reading outlets, we can look at feature flag underbedLightEnableFlag
 
         NEW FEATURE: Whole Bed Heating
         ---------------------
@@ -171,7 +148,9 @@ private void logError(String msg, Exception ex = null) {
         ---------------------
         setFoundationMassage
 
-        don't have any examples of this working
+        don't have any examples of this working. Is it even supported?
 
 
 */
+
+// vim: tabstop=2 shiftwidth=2 expandtab:w
