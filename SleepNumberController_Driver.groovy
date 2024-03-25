@@ -564,7 +564,7 @@ void setStatus(Map<String,Object> params) {
           break
         case sUNDERBEDLBRIGHT:
           // We use 1, 2 or 3 for the dimmer value and this correlates to the array index.
-          Integer dimmerLevel = (UNDERBED_LIGHT_BRIGHTNESS.keySet() as ArrayList).indexOf(value) + i1
+          Integer dimmerLevel = (UNDERBED_LIGHT_BRIGHTNESS.keySet() as ArrayList).indexOf(value)
           // Note that we don't set the light to on with a dimmer change since
           // the brightness can be set with the light in auto.
           childDimmerLevel(sUNDERBEDLIGHT, dimmerLevel)

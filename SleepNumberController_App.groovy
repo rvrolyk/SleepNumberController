@@ -1461,14 +1461,14 @@ Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
     Map status = httpRequest("/rest/bed/${bedId}/foundation/status")
     SIDES.each { side ->
       // Positions are in hex so convert to a decimal
-      if (status.containsKey("fs${side}HeadPosition")) response[side]['headPosition'] = convertHexToNumber((String) status["fs${side}HeadPosition"])
-      if (status.containsKey("fs${side}FootPosition")) response[side]['footPosition'] = convertHexToNumber((String) status["fs${side}FootPosition"])
-      if (status.containsKey("fsCurrentPositionPreset${side}")) response[side]['bedPreset'] = status["fsCurrentPositionPreset${side}"]
+      if (status["fs${side}HeadPosition"] != null) response[side]['headPosition'] = convertHexToNumber((String) status["fs${side}HeadPosition"])
+      if (status["fs${side}FootPosition"] != null) response[side]['footPosition'] = convertHexToNumber((String) status["fs${side}FootPosition"])
+      if (status["fsCurrentPositionPreset${side}"] != null) response[side]['bedPreset'] = status["fsCurrentPositionPreset${side}"]
       // Time remaining to activate preset
       // There's also a MSB timer but not sure when that gets set.  Least significant bit seems used for all valid times.
-      if (status.containsKey("fs${side}PositionTimerLSB")) response[side]['positionTimer'] = convertHexToNumber((String) status["fs${side}PositionTimerLSB"])
+      if (status["fs${side}PositionTimerLSB"] != null) response[side]['positionTimer'] = convertHexToNumber((String) status["fs${side}PositionTimerLSB"])
       // The preset that will be activated after timer expires
-      if (status.containsKey("fsTimerPositionPreset${side}")) response[side]['positionPresetTimer'] = status["fsTimerPositionPreset${side}"]
+      if (status["fsTimerPositionPreset${side}"] != null) response[side]['positionPresetTimer'] = status["fsTimerPositionPreset${side}"]
     }
   }
   return response
@@ -2255,15 +2255,11 @@ void setUnderbedLightState(Map params, String devId) {
           2, sREFRESHCHILDDEVICES)
     }
   } else {
-    // First set the light state.
-    Map body; body = [
-      enableAuto: ps == 'auto'
-    ]
-    httpRequestQueue(2, path: "/rest/bed/${bedId}/foundation/underbedLight", body: body)
     determineUnderbedLightSetup(bedId)
+    Map body
     Integer rightBrightness, leftBrightness
-    rightBrightness = pb
-    leftBrightness = pb
+    rightBrightness = leftBrightness = pb
+    // First set the brightness as auto defaults to last used.
     Integer outletNum; outletNum = i3
     if (((List) ((Map) state.bedInfo[bedId]).underbedoutlets).size() > i1) {
       // Two outlets so set the side corresponding to the device rather than
@@ -2278,7 +2274,6 @@ void setUnderbedLightState(Map params, String devId) {
         leftBrightness = null
       }
     }
-    // If brightness was given then set it.
     if (pb) {
       body = [
         rightUnderbedLightPWM: rightBrightness,
@@ -2286,6 +2281,11 @@ void setUnderbedLightState(Map params, String devId) {
       ]
       httpRequestQueue(2, path: "/rest/bed/${bedId}/foundation/system", body: body)
     }
+    // Now set the mode and timer
+    body = [
+      enableAuto: ps == 'auto'
+    ]
+    httpRequestQueue(2, path: "/rest/bed/${bedId}/foundation/underbedLight", body: body)
     setOutletState(bedId, outletNum,
             ps == 'auto' ? sOFF : ps, pt, true)
   }
