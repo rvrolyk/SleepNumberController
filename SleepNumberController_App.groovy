@@ -1111,7 +1111,7 @@ void processBedData(Map responseData) {
             if (!underbedLightData[bedId]) {
               bedFailures[bedId] = true
             } else {
-              Map brightnessData = getUnderbedLightBrightness(bedId)
+              Map brightnessData = getUnderbedLightBrightness(bedId, underbedLightData[bedId]?.enableAuto)
               if (!brightnessData) {
                 bedFailures[bedId] = true
               } else {
@@ -1160,16 +1160,24 @@ void processBedData(Map responseData) {
           Map outletDataBedOut = outletData[bedId][outletNumber]
           String bstate = underbedLightData[bedId]?.enableAuto ? 'Auto' :
               outletDataBedOut?.setting == i1 ? sSTON : sSTOFF
-          String timer 
+          String timer
+          Integer brightness 
           if (isFuzion(bedId)) {
             // Fuzion beds store the timer under a general 'state' call vs. outlets so
             // we obtained the state from the light data vs. outlet data. 
             timer = bstate == 'Auto' ? 'Not set' : underbedLightData[bedId]?.fuzionTimer ?: 'Forever'
+            // Fuzion beds may have brightness from the auto state if they are set to auto because in those cases
+            // the manual mode is set to off
+            if (bstate == 'Auto') {
+              brightness = underbedLightData[bedId]?.autoBrightness
+            } else {
+              brightness = underbedLightData[bedId]?."fs${bedSideStr}UnderbedLightPWM"
+            }
           } else {
             timer = bstate == 'Auto' ? 'Not set' :
               outletDataBedOut?.timer ?: 'Forever'
+            brightness = underbedLightData[bedId]?."fs${bedSideStr}UnderbedLightPWM"
           }
-          def brightness = underbedLightData[bedId]?."fs${bedSideStr}UnderbedLightPWM"
           statusMap << [
             underbedLightState: bstate,
             underbedLightTimer: timer,
@@ -2079,9 +2087,10 @@ Map getUnderbedLightState(String bedId) {
       info 'This bed does not have underbed lighting'
       return res
     }
-    // The first value from auto settings is a boolean on/off which is all the non-fuzion api returns here
-    String auto = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetUnderbedLightAutoSettings', []))[0]
-    res = ['enableAuto': auto == 'on'] 
+    // The first value from auto settings is a boolean
+    // The second is the auto brightness level
+    List<String> autoInfo = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetUnderbedLightAutoSettings', []))
+    res = ['enableAuto': autoInfo[0] == 'true', 'autoBrightness': UNDERBED_LIGHT_BRIGHTNESS.get(autoInfo[1].capitalize())]
   } else {
     res = httpRequest("/rest/bed/${bedId}/foundation/underbedLight", this.&get)
   }
@@ -2115,6 +2124,8 @@ Map getFoundationSystem(String bedId) {
  *     calls getFoundationSystem (C)
  *     may call getOutletState * 2 (C)
  * For fuzion beds, this also includes timer info
+ * Fuzion beds also only represent brightness for the 'on' state in settings.  The auto brightness
+ * is represented in the `auto` call which we made when we called #getUnderbedLightState.
  */
 Map getUnderbedLightBrightness(String bedId) {
   Map brightness = [:]
@@ -2126,11 +2137,16 @@ Map getUnderbedLightBrightness(String bedId) {
     List<String> results = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetUnderbedLightSettings', []))
     // The first value in the list is the level as a lower-cased string
     String level = results[0]
-    Integer iBrightness = UNDERBED_LIGHT_BRIGHTNESS.get(level.capitalize())
-    if (iBrightness) brightness.fsRightUnderbedLightPWM = brightness.fsLeftUnderbedLightPWM = iBrightness
+    Integer iBrightness
+    if (level == sOFF) {
+      iBrightness = 0
+    } else {
+      iBrightness = UNDERBED_LIGHT_BRIGHTNESS.get(level.capitalize())
+    }
+    if (iBrightness != null) brightness.fsRightUnderbedLightPWM = brightness.fsLeftUnderbedLightPWM = iBrightness
     if (results[1]) {
       String timer = VALID_LIGHT_TIMES.get(results[1] as Integer)
-      brightness.fuzionTimer = timer
+      brightness.fuzionTimer = timer // null will get converted to 'forever' in #setStatus
     }
   } else {
     determineUnderbedLightSetup(bedId)
@@ -2228,11 +2244,11 @@ void setUnderbedLightState(Map params, String devId) {
     // Otherwise if state is on/off, we set auto to false/low
     if (ps == 'auto') {
       addBamKeyRequestToQueue(bedId, 'SetUnderbedLightSettings', [sOFF, iZ])
-      addBamKeyRequestToQueue(bedId, 'SetUnderbedLightAutoSettings', [ps, VALID_LIGHT_BRIGHTNESS.get(pb)],
+      addBamKeyRequestToQueue(bedId, 'SetUnderbedLightAutoSettings', ['true', VALID_LIGHT_BRIGHTNESS.get(pb)],
           2, sREFRESHCHILDDEVICES)
     } else {
      addBamKeyRequestToQueue(bedId, 'SetUnderbedLightAutoSettings', ['false', 'low'])
-     addBamKeyRequestToQueue(bedId, 'SetUnderbedLightSettings', [ps, pt],
+     addBamKeyRequestToQueue(bedId, 'SetUnderbedLightSettings', [VALID_LIGHT_BRIGHTNESS.get(pb), pt],
           2, sREFRESHCHILDDEVICES)
     }
   } else {

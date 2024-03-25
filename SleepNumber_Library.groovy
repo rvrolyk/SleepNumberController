@@ -153,10 +153,10 @@ private void logError(String msg, Exception ex = null) {
         'SetUnderbedLightSettings': 'UBLS',  => arg = level (string: high, medium, low, off), timer (int: 0, ...)
              - note: app calls auto settings when this is set to off 
                      calls auto false/low when set to low
-        'SetUnderbedLightAutoSettings': 'UBAS', => arg = boolean (on/off), level (string)
+        'SetUnderbedLightAutoSettings': 'UBAS', => arg = boolean, level (string)
               - note: app calls UBLS first to set off/0
         'GetUnderbedLightSettings': 'UBLG', => returns [level, timer]
-        'GetUnderbedLightAutoSettings': 'UBAG', => returns [boolean (on/off), level]
+        'GetUnderbedLightAutoSettings': 'UBAG', => returns [boolean, level]
 
 
         instead of reading outlets, we can look at feature flag underbedLightEnableFlag
