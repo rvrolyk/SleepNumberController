@@ -2780,7 +2780,7 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
   try {
     if (async) {
       wrunInMillis(24000L, 'timeoutAreq', [data: qReq])
-      asynchttpPut('ahttpRequestHandler', statusParams, [command: qReq])
+      asynchttpPut('ahttpRequestHandler', statusParams, [command: qReq, method: method])
       return [:]
     } else {
       method(statusParams) { response ->
@@ -2810,7 +2810,7 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
       // otherwise give up.  Not Found errors won't improve with retry to don't
       // bother.
       if (!alreadyTriedRequest && !e.toString().contains('Not Found')) {
-        maybeLogError('Retrying failed request %s\n%s', statusParams, e)
+        maybeLogError('Retrying failed request %s\nError: %s', statusParams, e)
         result = httpRequest(path, method, body, query, true, false, qReq, async)
         if (async) { timeoutAreq() }
         return result
@@ -2839,11 +2839,16 @@ Map httpRequest(String path, Closure method = this.&get, Map body = null, Map qu
 
 void ahttpRequestHandler(resp, Map callbackData) {
   Map request = (Map) callbackData?.command
+  Closure method = (Closure) callbackData?.method
+  if (!method) {
+    if (devdbg()) debug('missing method in callback, using `put`')
+    method = this.&put
+  }
   unschedule('timeoutAreq')
   Integer rCode; rCode = (Integer) resp.status
-  if (resp.hasError()) {
+  if (true /*resp.hasError()*/) {
     debug "retrying async request as synchronous, code $rCode"
-    httpRequest((String) request.path, (Closure) request.method, (Map) request.body,
+    httpRequest((String) request.path, method, (Map) request.body,
             (Map) request.query, false, false, request)
   }
   finishAsyncReq(request, rCode)
