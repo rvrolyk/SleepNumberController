@@ -2846,7 +2846,7 @@ void ahttpRequestHandler(resp, Map callbackData) {
   }
   unschedule('timeoutAreq')
   Integer rCode; rCode = (Integer) resp.status
-  if (true /*resp.hasError()*/) {
+  if (resp.hasError()) {
     debug "retrying async request as synchronous, code $rCode"
     httpRequest((String) request.path, method, (Map) request.body,
             (Map) request.query, false, false, request)
