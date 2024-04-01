@@ -415,7 +415,7 @@ void initializeBedInfo() {
       // Only know one 'generation' that is the new API for now
       if (bed[sGEN] == 'fuzion') {
         stateBedInfo[id].newApi = bed[sGEN] == 'fuzion'
-        Map<String, List<String>> sysConfigs = getState('systemConfiguration') ?: [:]
+        Map<String, List<String>> sysConfigs = getState('systemConfiguration') as Map ?: [:]
         sysConfigs[id] = getSystemConfiguration(id, (String) bed[sACCT_ID])
         setState('systemConfiguration', sysConfigs)
       }
@@ -1328,7 +1328,7 @@ List<String> getSystemConfiguration(String bedId, String accountId) {
   SIDES.each({ side ->
     Boolean hasCoreClimate = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetHeidiPresence', [side.toLowerCase()]))[0].equals('true')
     if (devdbg()) debug('bed %s side %s has core climate: %s', bedId, side, hasCoreClimate)
-    if (hasCoreClimate) activeFeatures.add("coreClimate${side}")
+    if (hasCoreClimate) activeFeatures.add("coreClimate${side}" as String)
   })
   return activeFeatures
 }
@@ -1662,10 +1662,9 @@ Map<String, Integer> getCoreClimateSettings(String bedId, String side) {
     return
   }
   List<String> values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetHeidiMode', [side.toLowerCase()]))
-  Integer temp = CORE_CLIMATE_TEMPS.get(values[0].toUpperCase())
   if (devdbg()) debug('Core Climate response: %s', values)
   return [
-    'coreClimateTemp': temp,
+    'coreClimateTemp': values[0].toUpperCase(),
     'coreClimateTimer': temp > 0 ? values[1] : 0
   ]
 }
@@ -1673,7 +1672,7 @@ Map<String, Integer> getCoreClimateSettings(String bedId, String side) {
 /**
  * For Climate360 beds, sets the Core Climate settings.
  */
-void setClimateSettings(Map params, String devId) {
+void setCoreClimateSettings(Map params, String devId) {
   ChildDeviceWrapper device = findBedDevice(devId)
   if (!device) {
     error('Bed device with id %s is not a valid child', devId)
@@ -1681,21 +1680,22 @@ void setClimateSettings(Map params, String devId) {
   }
   String bedId = getBedDeviceId(device)
   if (!isFuzion(bedId)) {
+    debug('Core Climate only available on fuzion beds')
     return
   }
   if (!fuzionHasFeature(bedId, "coreClimate${side}")) {
     debug('Bed does not have core climate')
     return
   }
-  Integer preset = params?.preset
-  if (!CORE_CLIMATE_TEMPS.values().contains(preset)) {
-    error('Invalid temperature preset value %s.  Valid values are %s', preset, CORE_CLIMATE_TEMPS.values())
+  String preset = params?.preset
+  if (!CORE_CLIMATE_TEMPS.contains(preset)) {
+    error('Invalid temperature preset value %s.  Valid values are %s', preset, CORE_CLIMATE_TEMPS)
   }
-  String tempName = CORE_CLIMATE_TEMPS.find({ it.value == preset }).key.toLowerCase()
+  preset = preset.toLowerCase()
   Integer timer = (Integer) params?.timer
-  // if temp is `off` then we can ignore timer and just set it ourselves.  The sample trace I have is 240 so that's
+  // if preset temp is `off` then we can ignore timer and just set it ourselves.  The sample trace I have is 240 so that's
   // what I use here.
-  if (timer == 0) {
+  if (preset == sOFF) {
     debug('Core Climate preset is off, setting timer to 240')
     timer = 240
   }
@@ -1705,7 +1705,7 @@ void setClimateSettings(Map params, String devId) {
   }
 
   String side = getBedDeviceSide(device)
-  addBamKeyRequestToQueue(bedId, 'SetHeidiMode', [side.toLowerCase(), tempName, timer],
+  addBamKeyRequestToQueue(bedId, 'SetHeidiMode', [side.toLowerCase(), preset, timer],
         5, sREFRESHCHILDDEVICES)
 }
 

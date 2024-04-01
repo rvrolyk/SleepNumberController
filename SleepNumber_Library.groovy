@@ -132,18 +132,12 @@ private void logError(String msg, Exception ex = null) {
 @Field static final Map<Integer, String> VALID_LIGHT_BRIGHTNESS = [0: 'off', 1: 'low', 30: 'medium', 100: 'high']
 @Field static final ArrayList<String> OUTLET_STATES = ['On', 'Off']
 @Field static final ArrayList<Integer> VALID_SPEEDS = [0, 1, 2, 3]
-@Field static final Map<String, Integer> CORE_CLIMATE_TEMPS = ['OFF': 0, 'HEATING_PUSH_LOW': 21, 'HEATING_PUSH_MED': 22, 'HEATING_PUSH_HIGH': 23, 'COOLING_PULL_LOW': 41, 'COOLING_PULL_MED': 42, 'COOLING_PULL_HIGH': 43]
+@Field static final ArrayList<String> CORE_CLIMATE_TEMPS =  ['OFF', 'HEATING_PUSH_LOW', 'HEATING_PUSH_MED', 'HEATING_PUSH_HIGH', 'COOLING_PULL_LOW', 'COOLING_PULL_MED', 'COOLING_PULL_HIGH']
 @Field static final Integer MAX_CORE_CLIMATE_TIME = 600
 
 
 /*
  Fuzion TODOs
-
-        NEW FEATURE: Whole Bed Heating
-        ---------------------
-        doesn't exist in old beds
-        see core climate in asyncsleepiq
-
 
         Massage
         ---------------------
