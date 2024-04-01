@@ -30,7 +30,7 @@ import com.hubitat.app.DeviceWrapper
 import groovy.transform.CompileStatic
 import groovy.transform.Field
 
-#include rvrolyk.SleepNumberLibrary
+#include rvrolyk.SleepNumberLibraryBeta
 
 @Field static final String sLOW = 'Low'
 @Field static final String sMED = 'Medium'
@@ -57,6 +57,7 @@ import groovy.transform.Field
 @Field static final String sUNDERBEDLSTATE = 'underbedLightState'
 @Field static final String sUNDERBEDLBRIGHT = 'underbedLightBrightness'
 @Field static final String sOUTLETSTATE = 'outletState'
+@Field static final String sCORECLIMATETEMP = 'coreClimateTemp'
 
 @Field static final String DNI_SEPARATOR = '-'
 
@@ -113,6 +114,9 @@ metadata {
     // Responsive Air state - optional based on preference since it requires another HTTP request
     // and most users probably don't care about it.
     attribute 'responsiveAir', sENUM, ['true', 'false']
+    // Only certain beds have climate control so this will only be present when the feature is detected
+    attribute 'coreClimateTemp', sENUM, CORE_CLIMATE_TEMPS.collect{ it.key }
+    attribute 'coreClimateTimer', sNUM
 
     command 'setRefreshInterval', [[(sNM): 'interval', (sTYP): 'NUMBER', constraints: ['NUMBER']]]
 
@@ -485,11 +489,18 @@ void setStatus(Map<String,Object> params) {
           continue
         }
       } else if (pk == sUNDERBEDLBRIGHT) {
-        Map.Entry<String,Integer> aa= UNDERBED_LIGHT_BRIGHTNESS.find { it.value == value as Integer}
+        Map.Entry<String, Integer> aa = UNDERBED_LIGHT_BRIGHTNESS.find { it.value == value as Integer }
         value = aa ? aa.key : sNL
         if (value == sNL) {
           logWarn "Invalid underbedLightBrightness ${param.value}, using Low"
           value = sLOW
+        }
+      } else if (pk == sCORECLIMATETEMP) {
+        Map.Entry<String, Integer> aa = CORE_CLIMATE_TEMPS.find { it.value == value as Integer }
+        value = aa ? aa.key : sNL
+        if (value == sNL) {
+          logWarn "Invalid coreClimateTemp ${param.value}, using Off"
+          value = sOFF.toUpperCase()
         }
       }
 

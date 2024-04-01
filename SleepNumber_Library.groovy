@@ -6,7 +6,7 @@ import groovy.transform.Field
 
 library(
    author: 'rvrolyk',
-   name: 'SleepNumberLibrary',
+   name: 'SleepNumberLibraryBeta',
    namespace: 'rvrolyk',
    description: 'Library for Sleep Number'
 )
@@ -14,7 +14,7 @@ library(
 /*------------------ Shared constants ------------------*/
 
 // If true, change library imports and the name of this library
-@Field static final Boolean IS_BETA = false
+@Field static final Boolean IS_BETA = true
 @Field static final String appVersion = '4.0.1'  // public version; sync w/ manifest
 @Field static final String NAMESPACE = 'rvrolyk'
 @Field static final String DRIVER_PREFIX = 'Sleep Number Bed'
@@ -132,7 +132,8 @@ private void logError(String msg, Exception ex = null) {
 @Field static final Map<Integer, String> VALID_LIGHT_BRIGHTNESS = [0: 'off', 1: 'low', 30: 'medium', 100: 'high']
 @Field static final ArrayList<String> OUTLET_STATES = ['On', 'Off']
 @Field static final ArrayList<Integer> VALID_SPEEDS = [0, 1, 2, 3]
-
+@Field static final Map<String, Integer> CORE_CLIMATE_TEMPS = ['OFF': 0, 'HEATING_PUSH_LOW': 21, 'HEATING_PUSH_MED': 22, 'HEATING_PUSH_HIGH': 23, 'COOLING_PULL_LOW': 41, 'COOLING_PULL_MED': 42, 'COOLING_PULL_HIGH': 43]
+@Field static final Integer MAX_CORE_CLIMATE_TIME = 600
 
 
 /*
