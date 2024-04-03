@@ -282,6 +282,8 @@ def updated() {
   state.remove('selectBedP')
   state.remove('createBedP')
   state.remove('diagP')
+  state.remove('systemConfiguration')
+  state.remove('bedInfo')
   state.session = null // next run will refresh all tokens/cookies
   state.remove('pauseButtonName')
   initialize()
@@ -321,7 +323,7 @@ def initialize() {
   remTsVal('lastFoundationSystemUpdDt')
   outletMapFLD = [:]
 
-  setRefreshInterval(new BigDecimal(iZ) /* force picking from settings */, "" /* ignored */)
+  setRefreshInterval(new BigDecimal(iZ) /* force picking from settings */, '' /* ignored */)
   initializeBedInfo()
   refreshChildDevices()
   updateLabel()
@@ -1053,10 +1055,10 @@ void processBedData(Map responseData) {
 
     Set<String> deviceTypes = getBedDeviceTypes(bedId)
     Map bedInfo; bedInfo = (Map) getState('bedInfo')
-
-    for (Map bed in (List<Map>)responseData.beds) {
-      String bedId1 = (String)bed[sBEDID]
-      Map bedInfoBed; bedInfoBed = bedInfo ? (Map)bedInfo[bedId1] : null
+ 
+    for (Map bed in (List<Map>) responseData.beds) {
+      String bedId1 = (String) bed[sBEDID]
+      Map bedInfoBed; bedInfoBed = bedInfo ? (Map) bedInfo[bedId1] : null
       // Make sure the various bed state info is set up so we can use it later.
       if (!bedInfoBed || !bedInfoBed.components) {
         warn 'state.bedInfo somehow lost, re-caching it'
@@ -1658,7 +1660,7 @@ Map<String, Integer> getCoreClimateSettings(String bedId, String side) {
     return
   }
   if (!fuzionHasFeature(bedId, "coreClimate${side}")) {
-    debug('Bed %s does not have core climate on side %s', bedId, side)
+    debug('Bed %s does not have core climate feature on side %s', bedId, side)
     return
   }
   List<String> values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetHeidiMode', [side.toLowerCase()]))
@@ -1684,7 +1686,7 @@ void setCoreClimateSettings(Map params, String devId) {
     return
   }
   if (!fuzionHasFeature(bedId, "coreClimate${side}")) {
-    debug('Bed does not have core climate')
+    debug('Bed does not have core climate feature on side %s', side)
     return
   }
   String preset = params?.preset
@@ -2744,7 +2746,15 @@ private Boolean isFuzion(String bedId) {
 }
 
 private Boolean fuzionHasFeature(String bedId, String feature) {
-  List<String> currentConfiguration = getState('systemConfiguration')[bedId] as List<String>
+  // In a prior version system configuration was stored as an array vs. per bed in a map
+  def config = getState('systemConfiguration')
+  if (config instanceof ArrayList) {
+    debug('Old systemConfiguration found, removing and re-initializing')
+    state.remove('systemConfiguration')
+    initializeBedInfo()
+    config = getState('systemConfiguration')
+  }
+  List<String> currentConfiguration = (config as Map)[bedId] as List<String>
   return currentConfiguration.contains(feature)
 }
 
