@@ -655,16 +655,15 @@ Map findBedPage() {
         paragraph 'No Beds Found'
       }
     }
+    section {
+      href 'homePage', (sTIT): 'Back Home', (sDESC): sNL
+    }
   }
 }
 
 void addBedSelectLink(String side, String bedId, String label = sNL, String modifyCreate = 'create') {
   href 'selectBedPage', (sNM): "Bed: ${bedId}", (sTIT): label ?: "${side} Side", (sDESC): "Click to ${modifyCreate}",
           params: [(sBEDID): bedId, (sSIDE): side, label: label]
-}
-
-static String presenceText(presence) {
-  return presence ? 'Present' : 'Not Present'
 }
 
 void checkBedInfo() {
@@ -725,7 +724,7 @@ Side: ${side}
       input 'useChildDevices', sBOOL, (sTIT): 'Use child devices? (recommended for direct device control of bed features)', defaultValue: false,
          submitOnChange: true
       ucd = getSettingB('useChildDevices')
-      side = side.toLowerCase()
+      String sideLower = side.toLowerCase()
       paragraph '<br>A presence type device exposes on/off as switching to a preset level (on) and flat (off).  Dimming will change the Sleep Number.'
       if (!ucd) {
         paragraph 'All other features are accessible via the device page and custom commands'
@@ -736,16 +735,16 @@ Side: ${side}
 
         paragraph 'A head type device exposes on/off as switching to a preset level (on) and  flat (off).  Dimming will change the head position (0 is flat, 100 is fully raised).'
         input 'createHeadControl', sBOOL,
-          (sTIT): "Create device to control the head of the ${side} side?",
+          (sTIT): "Create device to control the head of the ${sideLower} side?",
           defaultValue: false, submitOnChange: true
         paragraph 'A foot type device exposes on/off as switching to a preset level (on) and  flat (off).  Dimming will change the foot position (0 is flat, 100 is fully raised).'
         input 'createFootControl', sBOOL,
-          (sTIT): "Create device to control the foot of the ${side} side?",
+          (sTIT): "Create device to control the foot of the ${sideLower} side?",
           defaultValue: false, submitOnChange: true
         if (((List<String>) ((Map) state.bedInfo[bdId]).components).contains('Warming')) {
           paragraph 'A foot type device exposes on/off as switching the foot warming on or off.  Dimming will change the heat levels (1: low, 2: medium, 3: high).'
           input 'createFootWarmer', sBOOL,
-            (sTIT): "Create device to control the foot warmer of the ${side} side?",
+            (sTIT): "Create device to control the foot warmer of the ${sideLower} side?",
             defaultValue: false, submitOnChange: true
         }
         determineUnderbedLightSetup(bdId)
@@ -754,19 +753,33 @@ Side: ${side}
         if (((List) ((Map)state.bedInfo[bdId]).underbedoutlets).size() > iZ) {
           paragraph 'Underbed lighting creates a dimmer allowing the light to be turned on or off at different levels with timer based on parent device preference.'
           input 'createUnderbedLighting', sBOOL,
-                  (sTIT): "Create device to control the underbed lighting of the ${side} side?",
+                  (sTIT): "Create device to control the underbed lighting of the ${sideLower} side?",
                   defaultValue: false, submitOnChange: true
         }
         if (((List) ((Map)state.bedInfo[bdId]).outlets).size() > iZ) {
           paragraph 'Outlet creates a switch allowing foundation outlet for this side to be turned on or off.'
           input 'createOutlet', sBOOL,
-           (sTIT): "Create device to control the outlet of the ${side} side?",
+           (sTIT): "Create device to control the outlet of the ${sideLower} side?",
+             defaultValue: false, submitOnChange: true
+        }
+        if (isFuzion(bdId) && fuzionHasFeature(bdId, "coreClimate${side}")) {
+          String coreTempDesc = ''
+          for (int i = 1 /* we want to skip off */; i < CORE_CLIMATE_TEMPS.size(); i++) {
+            coreTempDesc += "${i}: ${CORE_CLIMATE_TEMPS[i].toLowerCase()}"
+            if (i < CORE_CLIMATE_TEMPS.size() - 1) coreTempDesc += ', '
+          }
+          paragraph 'A core temperature device exposes on/off as turning core temperature on (or off).  ' +
+           'Dimming will step through the temperature levels from cool low to high and then heat low to high (e.g, ' +
+           "${coreTempDesc})"
+
+          input 'createCoreClimate', sBOOL,
+           (sTIT): "Create device to control the core temperature of the ${sideLower} side?",
              defaultValue: false, submitOnChange: true
         }
       }
     }
     if (!ucd) {
-      List<String> ucdOnlySettings = ['createHeadControl', 'createFootControl',  'createFootWarmer', 'createUnderbedLighting', 'createOutlet']
+      List<String> ucdOnlySettings = ['createHeadControl', 'createFootControl',  'createFootWarmer', 'createUnderbedLighting', 'createOutlet', 'createCoreClimate']
       ucdOnlySettings.each { 
         app.removeSetting(it) 
       }
@@ -804,6 +817,10 @@ Side: ${side}
         if (getSettingB('createOutlet') && ucd) {
           msg.append('<li>').append(createDeviceLabel(newName, sOUTLET)).append('</li>')
           types.add(sOUTLET)
+        }      
+        if (getSettingB('createCoreClimate') && ucd) {
+          msg.append('<li>').append(createDeviceLabel(newName, sCORECLIMATE)).append('</li>')
+          types.add(sCORECLIMATE)
         }
       }
       msg.append('</ol>')
@@ -813,7 +830,7 @@ Side: ${side}
       params: [
         presence: params.present,
         (sBEDID): bdId,
-        (sSIDE): params[sSIDE],
+        (sSIDE): side,
         useChildDevices: ucd,
         types: types
       ]
@@ -835,6 +852,8 @@ static String createDeviceLabel(String name, String type) {
       return name + ' Underbed Light'
     case sOUTLET:
       return name + ' Outlet'
+    case sCORECLIMATE:
+      return name + ' Core Temperature'
     default:
       return name + ' Unknown'
   }
@@ -862,7 +881,7 @@ Map createBedPage(Map iparams) {
   } else {
     debug('Creating parent device %s', deviceId)
     parent = addChildDevice(NAMESPACE, DRIVER_NAME, deviceId, null, [label: label])
-    parent.setStatus(params.presence)
+    parent.setStatus([(sPRESENCE): true]) // set presence to true, next poll will set it correctly anyway
     parent.setBedId(params[sBEDID])
     parent.setSide(params[sSIDE])
     devices.add(parent)
@@ -880,6 +899,7 @@ Map createBedPage(Map iparams) {
         case sFOOT:
         case sFOOTWMR:
         case sUNDERBEDLIGHT:
+        case sCORECLIMATE:
           driverType = 'Dimmer'
       }
       ChildDeviceWrapper newDevice = parent.createChildDevice(childId, "Generic Component ${driverType}",
@@ -911,6 +931,9 @@ Map createBedPage(Map iparams) {
     }
     section {
       href 'findBedPage', (sTIT): 'Back to Bed List', (sDESC): sNL
+    }
+    section {
+      href 'homePage', (sTIT): 'Back Home', (sDESC): sNL
     }
   }
 }
@@ -1664,6 +1687,10 @@ Map<String, Integer> getCoreClimateSettings(String bedId, String side) {
     return
   }
   List<String> values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetHeidiMode', [side.toLowerCase()]))
+  if (values.size() < 2) {
+    error('Core Climate request is missing values, cannot determine state')
+    return [:]
+  }
   if (devdbg()) debug('Core Climate response: %s', values)
   return [
     'coreClimateTemp': values[0].toUpperCase(),

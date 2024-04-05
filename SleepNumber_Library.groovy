@@ -113,6 +113,7 @@ private void logError(String msg, Exception ex = null) {
 @Field static final String sFOOTWMR = 'footwarmer'
 @Field static final String sOUTLET = 'outlet'
 @Field static final String sUNDERBEDLIGHT = 'underbedlight'
+@Field static final String sCORECLIMATE = 'coreclimate'
 
 @Field static final ArrayList<String> SIDES = ['Right', 'Left']
 @Field static final Map<String, String> ACTUATOR_TYPES = ['head': 'H', 'foot': 'F']

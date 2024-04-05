@@ -155,6 +155,8 @@ metadata {
       input ((sNM): sUNDERBEDLTIMER, (sTYP): sENUM, title: 'Underbed light timer for "on"', options: UNDERBED_LIGHT_TIMES.collect{ it.key }, defaultValue: '15m')
       input ((sNM): 'enableSleepData', (sTYP): sBOOL, title: 'Enable sleep data collection', defaultValue: false)
       input ((sNM): 'enableResponsiveAir', (sTYP): sBOOL, title: 'Enable responsive air data', defaultValue: false)
+      input ((sNM): 'coreClimateLevel', (sTYP): sENUM, title: 'Core temperature level for "on"', options: CORE_CLIMATE_TEMPS, defaultValue: 'HEATING_PUSH_LOW')
+      input ((sNM): 'coreClimateTimer', (sTYP): sNUM, title: 'Core temperature duration for "on"', defaultValue: 30)
     }
   }
 }
@@ -411,6 +413,10 @@ void setCoreClimateState(String temp, Number timer) {
     logError "Invalid temp ${temp}, valid options are ${CORE_CLIMATE_TEMPS}"
     return
   }
+  if (timer > MAX_CORE_CLIMATE_TIME) {
+    logInfo('Timer cannot exceed %s, adjusting to max', MAX_CORE_CLIMATE_TIME)
+    timer = MAX_CORE_CLIMATE_TIME
+  }
   sendToParent('setCoreClimateSettings', [
     'preset': temp,
     'timer': timer
@@ -658,14 +664,14 @@ String getChildType(String childNetworkId) {
 }
 
 void componentOn(DeviceWrapper device) {
-  String type = getChildType((String)device.deviceNetworkId)
+  String type = getChildType((String) device.deviceNetworkId)
   debug "componentOn $type"
   switch (type) {
     case sOUTLET:
       setOutletState(sSTON)
       break
     case sUNDERBEDLIGHT:
-      setUnderbedLightState(sSTON, (String)settings[sUNDERBEDLTIMER])
+      setUnderbedLightState(sSTON, (String) settings[sUNDERBEDLTIMER])
       break
     case sHEAD:
       // For now, just share the same preset as the parent.
@@ -680,7 +686,10 @@ void componentOn(DeviceWrapper device) {
       on()
       break
     case sFOOTWMR:
-      setFootWarmingState((String)settings.footWarmerLevel, (String)settings.footWarmerTimer)
+      setFootWarmingState((String) settings.footWarmerLevel, (String) settings.footWarmerTimer)
+      break
+    case sCORECLIMATE:
+      setCoreClimateState((String) settings.coreClimateLevel, (Number) settings.coreClimateTimer)
       break
     default:
       logWarn "Unknown child device type ${type}, not turning on"
@@ -708,6 +717,9 @@ void componentOff(DeviceWrapper device) {
       break
     case sFOOTWMR:
       setFootWarmingState(sSTOFF)
+      break
+    case sCORECLIMATE:
+      setCoreClimateState(sOFF.toUpperCase(), (Number) settings.coreClimateTimer)
       break
     default:
       logWarn "Unknown child device type ${type}, not turning off"
@@ -780,6 +792,18 @@ void componentSetLevel(DeviceWrapper device, Number level, Number duration) {
       }
       debug "Set warmer level to ${val} for ${presetDuration}"
       setFootWarmingState(val, presetDuration)
+      break
+    case sCORECLIMATE:
+      String val;
+      Integer maxLevel = CORE_CLIMATE_TEMPS.size() - 1
+      if (level > 0 && level <  maxLevel) {
+        val = CORE_CLIMATE_TEMPS[(Integer) level]
+      } else {
+        logError('Invalid level for warmer state.  Only 1 through %s is valid', maxLevel)
+        return
+      }
+      debug "Set core climate level to ${val} for ${settings.coreClimateTimer}"
+      setCoreClimateState(val, (Number) settings.coreClimateTimer)
       break
     default:
       logWarn "Unknown child device type ${type}, not setting level"
