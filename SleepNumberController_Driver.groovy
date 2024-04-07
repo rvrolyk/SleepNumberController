@@ -414,7 +414,7 @@ void setCoreClimateState(String temp, Number timer) {
     return
   }
   if (timer > MAX_CORE_CLIMATE_TIME) {
-    logInfo('Timer cannot exceed %s, adjusting to max', MAX_CORE_CLIMATE_TIME)
+    logInfo "Timer cannot exceed ${MAX_CORE_CLIMATE_TIME}, re-adjusting to max"
     timer = MAX_CORE_CLIMATE_TIME
   }
   sendToParent('setCoreClimateSettings', [
