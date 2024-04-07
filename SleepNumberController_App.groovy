@@ -392,7 +392,7 @@ void initializeBedInfo() {
   Map bedInfo = getBeds()
   Map<String, Map> stateBedInfo = [:]
   if (bedInfo) {
-    for (Map bed in (List<Map>)bedInfo.beds) {
+    for (Map bed in (List<Map>) bedInfo.beds) {
       String id = bed[sBEDID].toString()
       if (devdbg()) debug('Bed id %s', id)
       if (!stateBedInfo.containsKey(id)) {
@@ -1341,6 +1341,8 @@ Map getBeds(Boolean lazy = false) {
  */
 @CompileStatic
 List<String> getSystemConfiguration(String bedId, String accountId) {
+  // NOTE: Do not use `makeBamKeyHttpRequest` in this method.  It's called from `initializeBedInfo` when
+  // the state may not be set up yet.
   debug 'Getting system configuration to determine features'
   List<String> features = processBamKeyResponse(httpRequest(createBamKeyUrl(bedId, accountId),
       this.&put, createBamKeyArgs('GetSystemConfiguration', [])))  
@@ -1351,7 +1353,9 @@ List<String> getSystemConfiguration(String bedId, String accountId) {
   // Instead we need another HTTP call per side to determine whether or not it exists.  In order to
   // easily reference this, we synthesize a per side feature name.
   SIDES.each({ side ->
-    Boolean hasCoreClimate = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetHeidiPresence', [side.toLowerCase()]))[0].equals('true')
+    Boolean hasCoreClimate = processBamKeyResponse(httpRequest(
+      createBamKeyUrl(bedId, accountId), this.&put,
+          createBamKeyArgs('GetHeidiPresence', [side.toLowerCase()])))[0].equals('true')
     if (devdbg()) debug('bed %s side %s has core climate: %s', bedId, side, hasCoreClimate)
     if (hasCoreClimate) activeFeatures.add("coreClimate${side}" as String)
   })
