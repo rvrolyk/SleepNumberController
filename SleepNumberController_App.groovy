@@ -1712,6 +1712,7 @@ void setCoreClimateSettings(Map params, String devId) {
     return
   }
   String bedId = getBedDeviceId(device)
+  String side = getBedDeviceSide(device)
   if (!isFuzion(bedId)) {
     debug('Core Climate only available on fuzion beds')
     return
@@ -1737,7 +1738,6 @@ void setCoreClimateSettings(Map params, String devId) {
     return
   }
 
-  String side = getBedDeviceSide(device)
   addBamKeyRequestToQueue(bedId, 'SetHeidiMode', [side.toLowerCase(), preset, timer],
         5, sREFRESHCHILDDEVICES)
 }
