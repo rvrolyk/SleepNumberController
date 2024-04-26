@@ -1,7 +1,7 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "4.1.0",
+  "version": "4.1.1",
   "minimumHEVersion": "2.2.2",
   "dateReleased": "2024-04-26",
   "releaseNotes": "add support for core climate",
