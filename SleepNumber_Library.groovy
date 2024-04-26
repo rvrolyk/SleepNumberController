@@ -6,7 +6,7 @@ import groovy.transform.Field
 
 library(
    author: 'rvrolyk',
-   name: 'SleepNumberLibraryBeta',
+   name: 'SleepNumberLibrary',
    namespace: 'rvrolyk',
    description: 'Library for Sleep Number'
 )
@@ -14,8 +14,8 @@ library(
 /*------------------ Shared constants ------------------*/
 
 // If true, change library imports and the name of this library
-@Field static final Boolean IS_BETA = true
-@Field static final String appVersion = '4.0.1'  // public version; sync w/ manifest
+@Field static final Boolean IS_BETA = false
+@Field static final String appVersion = '4.1.0'  // public version; sync w/ manifest
 @Field static final String NAMESPACE = 'rvrolyk'
 @Field static final String DRIVER_PREFIX = 'Sleep Number Bed'
 @Field static final String APP_PREFIX = 'Sleep Number Controller'
