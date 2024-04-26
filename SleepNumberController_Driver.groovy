@@ -30,7 +30,7 @@ import com.hubitat.app.DeviceWrapper
 import groovy.transform.CompileStatic
 import groovy.transform.Field
 
-#include rvrolyk.SleepNumberLibraryBeta
+#include rvrolyk.SleepNumberLibrary
 
 @Field static final String sLOW = 'Low'
 @Field static final String sMED = 'Medium'

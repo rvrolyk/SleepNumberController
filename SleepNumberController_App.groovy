@@ -40,7 +40,7 @@ import java.util.regex.Pattern
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 
-#include rvrolyk.SleepNumberLibraryBeta
+#include rvrolyk.SleepNumberLibrary
 
 @Field static ConcurrentLinkedQueue requestQueue = new ConcurrentLinkedQueue()
 @Field static Semaphore mutex = new Semaphore(1)
