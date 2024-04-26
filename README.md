@@ -48,11 +48,8 @@ also use modes by selecting *Use modes to control variable refresh interval* and
 the modes you'd like to treat as night.
 
 As of version 3, you may create bed devices as a parent/child device.  This is strongly recommended
-if you intend to use devices for the head, foot, etc as it reduces the number of devices by one (no
-virtual container) and simplifies the device logic by relying on Hubitat maintained component drivers.
- Additionally, I may opt to remove support for the old structure in the future to simplify the code.
-
-Underbed lighting and outlets are also supported in the parent/child structure but not the old one.
+if you intend to use devices with a voice control system or if you want to expose each device as a tile/button
+in a dashboard.
 
 ## Logging
 
@@ -76,18 +73,18 @@ are noted below and functionality is described.
 
 ## Supported Commands
 
-* Set Bed Position*: sets the position of the head or the foot of the bed.  The level is expected to be 0-100 (flat-fully raised).
-This is supported via dimmer levels if the device type is *head* or *foot*.
+* Set Bed Position: sets the position of the head or the foot of the bed.  The level is expected to be 0-100 (flat-fully raised).
+This is supported via dimmer levels if the child device is *head* or *foot*.
 
-* Set Foot Warming State*: sets the foot warming duration and heat level.  If the device type is *foot warmer* then the level may
+* Set Foot Warming State: sets the foot warming duration and heat level.  If the child device is a *foot warmer* then the level may
 be set as a dimmer level of 1, 2 or 3 (low, medium, high) and on/off turns the warmer on or off.  The duration and initial heat
 level are preferences.
 
-* Set Bed Preset*: sets the bed to a preset level.  If the device type is *presence*, *head* or *foot*, then on will set enable
-the preset set as a preference (in this way, you can have 3 preferred preset levels via voice) and off will set the bed to *flat*.
+* Set Bed Preset: sets the bed to a preset level.  If the child device is a *head* or *foot*, then on will enable
+the preset set as a preference (in this way, you can have 3 preferred preset levels via voice, one for primary device, one for head and one for foot) and off will set the bed to *flat*.
 
   Please note that a preset for Flextop beds (partial split) will result in changing *both* sides, not just the one selected.  This is
-apparently by design (per SleepNumber).  If you want to change an individual head setting, I suggest using automation vs. a preset.
+apparently by design (per SleepNumber).  If you want to change an individual head setting, I suggest using an automation vs. a preset.
 
 * Set Bed Preset Timer: sets the bed to a preset level after an elapsed time.
 
@@ -110,6 +107,8 @@ you to have a slow refresh when you're not using the bed.  Also note that any co
 * Set Outlet State: if there are additional outlets (beyond the lighting) then this will set the state of those outlets (on/off).
 
 * Set Responsive Air State: if this is toggled on (in the driver) then this will set the responsive air state to on or off
+
+* Set Core Climate State: if the bed has core climate, this allows setting the temperature and timer.  There are preferences for the temperature level and timer if the child device is toggled on.
 
 ## Sleep Data
 
