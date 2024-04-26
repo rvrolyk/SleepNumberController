@@ -40,7 +40,7 @@ import java.util.regex.Pattern
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 
-#include rvrolyk.SleepNumberLibrary
+#include rvrolyk.SleepNumberLibraryBeta
 
 @Field static ConcurrentLinkedQueue requestQueue = new ConcurrentLinkedQueue()
 @Field static Semaphore mutex = new Semaphore(1)
@@ -96,6 +96,9 @@ static String getLOGIN_URL() { 'https://' + LOGIN_HOST }
   'GetResponsiveAirState': 'LRAG',
   'SetFootWarming': 'FWTS',
   'GetFootWarming': 'FWTG',
+  'GetHeidiPresence': 'THPG',
+  'SetHeidiMode': 'THMS',
+  'GetHeidiMode': 'THMG',
 ]
 
 @Field static List<String> FEATURE_NAMES = [
@@ -115,6 +118,7 @@ static String getLOGIN_URL() { 'https://' + LOGIN_HOST }
         'zeroGravityPreset',
         'watchTvPreset',
         'readPreset',
+        /* coreClimateRight, coreClimateLeft synthesized from GetHeidiPresence call */
 ]
 
 @Field static final String PAUSE = 'Pause'
@@ -278,6 +282,8 @@ def updated() {
   state.remove('selectBedP')
   state.remove('createBedP')
   state.remove('diagP')
+  state.remove('systemConfiguration')
+  state.remove('bedInfo')
   state.session = null // next run will refresh all tokens/cookies
   state.remove('pauseButtonName')
   initialize()
@@ -317,7 +323,7 @@ def initialize() {
   remTsVal('lastFoundationSystemUpdDt')
   outletMapFLD = [:]
 
-  setRefreshInterval(new BigDecimal(iZ) /* force picking from settings */, "" /* ignored */)
+  setRefreshInterval(new BigDecimal(iZ) /* force picking from settings */, '' /* ignored */)
   initializeBedInfo()
   refreshChildDevices()
   updateLabel()
@@ -386,7 +392,7 @@ void initializeBedInfo() {
   Map bedInfo = getBeds()
   Map<String, Map> stateBedInfo = [:]
   if (bedInfo) {
-    for (Map bed in (List<Map>)bedInfo.beds) {
+    for (Map bed in (List<Map>) bedInfo.beds) {
       String id = bed[sBEDID].toString()
       if (devdbg()) debug('Bed id %s', id)
       if (!stateBedInfo.containsKey(id)) {
@@ -411,7 +417,9 @@ void initializeBedInfo() {
       // Only know one 'generation' that is the new API for now
       if (bed[sGEN] == 'fuzion') {
         stateBedInfo[id].newApi = bed[sGEN] == 'fuzion'
-        setState('systemConfiguration', getSystemConfiguration(id, (String) bed[sACCT_ID]))
+        Map<String, List<String>> sysConfigs = getState('systemConfiguration') as Map ?: [:]
+        sysConfigs[id] = getSystemConfiguration(id, (String) bed[sACCT_ID])
+        setState('systemConfiguration', sysConfigs)
       }
     }
   }
@@ -647,16 +655,15 @@ Map findBedPage() {
         paragraph 'No Beds Found'
       }
     }
+    section {
+      href 'homePage', (sTIT): 'Back Home', (sDESC): sNL
+    }
   }
 }
 
 void addBedSelectLink(String side, String bedId, String label = sNL, String modifyCreate = 'create') {
   href 'selectBedPage', (sNM): "Bed: ${bedId}", (sTIT): label ?: "${side} Side", (sDESC): "Click to ${modifyCreate}",
           params: [(sBEDID): bedId, (sSIDE): side, label: label]
-}
-
-static String presenceText(presence) {
-  return presence ? 'Present' : 'Not Present'
 }
 
 void checkBedInfo() {
@@ -717,7 +724,7 @@ Side: ${side}
       input 'useChildDevices', sBOOL, (sTIT): 'Use child devices? (recommended for direct device control of bed features)', defaultValue: false,
          submitOnChange: true
       ucd = getSettingB('useChildDevices')
-      side = side.toLowerCase()
+      String sideLower = side.toLowerCase()
       paragraph '<br>A presence type device exposes on/off as switching to a preset level (on) and flat (off).  Dimming will change the Sleep Number.'
       if (!ucd) {
         paragraph 'All other features are accessible via the device page and custom commands'
@@ -728,16 +735,16 @@ Side: ${side}
 
         paragraph 'A head type device exposes on/off as switching to a preset level (on) and  flat (off).  Dimming will change the head position (0 is flat, 100 is fully raised).'
         input 'createHeadControl', sBOOL,
-          (sTIT): "Create device to control the head of the ${side} side?",
+          (sTIT): "Create device to control the head of the ${sideLower} side?",
           defaultValue: false, submitOnChange: true
         paragraph 'A foot type device exposes on/off as switching to a preset level (on) and  flat (off).  Dimming will change the foot position (0 is flat, 100 is fully raised).'
         input 'createFootControl', sBOOL,
-          (sTIT): "Create device to control the foot of the ${side} side?",
+          (sTIT): "Create device to control the foot of the ${sideLower} side?",
           defaultValue: false, submitOnChange: true
         if (((List<String>) ((Map) state.bedInfo[bdId]).components).contains('Warming')) {
           paragraph 'A foot type device exposes on/off as switching the foot warming on or off.  Dimming will change the heat levels (1: low, 2: medium, 3: high).'
           input 'createFootWarmer', sBOOL,
-            (sTIT): "Create device to control the foot warmer of the ${side} side?",
+            (sTIT): "Create device to control the foot warmer of the ${sideLower} side?",
             defaultValue: false, submitOnChange: true
         }
         determineUnderbedLightSetup(bdId)
@@ -746,19 +753,33 @@ Side: ${side}
         if (((List) ((Map)state.bedInfo[bdId]).underbedoutlets).size() > iZ) {
           paragraph 'Underbed lighting creates a dimmer allowing the light to be turned on or off at different levels with timer based on parent device preference.'
           input 'createUnderbedLighting', sBOOL,
-                  (sTIT): "Create device to control the underbed lighting of the ${side} side?",
+                  (sTIT): "Create device to control the underbed lighting of the ${sideLower} side?",
                   defaultValue: false, submitOnChange: true
         }
         if (((List) ((Map)state.bedInfo[bdId]).outlets).size() > iZ) {
           paragraph 'Outlet creates a switch allowing foundation outlet for this side to be turned on or off.'
           input 'createOutlet', sBOOL,
-           (sTIT): "Create device to control the outlet of the ${side} side?",
+           (sTIT): "Create device to control the outlet of the ${sideLower} side?",
+             defaultValue: false, submitOnChange: true
+        }
+        if (isFuzion(bdId) && fuzionHasFeature(bdId, "coreClimate${side}")) {
+          String coreTempDesc = ''
+          for (int i = 1 /* we want to skip off */; i < CORE_CLIMATE_TEMPS.size(); i++) {
+            coreTempDesc += "${i}: ${CORE_CLIMATE_TEMPS[i].toLowerCase()}"
+            if (i < CORE_CLIMATE_TEMPS.size() - 1) coreTempDesc += ', '
+          }
+          paragraph 'A core temperature device exposes on/off as turning core temperature on (or off).  ' +
+           'Dimming will step through the temperature levels from cool low to high and then heat low to high (e.g, ' +
+           "${coreTempDesc})"
+
+          input 'createCoreClimate', sBOOL,
+           (sTIT): "Create device to control the core temperature of the ${sideLower} side?",
              defaultValue: false, submitOnChange: true
         }
       }
     }
     if (!ucd) {
-      List<String> ucdOnlySettings = ['createHeadControl', 'createFootControl',  'createFootWarmer', 'createUnderbedLighting', 'createOutlet']
+      List<String> ucdOnlySettings = ['createHeadControl', 'createFootControl',  'createFootWarmer', 'createUnderbedLighting', 'createOutlet', 'createCoreClimate']
       ucdOnlySettings.each { 
         app.removeSetting(it) 
       }
@@ -796,6 +817,10 @@ Side: ${side}
         if (getSettingB('createOutlet') && ucd) {
           msg.append('<li>').append(createDeviceLabel(newName, sOUTLET)).append('</li>')
           types.add(sOUTLET)
+        }      
+        if (getSettingB('createCoreClimate') && ucd) {
+          msg.append('<li>').append(createDeviceLabel(newName, sCORECLIMATE)).append('</li>')
+          types.add(sCORECLIMATE)
         }
       }
       msg.append('</ol>')
@@ -805,7 +830,7 @@ Side: ${side}
       params: [
         presence: params.present,
         (sBEDID): bdId,
-        (sSIDE): params[sSIDE],
+        (sSIDE): side,
         useChildDevices: ucd,
         types: types
       ]
@@ -827,6 +852,8 @@ static String createDeviceLabel(String name, String type) {
       return name + ' Underbed Light'
     case sOUTLET:
       return name + ' Outlet'
+    case sCORECLIMATE:
+      return name + ' Core Temperature'
     default:
       return name + ' Unknown'
   }
@@ -854,7 +881,7 @@ Map createBedPage(Map iparams) {
   } else {
     debug('Creating parent device %s', deviceId)
     parent = addChildDevice(NAMESPACE, DRIVER_NAME, deviceId, null, [label: label])
-    parent.setStatus(params.presence)
+    parent.setStatus([(sPRESENCE): true]) // set presence to true, next poll will set it correctly anyway
     parent.setBedId(params[sBEDID])
     parent.setSide(params[sSIDE])
     devices.add(parent)
@@ -872,6 +899,7 @@ Map createBedPage(Map iparams) {
         case sFOOT:
         case sFOOTWMR:
         case sUNDERBEDLIGHT:
+        case sCORECLIMATE:
           driverType = 'Dimmer'
       }
       ChildDeviceWrapper newDevice = parent.createChildDevice(childId, "Generic Component ${driverType}",
@@ -903,6 +931,9 @@ Map createBedPage(Map iparams) {
     }
     section {
       href 'findBedPage', (sTIT): 'Back to Bed List', (sDESC): sNL
+    }
+    section {
+      href 'homePage', (sTIT): 'Back Home', (sDESC): sNL
     }
   }
 }
@@ -1047,10 +1078,10 @@ void processBedData(Map responseData) {
 
     Set<String> deviceTypes = getBedDeviceTypes(bedId)
     Map bedInfo; bedInfo = (Map) getState('bedInfo')
-
-    for (Map bed in (List<Map>)responseData.beds) {
-      String bedId1 = (String)bed[sBEDID]
-      Map bedInfoBed; bedInfoBed = bedInfo ? (Map)bedInfo[bedId1] : null
+ 
+    for (Map bed in (List<Map>) responseData.beds) {
+      String bedId1 = (String) bed[sBEDID]
+      Map bedInfoBed; bedInfoBed = bedInfo ? (Map) bedInfo[bedId1] : null
       // Make sure the various bed state info is set up so we can use it later.
       if (!bedInfoBed || !bedInfoBed.components) {
         warn 'state.bedInfo somehow lost, re-caching it'
@@ -1237,6 +1268,10 @@ void processBedData(Map responseData) {
             responsiveAir: responsiveAir.get(bedId)?."${side}SideEnabled" ?: sBLK
           ]
         }
+        // If the bed is fuzion and has core climate, poll for that state
+        if (isFuzion(bedId) && fuzionHasFeature(bedId, "coreClimate${bedSideStr}")) {
+          statusMap << getCoreClimateSettings(bedId, bedSideStr)
+        }
         if (bedFailures[bedId]) {
           // Only log update errors once per bed
           loggedError[bedId] = true
@@ -1306,12 +1341,24 @@ Map getBeds(Boolean lazy = false) {
  */
 @CompileStatic
 List<String> getSystemConfiguration(String bedId, String accountId) {
+  // NOTE: Do not use `makeBamKeyHttpRequest` in this method.  It's called from `initializeBedInfo` when
+  // the state may not be set up yet.
   debug 'Getting system configuration to determine features'
   List<String> features = processBamKeyResponse(httpRequest(createBamKeyUrl(bedId, accountId),
       this.&put, createBamKeyArgs('GetSystemConfiguration', [])))  
   // Decompose features into just active ones
   List<String> activeFeatures = [FEATURE_NAMES, features].transpose().grep{ ((List<List<String>>)it)[1] == "yes" }.collect({ ((List<List<String>>)it)[0] as String })
   if (devdbg()) debug('active features for %s are %s', bedId, activeFeatures)
+  // Fuzion beds may have core climate but oddly that's not exposed via the system configuration.
+  // Instead we need another HTTP call per side to determine whether or not it exists.  In order to
+  // easily reference this, we synthesize a per side feature name.
+  SIDES.each({ side ->
+    Boolean hasCoreClimate = processBamKeyResponse(httpRequest(
+      createBamKeyUrl(bedId, accountId), this.&put,
+          createBamKeyArgs('GetHeidiPresence', [side.toLowerCase()])))[0].equals('true')
+    if (devdbg()) debug('bed %s side %s has core climate: %s', bedId, side, hasCoreClimate)
+    if (hasCoreClimate) activeFeatures.add("coreClimate${side}" as String)
+  })
   return activeFeatures
 }
 
@@ -1439,9 +1486,9 @@ Map<String, Map<String, Object>> getFoundationStatus(String bedId) {
     // TODO: Use data stored about bed to decide left/right and head/foot.
     SIDES.each { side ->
       String sideLower = side.toLowerCase()
-      if (fuzionHasFeature('articulationEnableFlag')) {
+      if (fuzionHasFeature(bedId, 'articulationEnableFlag')) {
         [sHEAD, sFOOT].each { actuator ->
-          if (fuzionHasFeature("${sideLower}${actuator.capitalize()}Actuator")) {
+          if (fuzionHasFeature(bedId, "${sideLower}${actuator.capitalize()}Actuator")) {
             response[side]["${actuator}Position"] = processBamKeyResponse(
                     makeBamKeyHttpRequest(bedId, 'GetActuatorPosition', [sideLower, actuator]))[0]
           }
@@ -1478,7 +1525,7 @@ Map getFootWarmingStatus(String bedId) {
   debug('Getting Foot Warming Status for %s', bedId)
   Map response = [:]
   if (isFuzion(bedId)) {
-    if (!fuzionHasFeature('rapidSleepSettingEnableFlag')) {
+    if (!fuzionHasFeature(bedId, 'rapidSleepSettingEnableFlag')) {
       info('Bed %s does not have foot warming', bedId)
       return response
      }
@@ -1615,7 +1662,7 @@ void setFootWarmingState(Map params, String devId) {
   String side = getBedDeviceSide(device)
   String bedId = getBedDeviceId(device)
   if (isFuzion(bedId)) {
-    if (!fuzionHasFeature('rapidSleepSettingEnableFlag')) {
+    if (!fuzionHasFeature(bedId, 'rapidSleepSettingEnableFlag')) {
       info('Bed %s does not have foot warming', bedId)
       return
     }
@@ -1629,6 +1676,70 @@ void setFootWarmingState(Map params, String devId) {
     httpRequestQueue(0, path: "/rest/bed/${getBedDeviceId(device)}/foundation/footwarming",
             body: body, runAfter: sREFRESHCHILDDEVICES)
   }
+}
+
+/**
+ * For Climate360 beds, gets the Core Climate settings.
+ */
+Map<String, Integer> getCoreClimateSettings(String bedId, String side) {
+  // The next two checks should be redundant but just in case...
+  if (!isFuzion(bedId)) {
+    return
+  }
+  if (!fuzionHasFeature(bedId, "coreClimate${side}")) {
+    debug('Bed %s does not have core climate feature on side %s', bedId, side)
+    return
+  }
+  List<String> values = processBamKeyResponse(makeBamKeyHttpRequest(bedId, 'GetHeidiMode', [side.toLowerCase()]))
+  if (values.size() < 2) {
+    error('Core Climate request is missing values, cannot determine state')
+    return [:]
+  }
+  if (devdbg()) debug('Core Climate response: %s', values)
+  return [
+    'coreClimateTemp': values[0].toUpperCase(),
+    'coreClimateTimer': temp > 0 ? values[1] : 0
+  ]
+}
+
+/**
+ * For Climate360 beds, sets the Core Climate settings.
+ */
+void setCoreClimateSettings(Map params, String devId) {
+  ChildDeviceWrapper device = findBedDevice(devId)
+  if (!device) {
+    error('Bed device with id %s is not a valid child', devId)
+    return
+  }
+  String bedId = getBedDeviceId(device)
+  String side = getBedDeviceSide(device)
+  if (!isFuzion(bedId)) {
+    debug('Core Climate only available on fuzion beds')
+    return
+  }
+  if (!fuzionHasFeature(bedId, "coreClimate${side}")) {
+    debug('Bed does not have core climate feature on side %s', side)
+    return
+  }
+  String preset = params?.preset
+  if (!CORE_CLIMATE_TEMPS.contains(preset)) {
+    error('Invalid temperature preset value %s.  Valid values are %s', preset, CORE_CLIMATE_TEMPS)
+  }
+  preset = preset.toLowerCase()
+  Integer timer = (Integer) params?.timer
+  // if preset temp is `off` then we can ignore timer and just set it ourselves.  The sample trace I have is 240 so that's
+  // what I use here.
+  if (preset == sOFF) {
+    debug('Core Climate preset is off, setting timer to 240')
+    timer = 240
+  }
+  if (timer > MAX_CORE_CLIMATE_TIME || timer < 1) {
+    error('Invalid timer %s.  Must be between 0 and %s', timer, MAX_CORE_CLIMATE_TIME)
+    return
+  }
+
+  addBamKeyRequestToQueue(bedId, 'SetHeidiMode', [side.toLowerCase(), preset, timer],
+        5, sREFRESHCHILDDEVICES)
 }
 
 /**
@@ -1952,6 +2063,7 @@ Map getSleepNumberFavorite(String bedId, Boolean lazy = false) {
 //        WAVE
 //    ]
 
+// TODO: Expose this via driver
 void setFoundationMassage(Integer ifootspeed, Integer iheadspeed, Integer itimer = iZ, Integer mode = iZ, String devId) {
   ChildDeviceWrapper device = findBedDevice(devId)
   if (!device) return
@@ -2087,7 +2199,7 @@ void setOutletState(String bedId, Integer outletId, String ioutletState, Integer
 Map getUnderbedLightState(String bedId) {
   Map res = [:]
   if (isFuzion(bedId)) {
-    if (!fuzionHasFeature('underbedLightEnableFlag')) {
+    if (!fuzionHasFeature(bedId, 'underbedLightEnableFlag')) {
       info('Bed %s does not have underbed lighting', bedId)
       return res
     }
@@ -2134,7 +2246,7 @@ Map getFoundationSystem(String bedId) {
 Map getUnderbedLightBrightness(String bedId) {
   Map brightness = [:]
   if (isFuzion(bedId)) {
-     if (!fuzionHasFeature('underbedLightEnableFlag')) {
+     if (!fuzionHasFeature(bedId, 'underbedLightEnableFlag')) {
       info('Bed %s does not have underbed lighting', bedId)
       return brightness
      }
@@ -2170,7 +2282,7 @@ Map getUnderbedLightBrightness(String bedId) {
  */
 void determineUnderbedLightSetup(String bedId) {
   Map<String,Map> bdinfo = (Map<String,Map>) state.bedInfo
-  if (isFuzion(bedId) && fuzionHasFeature('underbedLightEnableFlag')) {
+  if (isFuzion(bedId) && fuzionHasFeature(bedId, 'underbedLightEnableFlag')) {
     // for now, I don't think fuzion beds have outlets in the same way old beds do
     // this means we can use the feature flag for lights to infer a single outlet
     debug('fuzion bed has single outlet, underbedLightEnableFlag feature exists for %s', bedId)
@@ -2237,7 +2349,7 @@ void setUnderbedLightState(Map params, String devId) {
   }
   String bedId = getBedDeviceId(device)
   if (isFuzion(bedId)) {
-    if (!fuzionHasFeature('underbedLightEnableFlag')) {
+    if (!fuzionHasFeature(bedId, 'underbedLightEnableFlag')) {
       info 'This bed does not have underbed lighting'
       return
     }
@@ -2664,8 +2776,16 @@ private Boolean isFuzion(String bedId) {
   return state.bedInfo[bedId].newApi
 }
 
-private Boolean fuzionHasFeature(String feature) {
-  List<String> currentConfiguration = getState('systemConfiguration') as List<String>
+private Boolean fuzionHasFeature(String bedId, String feature) {
+  // In a prior version system configuration was stored as an array vs. per bed in a map
+  def config = getState('systemConfiguration')
+  if (config instanceof ArrayList) {
+    debug('Old systemConfiguration found, removing and re-initializing')
+    state.remove('systemConfiguration')
+    initializeBedInfo()
+    config = getState('systemConfiguration')
+  }
+  List<String> currentConfiguration = (config as Map)[bedId] as List<String>
   return currentConfiguration.contains(feature)
 }
 

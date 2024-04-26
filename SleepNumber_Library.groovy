@@ -15,7 +15,7 @@ library(
 
 // If true, change library imports and the name of this library
 @Field static final Boolean IS_BETA = false
-@Field static final String appVersion = '4.0.2'  // public version; sync w/ manifest
+@Field static final String appVersion = '4.1.0'  // public version; sync w/ manifest
 @Field static final String NAMESPACE = 'rvrolyk'
 @Field static final String DRIVER_PREFIX = 'Sleep Number Bed'
 @Field static final String APP_PREFIX = 'Sleep Number Controller'
@@ -113,6 +113,7 @@ private void logError(String msg, Exception ex = null) {
 @Field static final String sFOOTWMR = 'footwarmer'
 @Field static final String sOUTLET = 'outlet'
 @Field static final String sUNDERBEDLIGHT = 'underbedlight'
+@Field static final String sCORECLIMATE = 'coreclimate'
 
 @Field static final ArrayList<String> SIDES = ['Right', 'Left']
 @Field static final Map<String, String> ACTUATOR_TYPES = ['head': 'H', 'foot': 'F']
@@ -132,17 +133,12 @@ private void logError(String msg, Exception ex = null) {
 @Field static final Map<Integer, String> VALID_LIGHT_BRIGHTNESS = [0: 'off', 1: 'low', 30: 'medium', 100: 'high']
 @Field static final ArrayList<String> OUTLET_STATES = ['On', 'Off']
 @Field static final ArrayList<Integer> VALID_SPEEDS = [0, 1, 2, 3]
-
+@Field static final ArrayList<String> CORE_CLIMATE_TEMPS =  ['OFF', 'HEATING_PUSH_LOW', 'HEATING_PUSH_MED', 'HEATING_PUSH_HIGH', 'COOLING_PULL_LOW', 'COOLING_PULL_MED', 'COOLING_PULL_HIGH']
+@Field static final Integer MAX_CORE_CLIMATE_TIME = 600 // minutes
 
 
 /*
  Fuzion TODOs
-
-        NEW FEATURE: Whole Bed Heating
-        ---------------------
-        doesn't exist in old beds
-        see core climate in asyncsleepiq
-
 
         Massage
         ---------------------

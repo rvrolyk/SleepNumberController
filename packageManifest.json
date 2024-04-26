@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "4.0.2",
+  "version": "4.1.0",
   "minimumHEVersion": "2.2.2",
-  "dateReleased": "2024-03-29",
-  "releaseNotes": "fix bug in async causing retries all the time",
+  "dateReleased": "2024-04-26",
+  "releaseNotes": "add support for core climate",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",
   "payPalUrl": "https://www.paypal.com/paypalme/rvrolyk",
