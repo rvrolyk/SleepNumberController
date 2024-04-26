@@ -134,7 +134,7 @@ private void logError(String msg, Exception ex = null) {
 @Field static final ArrayList<String> OUTLET_STATES = ['On', 'Off']
 @Field static final ArrayList<Integer> VALID_SPEEDS = [0, 1, 2, 3]
 @Field static final ArrayList<String> CORE_CLIMATE_TEMPS =  ['OFF', 'HEATING_PUSH_LOW', 'HEATING_PUSH_MED', 'HEATING_PUSH_HIGH', 'COOLING_PULL_LOW', 'COOLING_PULL_MED', 'COOLING_PULL_HIGH']
-@Field static final Integer MAX_CORE_CLIMATE_TIME = 600
+@Field static final Integer MAX_CORE_CLIMATE_TIME = 600 // minutes
 
 
 /*

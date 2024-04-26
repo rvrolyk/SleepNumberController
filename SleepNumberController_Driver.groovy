@@ -139,11 +139,11 @@ metadata {
     command 'setUnderbedLightState', [[(sNM): 'state', (sTYP): 'ENUM', constraints: UNDERBED_LIGHT_STATES],
         [(sNM): 'timer', (sTYP): 'ENUM', constraints: UNDERBED_LIGHT_TIMES.collect{ it.key }],
         [(sNM): 'brightness', (sTYP): 'ENUM', constraints: UNDERBED_LIGHT_BRIGHTNESS.collect{ it.key }]]
-    // Works regardless of preference but polling only happens if pref is true
+    // Control works regardless of preference but polling only happens if pref is true
     command 'setResponsiveAirState', [[(sNM): 'state', (sTYP): 'ENUM', constraints: ['true', 'false']]]
     // Only works for beds with CoreClimate
     command 'setCoreClimateState', [[(sNM): 'temperature', (sTYP): 'ENUM', constraints: CORE_CLIMATE_TEMPS],
-        [(sNM): 'timer', (sTYP): 'NUMBER', constraints: ['NUMBER']]]
+        [(sNM): "timer in minutes (max ${MAX_CORE_CLIMATE_TIME})", (sTYP): 'NUMBER', constraints: ['NUMBER']]]
   }
 
   preferences {
@@ -156,7 +156,7 @@ metadata {
       input ((sNM): 'enableSleepData', (sTYP): sBOOL, title: 'Enable sleep data collection', defaultValue: false)
       input ((sNM): 'enableResponsiveAir', (sTYP): sBOOL, title: 'Enable responsive air data', defaultValue: false)
       input ((sNM): 'coreClimateLevel', (sTYP): sENUM, title: 'Core temperature level for "on"', options: CORE_CLIMATE_TEMPS, defaultValue: 'HEATING_PUSH_LOW')
-      input ((sNM): 'coreClimateTimer', (sTYP): sNUM, title: 'Core temperature duration for "on"', defaultValue: 30)
+      input ((sNM): 'coreClimateTimer', (sTYP): sNUM, title: 'Core temperature duration minutes for "on" (max: ' + MAX_CORE_CLIMATE_TIME + ')', defaultValue: 30)
     }
   }
 }
