@@ -15,7 +15,7 @@ library(
 
 // If true, change library imports and the name of this library.  Don't forget to change imports in app/driver
 @Field static final Boolean IS_BETA = false
-@Field static final String appVersion = '4.1.1'  // public version; sync w/ manifest
+@Field static final String appVersion = '4.1.2'  // public version; sync w/ manifest
 @Field static final String NAMESPACE = 'rvrolyk'
 @Field static final String DRIVER_PREFIX = 'Sleep Number Bed'
 @Field static final String APP_PREFIX = 'Sleep Number Controller'

@@ -407,7 +407,7 @@ void setResponsiveAirState(String state) {
   sendToParent 'setResponsiveAirState', Boolean.valueOf(state)
 }
 
-void setCoreClimateState(String temp, Number timer) {
+void setCoreClimateState(String temp, Number timer = 30) {
   debug "setCoreClimateState($temp, $timer)"
   if (!CORE_CLIMATE_TEMPS.contains(temp)) {
     logError "Invalid temp ${temp}, valid options are ${CORE_CLIMATE_TEMPS}"
