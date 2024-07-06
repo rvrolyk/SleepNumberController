@@ -22,6 +22,9 @@
  *  of those but leverages prior work they"ve done for the API calls and bed management.
  *    https://github.com/natecj/SmartThings/blob/master/smartapps/natecj/sleepiq-manager.src/sleepiq-manager.groovy
  *    https://github.com/ClassicTim1/SleepNumberManager/blob/master/FlexBase/SmartApp.groovy
+ * 
+ *  mods by kewashi include allowing broader ranges for dimmer children instead of just 1, 2, and 3
+ *  and addition of sleepSensor capability
  */
 //file:noinspection SpellCheckingInspection
 //file:noinspection unused
@@ -42,6 +45,8 @@ import groovy.transform.Field
 @Field static final String sLEVEL = 'level'
 @Field static final String sSTR = 'string'
 @Field static final String sDATE = 'date'
+@Field static final String sSLEEPING = 'sleeping'
+@Field static final String sNSLEEPING = 'not sleeping'
 
 @Field static final String sHEADPOSITION = 'headPosition'
 @Field static final String sFOOTPOSITION = 'footPosition'
@@ -73,6 +78,7 @@ metadata {
     capability 'SwitchLevel'
     capability 'PresenceSensor'
     capability 'Polling'
+    capability 'SleepSensor'
 
     // indicator for overall connectivity to Sleep Number API
     attribute 'connection', 'enum', ['online', 'offline']
@@ -116,6 +122,7 @@ metadata {
     // Only certain beds have climate control so this will only be present when the feature is detected
     attribute 'coreClimateTemp', sENUM, CORE_CLIMATE_TEMPS
     attribute 'coreClimateTimer', sNUM
+    attribute 'sleeping', sENUM, ['not sleeping', 'sleeping']
 
     command 'setRefreshInterval', [[(sNM): 'interval', (sTYP): 'NUMBER', constraints: ['NUMBER']]]
 
@@ -228,16 +235,18 @@ Boolean isPresent() {
 void arrived() {
   debug 'arrived()'
   if (!isPresent()) {
-    logInfo "${device.displayName} arrived"
+    logInfo "${device.displayName} arrived and sleep status set to sleeping"
     sendEvent ((sNM): sPRESENCE, (sVL): sPRESENT)
+    sendEvent ((sNM): sSLEEPSENSOR, (sVL): sSLEEPING)
   }
 }
 
 void departed() {
   debug 'departed()'
   if (isPresent()) {
-    logInfo "${device.displayName} departed"
+    logInfo "${device.displayName} departed and sleep status set to not sleeping"
     sendEvent ((sNM): sPRESENCE, (sVL): sNPRESENT)
+    sendEvent ((sNM): sSLEEPSENSOR, (sVL): sNSLEEPING)
     if ((Boolean) settings.enableSleepData) {
       getSleepData()
     }
@@ -738,22 +747,14 @@ void componentSetLevel(DeviceWrapper device, Number level, Number duration) {
     case sOUTLET:
       logInfo 'Child type outlet does not support level'
       break
-    case sUNDERBEDLIGHT:
-      // Only 3 levels are supported.
       String val
-      switch (level) {
-        case i1:
-          val = sLOW
-          break
-        case 2:
-          val = sMED
-          break
-        case 3:
-          val = sHIGH
-          break
-        default:
-          logError 'Invalid level for underbed light.  Only 1, 2 or 3 is valid'
-          return
+      // tweaked to support all levels; same original 3 plus the full slider range - Low is <= 30, High >= 70, 30 < MED < 70
+      if ( level == 3 || level >= 70 ) {
+        val = sHIGH
+      } else if ( level == 2 || level > 30) {
+        val = sMED
+      } else {
+        val = sLOW
       }
       String presetDuration; presetDuration = (String)settings[sUNDERBEDLTIMER]
       if (duration != null && UNDERBED_LIGHT_TIMES.values().contains(duration)) {
@@ -771,19 +772,13 @@ void componentSetLevel(DeviceWrapper device, Number level, Number duration) {
       break
     case sFOOTWMR:
       String val
-      switch (level) {
-        case i1:
-          val = sLOW
-          break
-        case 2:
-          val = sMED
-          break
-        case 3:
-          val = sHIGH
-          break
-        default:
-          logError 'Invalid level for warmer state.  Only 1, 2 or 3 is valid'
-          return
+      // tweaked to support all levels; same original 3 plus the full slider range - Low is <= 30, High >= 70, 30 < MED < 70
+      if ( level == 3 || level >= 70 ) {
+        val = sHIGH
+      } else if ( level == 2 || level > 30) {
+        val = sMED
+      } else {
+        val = sLOW
       }
       Number presetDuration; presetDuration = HEAT_TIMES[(String)settings.footWarmerTimer]
       if (duration != null && HEAT_TIMES.values().contains(duration.toInteger())) {
