@@ -1,10 +1,10 @@
 {
   "packageName": "Sleep Number Controller",
   "author": "Russ Vrolyk",
-  "version": "4.1.2",
+  "version": "4.1.3",
   "minimumHEVersion": "2.2.2",
-  "dateReleased": "2024-05-27",
-  "releaseNotes": "allow duration for core climate to be empty",
+  "dateReleased": "2024-07-09",
+  "releaseNotes": "adds sleepsensor capability and allows ranges for foot warmer and lighting",
   "documentationLink": "https://github.com/rvrolyk/SleepNumberController",
   "communityLink": "https://community.hubitat.com/t/release-sleep-number-controller-control-your-sleep-number-bed-and-use-it-for-presence/46454",
   "payPalUrl": "https://www.paypal.com/paypalme/rvrolyk",
