@@ -796,6 +796,8 @@ Side: ${side}
       if (getSettingB('createPresence') || !ucd) {
         msg.append('<li>').append(createDeviceLabel(newName, sPRESENCE)).append('</li>')
         types.add(sPRESENCE)
+        msg.append('<li>').append(createDeviceLabel(newName, sSLEEPSENSOR)).append('</li>')
+        types.add(sSLEEPSENSOR)
       }
       if (ucd) {
         if (getSettingB('createHeadControl')) {
@@ -842,6 +844,8 @@ static String createDeviceLabel(String name, String type) {
   switch (type) {
     case sPRESENCE:
       return name
+    case sSLEEPSENSOR:
+      return name
     case sHEAD:
       return name + ' Head'
     case sFOOT:
@@ -887,7 +891,7 @@ Map createBedPage(Map iparams) {
     devices.add(parent)
   }
   for (String type in (List<String>)params.types) {
-    if (type != sPRESENCE) {
+    if (type != sPRESENCE && type != sSLEEPSENSOR) {
       String childId = deviceId + '-' + type.replaceAll(sSPACE, sBLK)
       String driverType; driverType = sNL
       //noinspection GroovyFallthrough

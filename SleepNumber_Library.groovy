@@ -97,6 +97,7 @@ private void logError(String msg, Exception ex = null) {
 @Field static final String sOFF = 'off'
 @Field static final String sSWITCH = 'switch'
 @Field static final String sPRESENCE = 'presence'
+@Field static final String sSLEEPSENSOR = 'sleepSensor'
 @Field static final String sNM = 'name'
 @Field static final String sVL = 'value'
 @Field static final String sTYP = 'type'
