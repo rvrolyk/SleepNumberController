@@ -747,8 +747,9 @@ void componentSetLevel(DeviceWrapper device, Number level, Number duration) {
     case sOUTLET:
       logInfo 'Child type outlet does not support level'
       break
+    case sUNDERBEDLIGHT:
       String val
-      // tweaked to support all levels; same original 3 plus the full slider range - Low is <= 30, High >= 70, 30 < MED < 70
+      // Support all levels; e.g., the full slider range - Low is <= 30, High >= 70, 30 < MED < 70
       if ( level == 3 || level >= 70 ) {
         val = sHIGH
       } else if ( level == 2 || level > 30) {
@@ -772,7 +773,7 @@ void componentSetLevel(DeviceWrapper device, Number level, Number duration) {
       break
     case sFOOTWMR:
       String val
-      // tweaked to support all levels; same original 3 plus the full slider range - Low is <= 30, High >= 70, 30 < MED < 70
+      // Support all levels; e.g., the full slider range - Low is <= 30, High >= 70, 30 < MED < 70
       if ( level == 3 || level >= 70 ) {
         val = sHIGH
       } else if ( level == 2 || level > 30) {
