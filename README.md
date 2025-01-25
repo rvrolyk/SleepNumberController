@@ -12,17 +12,22 @@ A driver and app to allow management of Sleep Number flexible bases in Hubitat. 
 
 ## Manually (via import)
 
+### Install Library
+1. Under `For Developer`, open `Libaries code`
+2. Click `+ Add Library`
+3. Choose `Import` (from the three dot drop down on far right) and paste the URL: https://raw.githubusercontent.com/rvrolyk/SleepNumberController/refs/heads/master/SleepNumber_Library.groovy
+
 ### Install App
 
-1. Go to `<> Apps Code` menu
-1. Click `+ New App` 
-1. Hit `Import` at the top of the page and paste the URL: https://raw.githubusercontent.com/rvrolyk/SleepNumberController/master/SleepNumberController_App.groovy
+1. Under `For Developer`, open `Apps code` 
+1. Click `New App` 
+1. Choose `Import` (from the three dot drop down on far right) and paste the URL: https://raw.githubusercontent.com/rvrolyk/SleepNumberController/master/SleepNumberController_App.groovy
 
 ### Install Driver
 
-1. Go to `<> Drivers Code` menu
-1. Click `+ New Driver`
-1. Hit `Import` at the top of the page and paste the URL: https://raw.githubusercontent.com/rvrolyk/SleepNumberController/master/SleepNumberController_Driver.groovy
+1. Under `For Developer`, open `Drivers code`
+1. Click `New Driver`
+1. Choose `Import` (from the three dot drop down on far right) and paste the URL: https://raw.githubusercontent.com/rvrolyk/SleepNumberController/master/SleepNumberController_Driver.groovy
 
 ### Set up App
 
